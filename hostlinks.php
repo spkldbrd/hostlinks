@@ -1,10 +1,11 @@
 <?php
 /**
  * Plugin Name: Hostlinks
- * Plugin URI:  https://github.com/spkldbrd/hostlinks
+ * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
  * Version:     2.2.2
  * Author:      Digital Solution
+ * Author URI:  https://digitalsolution.com
  * License:     GPL2
  */
 

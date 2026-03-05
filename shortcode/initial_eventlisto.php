@@ -100,10 +100,10 @@ if ( $resulttotapplijobscnt > 0 ) {
 			$avgmg    = $t['mgcnt'] > 0 ? round( $t['mgpaid'] / $t['mgcnt'] ) : 0;
 			?>
 	<tr bgcolor="ffffe1">
-		<td><p><b><?php echo date("F Y", strtotime( $alldriver['eve_start'] ) )?></b><br/>
+		<td valign="top"><p><b><?php echo date("F Y", strtotime( $alldriver['eve_start'] ) )?></b><br/>
 		<?php echo "{$t['paid']} / {$t['cnt']} / {$avg}"; ?></p></td>
-		<td><p>W&nbsp;<?php echo "{$t['wrpaid']} / {$t['wrcnt']} / {$avgwr}"; ?></p></td>
-		<td><p>M&nbsp;<?php echo "{$t['mgpaid']} / {$t['mgcnt']} / {$avgmg}"; ?></p></td>
+		<td valign="top"><p>W&nbsp;<?php echo "{$t['wrpaid']} / {$t['wrcnt']} / {$avgwr}"; ?></p></td>
+		<td valign="top"><p>M&nbsp;<?php echo "{$t['mgpaid']} / {$t['mgcnt']} / {$avgmg}"; ?></p></td>
 		<td></td><td></td>
 	</tr>
 	<tr>

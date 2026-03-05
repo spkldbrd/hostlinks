@@ -93,11 +93,11 @@ class Hostlinks_Updater {
 		$current_version  = $transient->checked[ $this->plugin_slug ] ?? HOSTLINKS_VERSION;
 
 		if ( version_compare( $remote_version, $current_version, '>' ) ) {
-			// Use the direct archive zip URL — its root folder is "{repo}-{tag}"
-			// (e.g. "hostlinks-2.0.8") which is a predictable pattern our
-			// fix_source_dir can detect reliably, unlike the API zipball URL
-			// which extracts to "{user}-{repo}-{commit_hash}".
-			$package = "https://github.com/{$this->github_user}/{$this->github_repo}/archive/refs/tags/{$remote_version}.zip";
+			// Prefer the uploaded hostlinks.zip release asset — it already has
+			// "hostlinks/" as its root folder so no renaming is needed.
+			// Fall back to the archive URL for older releases that pre-date
+			// the GitHub Actions workflow (fix_source_dir handles renaming there).
+			$package = $this->get_package_url( $release, $remote_version );
 
 			$transient->response[ $this->plugin_slug ] = (object) array(
 				'id'          => $this->plugin_slug,
@@ -132,7 +132,7 @@ class Hostlinks_Updater {
 		}
 
 		$version       = $this->clean_version( $release->tag_name );
-		$download_link = "https://github.com/{$this->github_user}/{$this->github_repo}/archive/refs/tags/{$version}.zip";
+		$download_link = $this->get_package_url( $release, $version );
 
 		return (object) array(
 			'name'          => 'Hostlinks',
@@ -146,6 +146,29 @@ class Hostlinks_Updater {
 				'changelog'   => nl2br( esc_html( $release->body ?? '' ) ),
 			),
 		);
+	}
+
+	// ── Resolve the best download URL for a release ─────────────────────────
+	//
+	// Prefers the uploaded hostlinks.zip asset (built by GitHub Actions with
+	// the correct "hostlinks/" root folder). Falls back to the predictable
+	// archive URL for older releases that pre-date the Actions workflow.
+
+	private function get_package_url( $release, $version ) {
+		if ( ! empty( $release->assets ) ) {
+			foreach ( $release->assets as $asset ) {
+				if (
+					isset( $asset->name, $asset->browser_download_url ) &&
+					$asset->name === $this->github_repo . '.zip' &&
+					$asset->state === 'uploaded'
+				) {
+					return $asset->browser_download_url;
+				}
+			}
+		}
+
+		// Fallback: archive URL (folder will be renamed by fix_source_dir)
+		return "https://github.com/{$this->github_user}/{$this->github_repo}/archive/refs/tags/{$version}.zip";
 	}
 
 	// ── Hook: rename GitHub's extracted folder to the correct plugin slug ────

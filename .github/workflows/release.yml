@@ -1,0 +1,26 @@
+name: Build Release Asset
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout into correctly-named folder
+        uses: actions/checkout@v4
+        with:
+          path: hostlinks
+
+      - name: Create hostlinks.zip with correct root folder
+        run: |
+          zip -r hostlinks.zip hostlinks/ \
+            --exclude "hostlinks/.git/*" \
+            --exclude "hostlinks/.github/*"
+
+      - name: Upload hostlinks.zip to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: hostlinks.zip

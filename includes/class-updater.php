@@ -38,6 +38,7 @@ class Hostlinks_Updater {
 
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
 		add_filter( 'plugins_api',                           array( $this, 'plugin_info' ), 10, 3 );
+		add_filter( 'upgrader_source_selection',             array( $this, 'fix_source_dir' ), 10, 4 );
 		add_action( 'upgrader_process_complete',             array( $this, 'clear_cache' ), 10, 2 );
 		add_action( 'admin_post_hostlinks_force_check',      array( $this, 'handle_force_check' ) );
 	}
@@ -135,6 +136,45 @@ class Hostlinks_Updater {
 				'description' => 'Event management tool for tracking hosted events, marketers, instructors, and types.',
 				'changelog'   => nl2br( esc_html( $release->body ?? '' ) ),
 			),
+		);
+	}
+
+	// ── Hook: rename GitHub's auto-generated folder to the correct slug ─────
+	//
+	// GitHub zipballs extract to a folder named "{user}-{repo}-{hash}" rather
+	// than the plugin slug. WordPress would treat that as a brand-new plugin
+	// instead of an update. This filter renames the extracted folder to the
+	// correct slug (e.g. "hostlinks") before WordPress copies it into place.
+
+	public function fix_source_dir( $source, $remote_source, $upgrader, $hook_extra ) {
+		global $wp_filesystem;
+
+		// Only act when this is an update for our plugin
+		if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== $this->plugin_slug ) {
+			return $source;
+		}
+
+		$correct_slug = dirname( $this->plugin_slug );  // e.g. "hostlinks"
+		$correct_dir  = trailingslashit( $remote_source ) . $correct_slug;
+
+		// If the folder is already correctly named, nothing to do
+		if ( trailingslashit( $source ) === trailingslashit( $correct_dir ) ) {
+			return $source;
+		}
+
+		// Rename the extracted folder to the correct slug
+		if ( $wp_filesystem->move( $source, $correct_dir, true ) ) {
+			return $correct_dir;
+		}
+
+		// If the rename failed, surface a WP_Error so the update is aborted
+		// cleanly rather than installing under the wrong folder name
+		return new WP_Error(
+			'hostlinks_rename_failed',
+			sprintf(
+				'Could not rename extracted plugin folder to <code>%s</code>. Update aborted.',
+				esc_html( $correct_slug )
+			)
 		);
 	}
 

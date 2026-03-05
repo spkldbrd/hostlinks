@@ -6,7 +6,6 @@ if ( ! is_user_logged_in() ) {
 	exit;
 }
 // CSS is enqueued via class-assets.php (wp_enqueue_style) — no inline tags needed.
-<?php
 
 $table11 = $wpdb->prefix . 'event_details_list';
 $table12 = $wpdb->prefix . 'event_type';

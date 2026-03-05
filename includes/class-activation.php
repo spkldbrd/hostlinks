@@ -17,13 +17,13 @@ class Hostlinks_Activation {
 	// wp_options key used to persist the conflict flag across page loads
 	const CONFLICT_OPTION = 'hostlinks_theme_conflict';
 
-	// Strings that only appear in the original theme-embedded version
+	// Strings that uniquely identify the original theme-embedded Hostlinks code.
+	// Intentionally avoids generic slugs like 'booking-menu' that other plugins might use.
 	private static $fingerprints = array(
-		'booking-menu',
-		'eventlisto',
-		'types-menu',
-		'marketer-menu',
-		'istructor-menu',
+		'oldeventlisto',    // unique shortcode name
+		'istructor-menu',   // typo-slug unique to this codebase
+		'eventlisto',       // primary shortcode name
+		'types-menu',       // combined with the others, specific enough
 	);
 
 	// ── Called from register_activation_hook ────────────────────────────────

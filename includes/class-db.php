@@ -11,10 +11,24 @@ class Hostlinks_DB {
 	 */
 	public static function maybe_upgrade() {
 		$installed = get_option( 'hostlinks_db_version', '0' );
-		if ( version_compare( $installed, HOSTLINKS_DB_VERSION, '<' ) ) {
-			self::create_tables();
-			update_option( 'hostlinks_db_version', HOSTLINKS_DB_VERSION );
+		if ( ! version_compare( $installed, HOSTLINKS_DB_VERSION, '<' ) ) {
+			return;
 		}
+
+		// Always run dbDelta to add missing columns / tables.
+		self::create_tables();
+
+		// v1.1 — rename misspelled column eve_trainner_url → eve_trainer_url
+		if ( version_compare( $installed, '1.1', '<' ) ) {
+			global $wpdb;
+			$table = $wpdb->prefix . 'event_details_list';
+			$cols  = $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_trainner_url' ) );
+			if ( ! empty( $cols ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` CHANGE `eve_trainner_url` `eve_trainer_url` text NOT NULL DEFAULT ''" );
+			}
+		}
+
+		update_option( 'hostlinks_db_version', HOSTLINKS_DB_VERSION );
 	}
 
 	public static function create_tables() {
@@ -34,7 +48,7 @@ class Hostlinks_DB {
 			eve_marketer int(11) NOT NULL DEFAULT 0,
 			eve_host_url text NOT NULL,
 			eve_roster_url text NOT NULL,
-			eve_trainner_url text NOT NULL,
+			eve_trainer_url text NOT NULL,
 			eve_sign_in_url text NOT NULL,
 			eve_instructor int(11) NOT NULL DEFAULT 0,
 			eve_tot_date varchar(100) NOT NULL DEFAULT '',

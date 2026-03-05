@@ -24,24 +24,24 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		$eve_marketer     = intval( $_POST['eve_marketer'] );
 		$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'] ) );
 		$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'] ) );
-		$eve_trainner_url = esc_url_raw( trim( $_POST['eve_trainner_url'] ) );
+		$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'] ) );
 		$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'] ) );
 		$eve_instructor   = intval( $_POST['eve_instructor'] );
 		update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
 		$wpdb->insert(
 			$table11,
 			array(
-				'eve_location'    => $eve_location,
-				'eve_paid'        => $eve_paid,
-				'eve_free'        => $eve_free,
-				'eve_start'       => $eve_start,
-				'eve_end'         => $eve_end,
-				'eve_type'        => $eve_type,
-				'eve_zoom'        => $eve_zoom,
-				'eve_marketer'    => $eve_marketer,
-				'eve_host_url'    => $eve_host_url,
-				'eve_roster_url'  => $eve_roster_url,
-				'eve_trainner_url'=> $eve_trainner_url,
+				'eve_location'   => $eve_location,
+				'eve_paid'       => $eve_paid,
+				'eve_free'       => $eve_free,
+				'eve_start'      => $eve_start,
+				'eve_end'        => $eve_end,
+				'eve_type'       => $eve_type,
+				'eve_zoom'       => $eve_zoom,
+				'eve_marketer'   => $eve_marketer,
+				'eve_host_url'   => $eve_host_url,
+				'eve_roster_url' => $eve_roster_url,
+				'eve_trainer_url'=> $eve_trainer_url,
 				'eve_sign_in_url' => $eve_sign_in_url,
 				'eve_instructor'  => $eve_instructor,
 				'eve_tot_date'    => $eve_tot_date,
@@ -57,7 +57,6 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	$all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
 	$all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
 	?>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
 <div class="wrap">
   <h2 id="add-new-user">Add New Event</h2>
   <div id="ajax-response"></div>
@@ -117,8 +116,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <td><input type="text" value="#" id="eve_roster_url" name="eve_roster_url" required></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_trainner_url">TRAINER URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="#" id="eve_trainner_url" name="eve_trainner_url" required></td>
+        <th><label for="eve_trainer_url">TRAINER URL <span class="description">(required)</span></label></th>
+        <td><input type="text" value="#" id="eve_trainer_url" name="eve_trainer_url" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_sign_in_url">Sign In URL <span class="description">(required)</span></label></th>
@@ -141,10 +140,6 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
     </p>
   </form>
 </div>
-<link rel="stylesheet" type="text/css" href="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/css/daterangepicker.css"/>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/jquery/latest/jquery.min.js"></script>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.1/moment.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/js/daterangepicker.js"></script>
 <script type="text/javascript">
 jQuery(function() {
   jQuery('input[name="evedate"]').daterangepicker({
@@ -175,24 +170,24 @@ jQuery(function() {
 		$eve_marketer     = intval( $_POST['eve_marketer'] );
 		$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'] ) );
 		$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'] ) );
-		$eve_trainner_url = esc_url_raw( trim( $_POST['eve_trainner_url'] ) );
+		$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'] ) );
 		$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'] ) );
 		$eve_instructor   = intval( $_POST['eve_instructor'] );
 		update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
 		$wpdb->update(
 			$table11,
 			array(
-				'eve_location'    => $eve_location,
-				'eve_paid'        => $eve_paid,
-				'eve_free'        => $eve_free,
-				'eve_start'       => $eve_start,
-				'eve_end'         => $eve_end,
-				'eve_type'        => $eve_type,
-				'eve_zoom'        => $eve_zoom,
-				'eve_marketer'    => $eve_marketer,
-				'eve_host_url'    => $eve_host_url,
-				'eve_roster_url'  => $eve_roster_url,
-				'eve_trainner_url'=> $eve_trainner_url,
+				'eve_location'   => $eve_location,
+				'eve_paid'       => $eve_paid,
+				'eve_free'       => $eve_free,
+				'eve_start'      => $eve_start,
+				'eve_end'        => $eve_end,
+				'eve_type'       => $eve_type,
+				'eve_zoom'       => $eve_zoom,
+				'eve_marketer'   => $eve_marketer,
+				'eve_host_url'   => $eve_host_url,
+				'eve_roster_url' => $eve_roster_url,
+				'eve_trainer_url'=> $eve_trainer_url,
 				'eve_sign_in_url' => $eve_sign_in_url,
 				'eve_instructor'  => $eve_instructor,
 				'eve_tot_date'    => $eve_tot_date,
@@ -210,7 +205,6 @@ jQuery(function() {
 	$all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
 	$all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
 	?>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
 <div class="wrap">
   <h2 id="add-new-user">Update Event</h2>
   <?php echo $sucessmsgnew; ?>
@@ -268,8 +262,8 @@ jQuery(function() {
         <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_roster_url ?? '' ); ?>" id="eve_roster_url" name="eve_roster_url" required></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_trainner_url">TRAINER URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_trainner_url ?? '' ); ?>" id="eve_trainner_url" name="eve_trainner_url" required></td>
+        <th><label for="eve_trainer_url">TRAINER URL <span class="description">(required)</span></label></th>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_trainer_url ?? '' ); ?>" id="eve_trainer_url" name="eve_trainer_url" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_sign_in_url">Sign In URL <span class="description">(required)</span></label></th>
@@ -292,10 +286,6 @@ jQuery(function() {
     </p>
   </form>
 </div>
-<link rel="stylesheet" type="text/css" href="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/css/daterangepicker.css"/>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/jquery/latest/jquery.min.js"></script>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.1/moment.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/js/daterangepicker.js"></script>
 <script type="text/javascript">
 jQuery(function() {
   jQuery('input[name="evedate"]').daterangepicker({
@@ -357,23 +347,23 @@ jQuery(function() {
 						$eve_marketer     = intval( $_POST['eve_marketer'][ $key ] );
 						$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'][ $key ] ) );
 						$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'][ $key ] ) );
-						$eve_trainner_url = esc_url_raw( trim( $_POST['eve_trainner_url'][ $key ] ) );
+						$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'][ $key ] ) );
 						$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'][ $key ] ) );
 						$eve_instructor   = intval( $_POST['eve_instructor'][ $key ] );
 						$wpdb->update(
 							$table11,
 							array(
-								'eve_location'    => $eve_location,
-								'eve_paid'        => $eve_paid,
-								'eve_free'        => $eve_free,
-								'eve_start'       => $eve_start,
-								'eve_end'         => $eve_end,
-								'eve_type'        => $eve_type,
-								'eve_zoom'        => $eve_zoom,
-								'eve_marketer'    => $eve_marketer,
-								'eve_host_url'    => $eve_host_url,
-								'eve_roster_url'  => $eve_roster_url,
-								'eve_trainner_url'=> $eve_trainner_url,
+								'eve_location'   => $eve_location,
+								'eve_paid'       => $eve_paid,
+								'eve_free'       => $eve_free,
+								'eve_start'      => $eve_start,
+								'eve_end'        => $eve_end,
+								'eve_type'       => $eve_type,
+								'eve_zoom'       => $eve_zoom,
+								'eve_marketer'   => $eve_marketer,
+								'eve_host_url'   => $eve_host_url,
+								'eve_roster_url' => $eve_roster_url,
+								'eve_trainer_url'=> $eve_trainer_url,
 								'eve_sign_in_url' => $eve_sign_in_url,
 								'eve_instructor'  => $eve_instructor,
 								'eve_tot_date'    => $eve_tot_date,
@@ -414,7 +404,6 @@ jQuery(function() {
 	);
 	$tot1 = count( $all_pending_bookings );
 	?>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
 <div id="wpbody">
 <?php echo $sucessmsgnew; ?>
 <div tabindex="0" id="wpbody-content" class="ddddd">
@@ -525,7 +514,7 @@ jQuery(function() {
             </td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" required style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" required style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainner_url'] ?? '' ); ?>" name="eve_trainner_url[]" required style="width:140px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>" name="eve_trainer_url[]" required style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_sign_in_url'] ?? '' ); ?>" name="eve_sign_in_url[]" required style="width:140px;"></td>
             <td>
               <select name="eve_instructor[]" class="evetype" required style="width:100px;">
@@ -552,9 +541,6 @@ jQuery(function() {
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
 <script type="text/javascript" src="https://cdn.datatables.net/v/dt/jszip-2.5.0/dt-1.12.1/af-2.4.0/b-2.2.3/b-colvis-2.2.3/b-html5-2.2.3/b-print-2.2.3/cr-1.5.6/date-1.1.2/fc-4.1.0/fh-3.2.4/kt-2.7.0/r-2.3.0/rg-1.2.0/rr-1.2.8/sc-2.0.7/sb-1.3.4/sp-2.0.2/sl-1.4.0/sr-1.1.1/datatables.min.js"></script>
-<link rel="stylesheet" type="text/css" href="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/css/daterangepicker.css"/>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.1/moment.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/js/daterangepicker.js"></script>
 <script type="text/javascript">
 jQuery(function() {
   jQuery('.eventenddertot').daterangepicker({

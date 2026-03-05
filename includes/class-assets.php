@@ -11,8 +11,16 @@ class Hostlinks_Assets {
 	}
 
 	public function enqueue_frontend() {
+		global $post;
+		// Only load Bootstrap on pages that actually contain a Hostlinks shortcode.
+		if ( ! $post instanceof WP_Post ) {
+			return;
+		}
+		if ( ! has_shortcode( $post->post_content, 'eventlisto' ) &&
+		     ! has_shortcode( $post->post_content, 'oldeventlisto' ) ) {
+			return;
+		}
 		// Only Bootstrap is needed for the frontend event table layout (.card, .col-lg-12).
-		// icons.min.css and app.min.css are admin-dashboard assets and add unnecessary weight.
 		wp_enqueue_style(
 			'hostlinks-bootstrap',
 			HOSTLINKS_PLUGIN_URL . 'assets/css/bootstrap.min.css',

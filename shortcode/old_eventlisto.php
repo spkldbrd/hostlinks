@@ -2,19 +2,12 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 global $wpdb, $post;
 
-if ( isset( $_POST['applyfilter'] ) ) {
-	$thispage   = get_permalink();
-	$chooseyear = (int) $_POST['chooseyear'];
-	wp_redirect( $thispage . '?syear=' . $chooseyear );
-	exit;
-}
-
 $table11 = $wpdb->prefix . 'event_details_list';
 $table12 = $wpdb->prefix . 'event_type';
 $table13 = $wpdb->prefix . 'event_marketer';
 $table14 = $wpdb->prefix . 'event_instructor';
 
-$currentYear = (int) date('Y');
+$currentYear = (int) wp_date('Y');
 
 $selectedYear = ( isset( $_GET['syear'] ) && $_GET['syear'] !== '' )
 	? (int) $_GET['syear']
@@ -64,34 +57,35 @@ foreach ( $all_pending_bookings as $ev ) {
 <div class="alignwide">
 	<div class="col-lg-12">
 		<div class="card">
-<form method="post" action="" id="posts-filter">
-  <div class="tablenav-pages">
-    <table border="0" cellspacing="0" cellpadding="30" class="listtable" width="100%"><tr>
-      <td align="left">
-        Filter By Year:
-        <select name="chooseyear" class="mosifyy">
-          <option value="">Choose Year</option>
-          <?php
-          $yearStart = 2022;
-          $yearEnd   = $currentYear + 1;
-          for ( $yr = $yearEnd; $yr >= $yearStart; $yr-- ) {
-              $sel = ( $yr === $selectedYear ) ? 'selected' : '';
-              echo "<option value=\"$yr\" $sel>$yr</option>";
-          }
-          ?>
-        </select>
-        <input type="submit" value="Apply Filter" class="button action powerup" name="applyfilter">
-      </td>
-    </tr></table>
-  </div>
-</form>
+<div class="tablenav-pages" style="margin-bottom:10px;">
+  <table border="0" cellspacing="0" cellpadding="30" class="listtable" width="100%"><tr>
+    <td align="left">
+      Filter By Year:
+      <select id="hl-old-chooseyear" class="mosifyy">
+        <?php
+        $yearStart = 2022;
+        $yearEnd   = $currentYear + 1;
+        for ( $yr = $yearEnd; $yr >= $yearStart; $yr-- ) {
+            $sel = ( $yr === $selectedYear ) ? 'selected' : '';
+            echo "<option value=\"$yr\" $sel>$yr</option>";
+        }
+        ?>
+      </select>
+    </td>
+  </tr></table>
+</div>
+<script>
+document.getElementById('hl-old-chooseyear').addEventListener('change', function() {
+    window.location.href = '<?php echo esc_js( get_permalink() ); ?>?syear=' + this.value;
+});
+</script>
 
 		<div class="card-body">
 <table class="castor" valign="top" cellspacing="0" cellpadding="8" border="0" bgcolor="ffffff" align="center">
 <tr>
 <td><span class="zoomyes"> color Key:zoom</span> <span class="management">mgmt</span></td>
 <td></td><td></td><td></td>
-<td><?php echo date("m/d", strtotime( get_option('last_data_updation', true) ) )?></td>
+<td><?php echo wp_date("m/d", strtotime( get_option('last_data_updation', '') ?: 'now' ) )?></td>
 </tr>
 </table>
 <table valign="top" cellspacing="0" cellpadding="8" border="0" bgcolor="ffffff" align="center">
@@ -104,6 +98,10 @@ $today  = new DateTime();
 if ( $resulttotapplijobscnt > 0 ) {
 
 	foreach ( $all_pending_bookings as $alldriver ) {
+
+		// Cache timestamps once per row (used multiple times for date formatting)
+		$ts_start = strtotime( $alldriver['eve_start'] );
+		$ts_end   = strtotime( $alldriver['eve_end'] );
 
 		$type_name       = trim( $alldriver['event_type_name']       ?? '' );
 		$marketer_name   = $alldriver['event_marketer_name']   ?? '';
@@ -124,7 +122,7 @@ if ( $resulttotapplijobscnt > 0 ) {
 			$avgmg = $t['mgcnt'] > 0 ? round( $t['mgpaid'] / $t['mgcnt'] ) : 0;
 			?>
 	<tr bgcolor="ffffe1">
-		<td valign="bottom"><p><b><?php echo date("F Y", strtotime( $alldriver['eve_start'] ) )?></b><br/>
+		<td valign="bottom"><p><b><?php echo wp_date("F Y", $ts_start); ?></b><br/>
 		<?php echo "{$t['paid']} / {$t['cnt']} / {$avg}"; ?></p></td>
 		<td valign="bottom"><p>W&nbsp;<?php echo "{$t['wrpaid']} / {$t['wrcnt']} / {$avgwr}"; ?></p></td>
 		<td valign="bottom"><p>M&nbsp;<?php echo "{$t['mgpaid']} / {$t['mgcnt']} / {$avgmg}"; ?></p></td>
@@ -134,67 +132,44 @@ if ( $resulttotapplijobscnt > 0 ) {
 			<?php
 		}
 
+		// ── Compute per-row values once (shared by both cell branches) ────
+		$fsarray = explode( '-', $alldriver['eve_start'] );
+		$lsarray = explode( '-', $alldriver['eve_end'] );
+		if ( $fsarray[0] == $lsarray[0] ) {
+			if ( $fsarray[1] == $lsarray[1] ) {
+				$date_range = wp_date( "F", $ts_start ) . '&nbsp;' . $fsarray[2] . '-' . $lsarray[2] . ',&nbsp;' . $fsarray[0];
+			} else {
+				$date_range = wp_date( "M", $ts_start ) . ',' . $fsarray[2] . '-' . wp_date( "M", $ts_end ) . ',' . $lsarray[2] . ',&nbsp;' . $fsarray[0];
+			}
+		} else {
+			$date_range = wp_date( "M", $ts_start ) . ',' . $fsarray[2] . ',' . $fsarray[0] . '-' . wp_date( "M", $ts_end ) . ',' . $lsarray[2] . ',' . $lsarray[0];
+		}
+		$date2 = new DateTime( $alldriver['eve_start'] );
+		$date3 = new DateTime( $alldriver['eve_end'] );
+		if ( $today > $date2 ) {
+			$days_label = ( $today > $date3 ) ? 'The Event is History' : 'Event Started';
+		} else {
+			$days_label = $today->diff( $date2 )->days . ' days to event';
+		}
+
 		// ── Event cell ───────────────────────────────────────────────────
 		if ( $tt % 5 == 0 ) { ?>
 <td>
 <span class="zoom<?php echo trim( strtolower( $alldriver['eve_zoom'] ) );?>"><a href="<?php echo $alldriver['eve_host_url']; ?>" target="_blank"><?php echo $alldriver['eve_location']; ?></a> <?php echo $alldriver['eve_paid']; ?> + <?php echo $alldriver['eve_free']; ?> <?php echo esc_html( $marketer_name );?></span><br/>
-<a href="<?php echo $alldriver['eve_roster_url']; ?>" target="_blank" class="rosterlink">Roster</a> | <a href="<?php echo $alldriver['eve_trainner_url']; ?>" target="_blank" class="trainerlink">TR</a> | <a href="<?php echo $alldriver['eve_sign_in_url']; ?>" target="_blank" class="signinurllink">SI</a><br/>
-<?php
-			$fsarray = explode( '-', $alldriver['eve_start'] );
-			$lsarray = explode( '-', $alldriver['eve_end'] );
-			if ( $fsarray[0] == $lsarray[0] ) {
-				if ( $fsarray[1] == $lsarray[1] ) {
-					echo date( "F", strtotime( $alldriver['eve_start'] ) ); ?><?php echo '&nbsp;' . $fsarray[2] . '-' . $lsarray[2];
-				} else {
-					echo date( "M", strtotime( $alldriver['eve_start'] ) ); ?><?php echo ',' . $fsarray[2] . '-'; ?><?php echo date( "M", strtotime( $alldriver['eve_end'] ) ); ?><?php echo ',' . $lsarray[2];
-				}
-				echo ',&nbsp;' . $fsarray[0];
-			} else {
-				echo date( "M", strtotime( $alldriver['eve_start'] ) ); ?><?php echo ',' . $fsarray[2] . ',' . $fsarray[0] . '-'; ?><?php echo date( "M", strtotime( $alldriver['eve_end'] ) ); ?><?php echo ',' . $lsarray[2] . ',' . $lsarray[0];
-			}
-			?>
-<br/>
+<a href="<?php echo $alldriver['eve_roster_url']; ?>" target="_blank" class="rosterlink">Roster</a> | <a href="<?php echo $alldriver['eve_trainer_url']; ?>" target="_blank" class="trainerlink">TR</a> | <a href="<?php echo $alldriver['eve_sign_in_url']; ?>" target="_blank" class="signinurllink">SI</a><br/>
+<?php echo $date_range; ?><br/>
 <span class="<?php echo trim( strtolower( $type_name ) );?>">Instructor: <?php echo esc_html( $instructor_name );?></span><br/>
-<?php
-			$date2 = new DateTime( $alldriver['eve_start'] );
-			$date3 = new DateTime( $alldriver['eve_end'] );
-			if ( $today > $date2 ) {
-				echo ( $today > $date3 ) ? 'The Event is History' : 'Event Started';
-			} else {
-				echo $today->diff( $date2 )->days . ' days to event';
-			}
-			?>
+<?php echo $days_label; ?>
 </td>
 </tr><tr>
 		<?php
 		} else { ?>
 <td>
 <span class="zoom<?php echo trim( strtolower( $alldriver['eve_zoom'] ) );?>"><a href="<?php echo $alldriver['eve_host_url']; ?>" target="_blank"><?php echo $alldriver['eve_location']; ?></a> <?php echo $alldriver['eve_paid']; ?>+<?php echo $alldriver['eve_free']; ?> <?php echo esc_html( $marketer_name );?></span><br/>
-<a href="<?php echo $alldriver['eve_roster_url']; ?>" target="_blank" class="rosterlink">Roster</a> | <a href="<?php echo $alldriver['eve_trainner_url']; ?>" target="_blank" class="trainerlink">TR</a> | <a href="<?php echo $alldriver['eve_sign_in_url']; ?>" target="_blank" class="signinurllink">SI</a><br/>
-<?php
-			$fsarray = explode( '-', $alldriver['eve_start'] );
-			$lsarray = explode( '-', $alldriver['eve_end'] );
-			if ( $fsarray[0] == $lsarray[0] ) {
-				if ( $fsarray[1] == $lsarray[1] ) {
-					echo date( "F", strtotime( $alldriver['eve_start'] ) ); ?><?php echo '&nbsp;' . $fsarray[2] . '-' . $lsarray[2];
-				} else {
-					echo date( "M", strtotime( $alldriver['eve_start'] ) ); ?><?php echo ',' . $fsarray[2] . '-'; ?><?php echo date( "M", strtotime( $alldriver['eve_end'] ) ); ?><?php echo ',' . $lsarray[2];
-				}
-				echo ',&nbsp;' . $fsarray[0];
-			} else {
-				echo date( "M", strtotime( $alldriver['eve_start'] ) ); ?><?php echo ',' . $fsarray[2] . ',' . $fsarray[0] . '-'; ?><?php echo date( "M", strtotime( $alldriver['eve_end'] ) ); ?><?php echo ',' . $lsarray[2] . ',' . $lsarray[0];
-			}
-			?><br/>
+<a href="<?php echo $alldriver['eve_roster_url']; ?>" target="_blank" class="rosterlink">Roster</a> | <a href="<?php echo $alldriver['eve_trainer_url']; ?>" target="_blank" class="trainerlink">TR</a> | <a href="<?php echo $alldriver['eve_sign_in_url']; ?>" target="_blank" class="signinurllink">SI</a><br/>
+<?php echo $date_range; ?><br/>
 <span class="<?php echo trim( strtolower( $type_name ) );?>">Instructor: <?php echo esc_html( $instructor_name );?></span><br/>
-<?php
-			$date2 = new DateTime( $alldriver['eve_start'] );
-			$date3 = new DateTime( $alldriver['eve_end'] );
-			if ( $today > $date2 ) {
-				echo ( $today > $date3 ) ? 'The Event is History' : 'Event Started';
-			} else {
-				echo $today->diff( $date2 )->days . ' days to event';
-			}
-			?>
+<?php echo $days_label; ?>
 </td>
 		<?php
 		}

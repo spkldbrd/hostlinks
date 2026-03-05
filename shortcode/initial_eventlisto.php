@@ -5,11 +5,7 @@ if ( ! is_user_logged_in() ) {
 	wp_redirect( home_url() );
 	exit;
 }
-?>
-<link href="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/css/bootstrap.min.css" id="bootstrap-style" rel="stylesheet" type="text/css" />
-<link href="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/css/icons.min.css" rel="stylesheet" type="text/css" />
-<link href="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/css/app.min.css" id="app-style" rel="stylesheet" type="text/css" />
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
+// CSS is enqueued via class-assets.php (wp_enqueue_style) — no inline tags needed.
 <?php
 
 $table11 = $wpdb->prefix . 'event_details_list';
@@ -142,7 +138,7 @@ if ( $resulttotapplijobscnt > 0 ) {
 			if ( $today > $date2 ) {
 				echo ( $today > $date3 ) ? 'The Event is History' : 'Event Started';
 			} else {
-				echo $today->diff($date2)->days . ' days to event';
+				echo $today->diff( $date2 )->days . ' days to event';
 			}
 			?>
 </td>
@@ -173,10 +169,7 @@ if ( $resulttotapplijobscnt > 0 ) {
 			if ( $today > $date2 ) {
 				echo ( $today > $date3 ) ? 'The Event is History' : 'Event Started';
 			} else {
-				$date11 = date_create( $alldriver['eve_start'] );
-				$date21 = date_create( date('Y-m-d') );
-				$diff   = date_diff( $date11, $date21 );
-				echo $diff->format("%a days") . ' to event';
+				echo $today->diff( $date2 )->days . ' days to event';
 			}
 			?>
 </td>
@@ -193,17 +186,6 @@ if ( $resulttotapplijobscnt > 0 ) {
 		</div>
 	</div>
 </div>
-
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/jquery/jquery.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/bootstrap/js/bootstrap.bundle.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/metismenu/metisMenu.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/simplebar/simplebar.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/node-waves/waves.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/waypoints/lib/jquery.waypoints.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/jquery.counterup/jquery.counterup.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/moment/min/moment.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/jquery-ui-dist/jquery-ui.min.js"></script>
-<script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/js/app.js"></script>
 <style>
 .card-body table{width:100%;}
 td p{margin-bottom:0px;}

@@ -11,22 +11,12 @@ class Hostlinks_Assets {
 	}
 
 	public function enqueue_frontend() {
+		// Only Bootstrap is needed for the frontend event table layout (.card, .col-lg-12).
+		// icons.min.css and app.min.css are admin-dashboard assets and add unnecessary weight.
 		wp_enqueue_style(
 			'hostlinks-bootstrap',
 			HOSTLINKS_PLUGIN_URL . 'assets/css/bootstrap.min.css',
 			array(),
-			HOSTLINKS_VERSION
-		);
-		wp_enqueue_style(
-			'hostlinks-icons',
-			HOSTLINKS_PLUGIN_URL . 'assets/css/icons.min.css',
-			array(),
-			HOSTLINKS_VERSION
-		);
-		wp_enqueue_style(
-			'hostlinks-app',
-			HOSTLINKS_PLUGIN_URL . 'assets/css/app.min.css',
-			array( 'hostlinks-bootstrap' ),
 			HOSTLINKS_VERSION
 		);
 	}

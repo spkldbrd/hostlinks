@@ -62,7 +62,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
     <table class="form-table"><tbody>
       <tr class="form-field">
         <th><label for="first_name">Name Of the Type <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->event_type_name ); ?>" id="first_name" name="first_name" required onkeypress="return alphabetssonly(event)"></td>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->event_type_name ?? '' ); ?>" id="first_name" name="first_name" required onkeypress="return alphabetssonly(event)"></td>
       </tr>
       <tr class="form-field">
         <th><label for="lat_long">Type Color <span class="description">(required)</span></label></th>

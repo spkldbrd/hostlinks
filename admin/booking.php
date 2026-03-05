@@ -173,19 +173,19 @@ jQuery(function() {
     <table class="form-table"><tbody>
       <tr class="form-field">
         <th><label for="eve_location">Location <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_location ); ?>" id="eve_location" name="eve_location" required></td>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_location ?? '' ); ?>" id="eve_location" name="eve_location" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_paid">Paid <span class="description">(required)</span></label></th>
-        <td><input type="number" value="<?php echo esc_attr( $bokdetsx->eve_paid ); ?>" id="eve_paid" name="eve_paid" required></td>
+        <td><input type="number" value="<?php echo esc_attr( $bokdetsx->eve_paid ?? '' ); ?>" id="eve_paid" name="eve_paid" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_free">Free <span class="description">(required)</span></label></th>
-        <td><input type="number" value="<?php echo esc_attr( $bokdetsx->eve_free ); ?>" id="eve_free" name="eve_free" required></td>
+        <td><input type="number" value="<?php echo esc_attr( $bokdetsx->eve_free ?? '' ); ?>" id="eve_free" name="eve_free" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="evedate">Eve Date <span class="description">(required)</span></label></th>
-        <td><input type="text" name="evedate" class="sentinal inputfilder" value="<?php echo esc_attr( $bokdetsx->eve_tot_date ); ?>" id="eventenddertot" required></td>
+        <td><input type="text" name="evedate" class="sentinal inputfilder" value="<?php echo esc_attr( $bokdetsx->eve_tot_date ?? '' ); ?>" id="eventenddertot" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_type">Type <span class="description">(required)</span></label></th>
@@ -219,19 +219,19 @@ jQuery(function() {
       </tr>
       <tr class="form-field">
         <th><label for="eve_host_url">HOST URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_host_url ); ?>" id="eve_host_url" name="eve_host_url" required></td>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_host_url ?? '' ); ?>" id="eve_host_url" name="eve_host_url" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_roster_url">ROSTER URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_roster_url ); ?>" id="eve_roster_url" name="eve_roster_url" required></td>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_roster_url ?? '' ); ?>" id="eve_roster_url" name="eve_roster_url" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_trainner_url">TRAINER URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_trainner_url ); ?>" id="eve_trainner_url" name="eve_trainner_url" required></td>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_trainner_url ?? '' ); ?>" id="eve_trainner_url" name="eve_trainner_url" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_sign_in_url">Sign In URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_sign_in_url ); ?>" id="eve_sign_in_url" name="eve_sign_in_url" required></td>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_sign_in_url ?? '' ); ?>" id="eve_sign_in_url" name="eve_sign_in_url" required></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_instructor">Instructor <span class="description">(required)</span></label></th>
@@ -441,14 +441,14 @@ jQuery(function() {
           <tr class="alternate" id="user-<?php echo $alldriver['eve_id']; ?>">
             <th class="check-column"><input type="checkbox" value="<?php echo $alldriver['eve_id']; ?>" class="administrator splchkkr" name="users[]"></th>
             <input type="hidden" name="originalid[]" value="<?php echo $alldriver['eve_id']; ?>">
-            <td><p class="hidder"><?php echo $alldriver['eve_location']; ?></p>
-              <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ); ?>" name="eve_location[]" required></td>
-            <td><p class="hidder"><?php echo $alldriver['eve_paid']; ?></p>
-              <input type="number" value="<?php echo esc_attr( $alldriver['eve_paid'] ); ?>" name="eve_paid[]" required style="width:50px;"></td>
-            <td><p class="hidder"><?php echo $alldriver['eve_free']; ?></p>
-              <input type="number" value="<?php echo esc_attr( $alldriver['eve_free'] ); ?>" name="eve_free[]" required style="width:50px;"></td>
-            <td><p class="hidder"><?php echo $alldriver['eve_start']; ?></p>
-              <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot" id="eventenddertot<?php echo $alldriver['eve_id']; ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ); ?>" required></td>
+            <td><p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
+              <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required></td>
+            <td><p class="hidder"><?php echo esc_html( $alldriver['eve_paid'] ?? '' ); ?></p>
+              <input type="number" value="<?php echo esc_attr( $alldriver['eve_paid'] ?? '' ); ?>" name="eve_paid[]" required style="width:50px;"></td>
+            <td><p class="hidder"><?php echo esc_html( $alldriver['eve_free'] ?? '' ); ?></p>
+              <input type="number" value="<?php echo esc_attr( $alldriver['eve_free'] ?? '' ); ?>" name="eve_free[]" required style="width:50px;"></td>
+            <td><p class="hidder"><?php echo esc_html( $alldriver['eve_start'] ?? '' ); ?></p>
+              <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot" id="eventenddertot<?php echo $alldriver['eve_id']; ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required></td>
             <td>
               <select name="eve_type[]" class="evetype" required style="width:100px;">
                 <option value="">Please Choose</option>
@@ -468,10 +468,10 @@ jQuery(function() {
               </select>
               <?php foreach ( $all_pending_toterx as $alldriverx2 ) { if ( $alldriver['eve_marketer'] == $alldriverx2['event_marketer_id'] ) { ?><p class="hidder"><?php echo $alldriverx2['event_marketer_name']; ?></p><?php } } ?>
             </td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ); ?>" name="eve_host_url[]" required style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ); ?>" name="eve_roster_url[]" required style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainner_url'] ); ?>" name="eve_trainner_url[]" required style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_sign_in_url'] ); ?>" name="eve_sign_in_url[]" required style="width:140px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" required style="width:140px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" required style="width:140px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainner_url'] ?? '' ); ?>" name="eve_trainner_url[]" required style="width:140px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_sign_in_url'] ?? '' ); ?>" name="eve_sign_in_url[]" required style="width:140px;"></td>
             <td>
               <select name="eve_instructor[]" class="evetype" required style="width:100px;">
                 <option value="">Please Choose</option>

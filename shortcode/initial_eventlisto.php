@@ -218,7 +218,7 @@ td p{margin-bottom:0px;}
 .management{background-color:#a4dfa4;padding-left:10px;padding-right:10px;}
 tr{border-bottom-style:dashed;border-bottom-color:#b2b2b2;border-bottom-width:1px;}
 .card{max-width:100%;}
-.rosterlink,.trainerlink,.signinurllink{font-size:12px;}
+.rosterlink,.trainerlink,.signinurllink{font-size:1.05em;}
 </style>
 <script>
 jQuery(document).ready(function(){

@@ -93,13 +93,19 @@ class Hostlinks_Updater {
 		$current_version  = $transient->checked[ $this->plugin_slug ] ?? HOSTLINKS_VERSION;
 
 		if ( version_compare( $remote_version, $current_version, '>' ) ) {
+			// Use the direct archive zip URL — its root folder is "{repo}-{tag}"
+			// (e.g. "hostlinks-2.0.8") which is a predictable pattern our
+			// fix_source_dir can detect reliably, unlike the API zipball URL
+			// which extracts to "{user}-{repo}-{commit_hash}".
+			$package = "https://github.com/{$this->github_user}/{$this->github_repo}/archive/refs/tags/{$remote_version}.zip";
+
 			$transient->response[ $this->plugin_slug ] = (object) array(
 				'id'          => $this->plugin_slug,
 				'slug'        => dirname( $this->plugin_slug ),
 				'plugin'      => $this->plugin_slug,
 				'new_version' => $remote_version,
 				'url'         => "https://github.com/{$this->github_user}/{$this->github_repo}",
-				'package'     => $release->zipball_url,
+				'package'     => $package,
 				'icons'       => array(),
 				'banners'     => array(),
 				'tested'      => '',
@@ -125,13 +131,16 @@ class Hostlinks_Updater {
 			return $result;
 		}
 
+		$version       = $this->clean_version( $release->tag_name );
+		$download_link = "https://github.com/{$this->github_user}/{$this->github_repo}/archive/refs/tags/{$version}.zip";
+
 		return (object) array(
 			'name'          => 'Hostlinks',
 			'slug'          => dirname( $this->plugin_slug ),
-			'version'       => $this->clean_version( $release->tag_name ),
+			'version'       => $version,
 			'author'        => 'Digital Solution',
 			'homepage'      => "https://github.com/{$this->github_user}/{$this->github_repo}",
-			'download_link' => $release->zipball_url,
+			'download_link' => $download_link,
 			'sections'      => array(
 				'description' => 'Event management tool for tracking hosted events, marketers, instructors, and types.',
 				'changelog'   => nl2br( esc_html( $release->body ?? '' ) ),
@@ -139,45 +148,48 @@ class Hostlinks_Updater {
 		);
 	}
 
-	// ── Hook: rename GitHub's auto-generated folder to the correct slug ─────
+	// ── Hook: rename GitHub's extracted folder to the correct plugin slug ────
 	//
-	// GitHub zipballs extract to a folder named "{user}-{repo}-{hash}" rather
-	// than the plugin slug. WordPress would treat that as a brand-new plugin
-	// instead of an update. This filter detects that pattern and renames the
-	// folder to the correct slug before WordPress copies it into place.
-	// Works for both automatic WP updates AND manual zip uploads.
+	// GitHub archives extract to a folder named "{repo}-{tag}" (e.g.
+	// "hostlinks-2.0.8") rather than the bare plugin slug ("hostlinks").
+	// WordPress needs the folder to match the plugin slug, otherwise it
+	// treats it as a brand-new plugin instead of an update.
+	//
+	// Detection strategy: we look for the plugin's own main file
+	// (hostlinks.php) inside the extracted folder — no fragile regex needed.
+	// Works for automatic WP updates AND manual zip uploads.
 
 	public function fix_source_dir( $source, $remote_source, $upgrader, $hook_extra ) {
 		global $wp_filesystem;
 
-		$source_name  = basename( untrailingslashit( $source ) );
-		$correct_slug = dirname( $this->plugin_slug );  // e.g. "hostlinks"
+		$correct_slug    = dirname( $this->plugin_slug );          // "hostlinks"
+		$main_plugin_file = $correct_slug . '.php';                // "hostlinks.php"
+		$correct_dir     = trailingslashit( $remote_source ) . $correct_slug;
 
-		// Match "{github_user}-{github_repo}-{7-40 hex chars}" — the format
-		// GitHub uses for both release zipballs and source code archives.
-		$pattern = '/^'
-			. preg_quote( $this->github_user, '/' )
-			. '-'
-			. preg_quote( $this->github_repo, '/' )
-			. '-[0-9a-f]{7,40}$/i';
-
-		if ( ! preg_match( $pattern, $source_name ) ) {
-			return $source;  // Not our GitHub zip; leave everything else alone
+		// Nothing to do if already correctly named
+		if ( untrailingslashit( $source ) === untrailingslashit( $correct_dir ) ) {
+			return $source;
 		}
 
-		$correct_dir = trailingslashit( $remote_source ) . $correct_slug;
-
-		if ( $wp_filesystem->move( $source, $correct_dir, true ) ) {
-			return $correct_dir;
+		// Only act when the extracted folder actually contains our plugin's
+		// main file — this prevents accidentally renaming unrelated zips
+		if ( ! $wp_filesystem->exists( trailingslashit( $source ) . $main_plugin_file ) ) {
+			return $source;
 		}
 
-		return new WP_Error(
-			'hostlinks_rename_failed',
-			sprintf(
-				'Could not rename extracted plugin folder to <code>%s</code>. Please rename it manually.',
-				esc_html( $correct_slug )
-			)
-		);
+		// Remove any stale copy at the destination (e.g. from a failed attempt)
+		if ( $wp_filesystem->exists( $correct_dir ) ) {
+			$wp_filesystem->delete( $correct_dir, true );
+		}
+
+		if ( $wp_filesystem->move( $source, $correct_dir ) ) {
+			return trailingslashit( $correct_dir );
+		}
+
+		// Rename failed — return the original source so WordPress can still
+		// find the plugin file and at least report a meaningful error instead
+		// of "No valid plugins were found"
+		return $source;
 	}
 
 	// ── Hook: clear cached release after a plugin update ───────────────────

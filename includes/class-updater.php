@@ -143,36 +143,38 @@ class Hostlinks_Updater {
 	//
 	// GitHub zipballs extract to a folder named "{user}-{repo}-{hash}" rather
 	// than the plugin slug. WordPress would treat that as a brand-new plugin
-	// instead of an update. This filter renames the extracted folder to the
-	// correct slug (e.g. "hostlinks") before WordPress copies it into place.
+	// instead of an update. This filter detects that pattern and renames the
+	// folder to the correct slug before WordPress copies it into place.
+	// Works for both automatic WP updates AND manual zip uploads.
 
 	public function fix_source_dir( $source, $remote_source, $upgrader, $hook_extra ) {
 		global $wp_filesystem;
 
-		// Only act when this is an update for our plugin
-		if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== $this->plugin_slug ) {
-			return $source;
-		}
-
+		$source_name  = basename( untrailingslashit( $source ) );
 		$correct_slug = dirname( $this->plugin_slug );  // e.g. "hostlinks"
-		$correct_dir  = trailingslashit( $remote_source ) . $correct_slug;
 
-		// If the folder is already correctly named, nothing to do
-		if ( trailingslashit( $source ) === trailingslashit( $correct_dir ) ) {
-			return $source;
+		// Match "{github_user}-{github_repo}-{7-40 hex chars}" — the format
+		// GitHub uses for both release zipballs and source code archives.
+		$pattern = '/^'
+			. preg_quote( $this->github_user, '/' )
+			. '-'
+			. preg_quote( $this->github_repo, '/' )
+			. '-[0-9a-f]{7,40}$/i';
+
+		if ( ! preg_match( $pattern, $source_name ) ) {
+			return $source;  // Not our GitHub zip; leave everything else alone
 		}
 
-		// Rename the extracted folder to the correct slug
+		$correct_dir = trailingslashit( $remote_source ) . $correct_slug;
+
 		if ( $wp_filesystem->move( $source, $correct_dir, true ) ) {
 			return $correct_dir;
 		}
 
-		// If the rename failed, surface a WP_Error so the update is aborted
-		// cleanly rather than installing under the wrong folder name
 		return new WP_Error(
 			'hostlinks_rename_failed',
 			sprintf(
-				'Could not rename extracted plugin folder to <code>%s</code>. Update aborted.',
+				'Could not rename extracted plugin folder to <code>%s</code>. Please rename it manually.',
 				esc_html( $correct_slug )
 			)
 		);

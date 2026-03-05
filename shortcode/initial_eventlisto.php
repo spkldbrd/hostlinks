@@ -102,9 +102,9 @@ if ( $resulttotapplijobscnt > 0 ) {
 			?>
 	<tr bgcolor="ffffe1">
 		<td><p><b><?php echo date("F Y", strtotime( $alldriver['eve_start'] ) )?></b><br/>
-		<b><?php echo "{$t['paid']} / {$t['cnt']} / {$avg}"; ?></b></p></td>
-		<td><p><b>W&nbsp;<?php echo "{$t['wrpaid']} / {$t['wrcnt']} / {$avgwr}"; ?></b></p></td>
-		<td><p><b>M&nbsp;<?php echo "{$t['mgpaid']} / {$t['mgcnt']} / {$avgmg}"; ?></b></p></td>
+		<?php echo "{$t['paid']} / {$t['cnt']} / {$avg}"; ?></p></td>
+		<td><p>W&nbsp;<?php echo "{$t['wrpaid']} / {$t['wrcnt']} / {$avgwr}"; ?></p></td>
+		<td><p>M&nbsp;<?php echo "{$t['mgpaid']} / {$t['mgcnt']} / {$avgmg}"; ?></p></td>
 		<td></td><td></td>
 	</tr>
 	<tr>

@@ -528,7 +528,6 @@ jQuery(document).ready(function(){
 <style type="text/css">
 .hidder{display:none;}
 .splchkkr,.administrator,#cb-select-all-1{width:17px!important;height:17px!important;}
-input[type="checkbox"]:checked::before,input[type="radio"]:checked::before{width:2rem!important;}
 th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertical-align:middle!important;}
 .updpocode,.anewpostcode{background-color:#e0e0e0;padding:20px;width:49%;}
 .TFtable tr:nth-child(odd){background:#f9f9f9;}

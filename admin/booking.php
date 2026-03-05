@@ -270,23 +270,38 @@ jQuery(function() {
 
 } else {
 
+	// ── Determine active year-month filter (default: current month) ──────────
+	$currentYear  = (int) date('Y');
+	$currentMonth = date('m');
+	$defaultSyear = $currentYear . '-' . $currentMonth;
+
+	$syear = ( isset( $_GET['syear'] ) && $_GET['syear'] !== '' )
+		? sanitize_text_field( $_GET['syear'] )
+		: $defaultSyear;
+
+	$syearParts  = explode( '-', $syear );
+	$filterYear  = isset( $syearParts[0] ) ? (int) $syearParts[0] : $currentYear;
+	$filterMonth = isset( $syearParts[1] ) ? (int) $syearParts[1] : (int) $currentMonth;
+
+	// ── Bulk action processing (POST) ────────────────────────────────────────
 	$sucessmsgnew = '';
 	if ( isset( $_POST['deleteentire'] ) ) {
-		if ( $_POST['actiondelete'] == 'delete' ) {
-			$users = $_POST['users'];
-			if ( count( $users ) > 0 ) {
-				foreach ( $users as $user ) {
-					$wpdb->query( "UPDATE $table11 SET `eve_status` = '2' WHERE `eve_id` = " . intval( $user ) );
-				}
+		if ( $_POST['actiondelete'] === 'delete' ) {
+			$users = isset( $_POST['users'] ) ? (array) $_POST['users'] : array();
+			foreach ( $users as $user ) {
+				$wpdb->query( "UPDATE $table11 SET `eve_status` = '2' WHERE `eve_id` = " . intval( $user ) );
 			}
+			update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
+			$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) deleted. <a href="admin.php?page=booking-menu&syear=' . esc_attr( $syear ) . '">Back to list</a></p></div>';
 		}
-		if ( $_POST['actiondelete'] == 'uppydate' ) {
-			$users        = $_POST['originalid'];
-			$usersadvance = $_POST['users'];
-			if ( ! empty( $usersadvance ) && count( $usersadvance ) > 0 ) {
+
+		if ( $_POST['actiondelete'] === 'uppydate' ) {
+			$users        = isset( $_POST['originalid'] ) ? (array) $_POST['originalid'] : array();
+			$usersadvance = isset( $_POST['users'] )      ? (array) $_POST['users']      : array();
+			if ( ! empty( $usersadvance ) ) {
 				foreach ( $users as $key => $user ) {
 					if ( in_array( $user, $usersadvance ) ) {
-						$userid           = $user;
+						$userid           = intval( $user );
 						$eve_location     = trim( $_POST['eve_location'][ $key ] );
 						$eve_paid         = trim( $_POST['eve_paid'][ $key ] );
 						$eve_free         = trim( $_POST['eve_free'][ $key ] );
@@ -295,42 +310,49 @@ jQuery(function() {
 						$eve_start        = date( 'Y-m-d', strtotime( trim( $evedatearray[0] ) ) );
 						$eve_end          = date( 'Y-m-d', strtotime( trim( $evedatearray[1] ) ) );
 						$eve_type         = trim( $_POST['eve_type'][ $key ] );
-						$eve_zoom_array   = isset( $_POST['eve_zoom'] ) ? $_POST['eve_zoom'] : array();
-						$eve_zoom         = in_array( $user, $eve_zoom_array ) ? 'yes' : '';
+						$eve_zoom_array   = isset( $_POST['eve_zoom'] ) ? (array) $_POST['eve_zoom'] : array();
+						$eve_zoom         = in_array( (string) $user, $eve_zoom_array ) ? 'yes' : '';
 						$eve_marketer     = trim( $_POST['eve_marketer'][ $key ] );
 						$eve_host_url     = trim( $_POST['eve_host_url'][ $key ] );
 						$eve_roster_url   = trim( $_POST['eve_roster_url'][ $key ] );
 						$eve_trainner_url = trim( $_POST['eve_trainner_url'][ $key ] );
 						$eve_sign_in_url  = trim( $_POST['eve_sign_in_url'][ $key ] );
 						$eve_instructor   = trim( $_POST['eve_instructor'][ $key ] );
-						$wpdb->query( "UPDATE $table11 SET `eve_location`='$eve_location',`eve_paid`='$eve_paid',`eve_free`='$eve_free',`eve_start`='$eve_start',`eve_end`='$eve_end',`eve_type`='$eve_type',`eve_zoom`='$eve_zoom',
-							`eve_marketer`='$eve_marketer',`eve_host_url`='$eve_host_url',`eve_roster_url`='$eve_roster_url',`eve_trainner_url`='$eve_trainner_url',`eve_sign_in_url`='$eve_sign_in_url',
-							`eve_instructor`='$eve_instructor',`eve_tot_date`='$eve_tot_date' WHERE `eve_id`=" . intval( $userid ) );
+						$wpdb->query( $wpdb->prepare(
+							"UPDATE $table11 SET
+								`eve_location`=%s, `eve_paid`=%d, `eve_free`=%d,
+								`eve_start`=%s, `eve_end`=%s, `eve_type`=%d,
+								`eve_zoom`=%s, `eve_marketer`=%d,
+								`eve_host_url`=%s, `eve_roster_url`=%s,
+								`eve_trainner_url`=%s, `eve_sign_in_url`=%s,
+								`eve_instructor`=%d, `eve_tot_date`=%s
+							WHERE `eve_id`=%d",
+							$eve_location, $eve_paid, $eve_free,
+							$eve_start, $eve_end, $eve_type,
+							$eve_zoom, $eve_marketer,
+							$eve_host_url, $eve_roster_url,
+							$eve_trainner_url, $eve_sign_in_url,
+							$eve_instructor, $eve_tot_date,
+							$userid
+						) );
 					}
 				}
 				update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
-				$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event Sucessfully Updated. <a href="admin.php?page=booking-menu">View Event</a></p></div>';
+				$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) successfully updated.</p></div>';
 			}
 		}
 	}
 
-	$thispage = get_bloginfo( 'url' ) . '/wp-admin/admin.php?page=booking-menu';
-	if ( isset( $_POST['applyfilter'] ) ) {
-		$chooseyear  = $_POST['chooseyear'];
-		$choosemonth = $_POST['choosemonth'];
-		wp_redirect( $thispage . '&syear=' . $chooseyear . '-' . $choosemonth );
-	}
-
-	if ( isset( $_GET['syear'] ) && $_GET['syear'] != '' ) {
-		$yu = $_GET['syear'];
-		$all_pending_bookings    = $wpdb->get_results( "SELECT * FROM $table11 WHERE `eve_status` = '1' AND `eve_start` LIKE '$yu%' ORDER BY `eve_start` ASC", ARRAY_A );
-		$resulttotapplijobscnt   = $wpdb->num_rows;
-		$tot1                    = $resulttotapplijobscnt;
-	} else {
-		$all_pending_bookings    = $wpdb->get_results( "SELECT * FROM $table11 WHERE `eve_status` = '1' ORDER BY `eve_start` ASC", ARRAY_A );
-		$resulttotapplijobscnt   = $wpdb->num_rows;
-		$tot1                    = $resulttotapplijobscnt;
-	}
+	// ── Query events for the active filter ───────────────────────────────────
+	$all_pending_bookings = $wpdb->get_results(
+		$wpdb->prepare(
+			"SELECT * FROM $table11 WHERE `eve_status` = '1' AND `eve_start` LIKE %s ORDER BY `eve_start` ASC",
+			$syear . '%'
+		),
+		ARRAY_A
+	);
+	$resulttotapplijobscnt = $wpdb->num_rows;
+	$tot1                  = $resulttotapplijobscnt;
 	?>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
 <div id="wpbody">
@@ -339,9 +361,48 @@ jQuery(function() {
   <div class="wrap">
     <h2>Events <a class="add-new-h2" href="admin.php?page=booking-menu&add=1">Add New Event</a></h2>
     <ul class="subsubsubx">
-      <li class="all"><a class="current">All <span class="count">(<?php echo $tot1; ?>)</span></a> |</li>
+      <li class="all"><a class="current">Showing <?php echo $tot1; ?> event(s) for <?php echo esc_html( date( 'F Y', mktime( 0, 0, 0, $filterMonth, 1, $filterYear ) ) ); ?></a></li>
     </ul>
-    <form method="post" action="" id="posts-filter">
+
+    <?php /* ── Year / Month filter — uses JS redirect so it works inside a WP admin page callback ── */ ?>
+    <div class="tablenav-pages" style="margin-bottom:10px;">
+      <table border="0" cellspacing="0" cellpadding="0" class="listtable" width="100%"><tr>
+        <td align="left">
+          <select id="hl-chooseyear">
+            <?php
+            $yearStart = $currentYear - 4;
+            $yearEnd   = $currentYear + 1;
+            for ( $yr = $yearEnd; $yr >= $yearStart; $yr-- ) {
+                $sel = ( $yr === $filterYear ) ? 'selected' : '';
+                echo "<option value=\"$yr\" $sel>$yr</option>";
+            }
+            ?>
+          </select>
+          <select id="hl-choosemonth">
+            <?php
+            $monthNames = array( 1=>'Jan',2=>'Feb',3=>'Mar',4=>'Apr',5=>'May',6=>'Jun',
+                                 7=>'Jul',8=>'Aug',9=>'Sep',10=>'Oct',11=>'Nov',12=>'Dec' );
+            for ( $m = 1; $m <= 12; $m++ ) {
+                $mv  = str_pad( $m, 2, '0', STR_PAD_LEFT );
+                $sel = ( $m === $filterMonth ) ? 'selected' : '';
+                echo "<option value=\"$mv\" $sel>" . $monthNames[$m] . " ($mv)</option>";
+            }
+            ?>
+          </select>
+          <button type="button" id="hl-apply-filter" class="button action">Apply Filter</button>
+          <a href="admin.php?page=booking-menu" class="button" style="margin-left:6px;">Reset</a>
+        </td>
+      </tr></table>
+    </div>
+    <script>
+    document.getElementById('hl-apply-filter').addEventListener('click', function() {
+        var yr  = document.getElementById('hl-chooseyear').value;
+        var mo  = document.getElementById('hl-choosemonth').value;
+        window.location.href = 'admin.php?page=booking-menu&syear=' + yr + '-' + mo;
+    });
+    </script>
+
+    <form method="post" action="admin.php?page=booking-menu&syear=<?php echo esc_attr( $syear ); ?>" id="posts-filter">
       <div class="tablenav-pages">
         <table border="0" cellspacing="0" cellpadding="0" class="listtable" width="100%"><tr>
           <td align="left">
@@ -352,35 +413,6 @@ jQuery(function() {
               </select>
               <input type="submit" value="Apply" class="button action" id="doaction" name="deleteentire">
             </div>
-            <select name="chooseyear">
-              <option value="">Choose Year</option>
-              <?php
-              $years = array( 2021, 2022, 2023, 2024, 2025, 2026, 2027 );
-              foreach ( $years as $yr ) {
-                  $sel = '';
-                  if ( isset( $_GET['syear'] ) ) {
-                      $rr = explode( '-', $_GET['syear'] );
-                      if ( $rr[0] == $yr ) $sel = 'selected';
-                  }
-                  echo "<option value=\"$yr\" $sel>$yr</option>";
-              }
-              ?>
-            </select>
-            <select name="choosemonth">
-              <option value="">Choose Month</option>
-              <?php
-              for ( $m = 1; $m <= 12; $m++ ) {
-                  $mv  = str_pad( $m, 2, '0', STR_PAD_LEFT );
-                  $sel = '';
-                  if ( isset( $_GET['syear'] ) ) {
-                      $rr = explode( '-', $_GET['syear'] );
-                      if ( isset( $rr[1] ) && intval( $rr[1] ) == $m ) $sel = 'selected';
-                  }
-                  echo "<option value=\"$mv\" $sel>$mv</option>";
-              }
-              ?>
-            </select>
-            <input type="submit" value="Apply Filter" class="button action" name="applyfilter">
           </td>
         </tr></table>
       </div>

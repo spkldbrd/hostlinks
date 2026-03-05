@@ -515,7 +515,7 @@ jQuery(document).ready(function(){
     "order": [[4,"asc"]],
     "bPaginate": true, "bLengthChange": true, "bFilter": true, "bSort": true,
     "bInfo": true, "bAutoWidth": true, "stateSave": true, "searching": true,
-    "dom": 'lfrtip', "pageLength": 10, "lengthChange": true,
+    "dom": 'lfrtip', "pageLength": 25, "lengthChange": true,
     "columnDefs": [{"targets":[0,2,3,5,6,7,8,9,10,11,12],"orderable":false}]
   });
   jQuery.extend(jQuery.fn.dataTableExt.oSort, {

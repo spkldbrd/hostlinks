@@ -21,12 +21,15 @@ define( 'HOSTLINKS_GITHUB_USER', 'spkldbrd' );
 define( 'HOSTLINKS_GITHUB_REPO', 'hostlinks' );
 
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-db.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-activation.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-assets.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-admin-menus.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-shortcodes.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-import-export.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-updater.php';
 
-register_activation_hook( __FILE__, array( 'Hostlinks_DB', 'create_tables' ) );
+// Activation: create DB tables + detect theme conflict in one hook
+register_activation_hook( __FILE__, array( 'Hostlinks_Activation', 'on_activate' ) );
 
+new Hostlinks_Activation();
 new Hostlinks_Updater( __FILE__, HOSTLINKS_GITHUB_USER, HOSTLINKS_GITHUB_REPO );

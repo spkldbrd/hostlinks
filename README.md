@@ -13,6 +13,10 @@ A standalone WordPress plugin for managing hosted events, marketers, instructors
 - **Import / Export** – Export all data as JSON (full backup) or CSV (events only). Import from either format with duplicate detection.
 - **Auto-updates** – Checks GitHub Releases for new versions; updates appear in the standard WordPress "Plugins" update flow.
 
+## Author
+
+Digital Solution
+
 ## Installation
 
 1. Upload the `hostlinks` folder to `wp-content/plugins/`.

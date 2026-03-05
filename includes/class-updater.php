@@ -127,7 +127,7 @@ class Hostlinks_Updater {
 			'name'          => 'Hostlinks',
 			'slug'          => dirname( $this->plugin_slug ),
 			'version'       => $this->clean_version( $release->tag_name ),
-			'author'        => '<a href="https://grantwritingusa.com">Grant Writing USA</a>',
+			'author'        => 'Digital Solution',
 			'homepage'      => "https://github.com/{$this->github_user}/{$this->github_repo}",
 			'download_link' => $release->zipball_url,
 			'sections'      => array(

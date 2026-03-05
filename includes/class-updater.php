@@ -154,13 +154,24 @@ class Hostlinks_Updater {
 		$download_link = $this->get_package_url( $release, $version );
 
 		return (object) array(
-			'name'          => 'Hostlinks',
-			'slug'          => dirname( $this->plugin_slug ),
-			'version'       => $version,
-			'author'        => '<a href="https://digitalsolution.com">Digital Solution</a>',
-			'homepage'      => 'https://digitalsolution.com',
-			'download_link' => $download_link,
-			'sections'      => array(
+			'name'               => 'Hostlinks',
+			'slug'               => dirname( $this->plugin_slug ),
+			'version'            => $version,
+			'author'             => '<a href="https://digitalsolution.com">Digital Solution</a>',
+			'author_profile'     => 'https://digitalsolution.com',
+			'homepage'           => 'https://digitalsolution.com',
+			'requires'           => '5.0',
+			'requires_php'       => '7.4',
+			'tested'             => '',
+			'last_updated'       => '',
+			'short_description'  => 'Event management tool for tracking hosted events, marketers, instructors, and types.',
+			'download_link'      => $download_link,
+			'banners'            => array(),
+			'icons'              => array(),
+			'tags'               => array(),
+			'rating'             => 0,
+			'num_ratings'        => 0,
+			'sections'           => array(
 				'description' => 'Event management tool for tracking hosted events, marketers, instructors, and types.',
 				'changelog'   => nl2br( esc_html( $release->body ?? '' ) ),
 			),

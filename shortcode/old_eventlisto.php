@@ -17,19 +17,20 @@ $table12 = $wpdb->prefix . 'event_type';
 $table13 = $wpdb->prefix . 'event_marketer';
 $table14 = $wpdb->prefix . 'event_instructor';
 
-$currentYear  = date('Y');
-$previousYear = $currentYear - 1;
+$currentYear = (int) date('Y');
 
-if ( isset( $_GET['syear'] ) ) {
-	if ( $_GET['syear'] == '' ) {
-		$all_pending_bookings  = $wpdb->get_results( "SELECT * FROM $table11 WHERE `eve_status` = '1' AND `eve_start` LIKE '$previousYear%' ORDER BY `eve_start` ASC", ARRAY_A );
-	} else {
-		$yu = $_GET['syear'];
-		$all_pending_bookings  = $wpdb->get_results( "SELECT * FROM $table11 WHERE `eve_status` = '1' AND `eve_start` LIKE '$yu%' ORDER BY `eve_start` ASC", ARRAY_A );
-	}
-} else {
-	$all_pending_bookings  = $wpdb->get_results( "SELECT * FROM $table11 WHERE `eve_status` = '1' AND `eve_start` LIKE '$previousYear%' ORDER BY `eve_start` ASC", ARRAY_A );
-}
+// Use syear from URL if provided and non-empty, otherwise default to current year
+$selectedYear = ( isset( $_GET['syear'] ) && $_GET['syear'] !== '' )
+	? (int) $_GET['syear']
+	: $currentYear;
+
+$all_pending_bookings = $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT * FROM $table11 WHERE `eve_status` = '1' AND `eve_start` LIKE %s ORDER BY `eve_start` ASC",
+		$selectedYear . '%'
+	),
+	ARRAY_A
+);
 $resulttotapplijobscnt = $wpdb->num_rows;
 ?>
 <link href="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/css/bootstrap.min.css" id="bootstrap-style" rel="stylesheet" type="text/css" />
@@ -48,13 +49,11 @@ $resulttotapplijobscnt = $wpdb->num_rows;
         <select name="chooseyear" class="mosifyy">
           <option value="">Choose Year</option>
           <?php
-          $years = array( 2022, 2023, 2024, 2025, 2026, 2027 );
-          foreach ( $years as $yr ) {
-              $sel = '';
-              if ( isset( $_GET['syear'] ) ) {
-                  $rr = explode( '-', $_GET['syear'] );
-                  if ( $rr[0] == $yr ) $sel = 'selected';
-              }
+          // Build year list dynamically: 4 years back through 1 year ahead
+          $yearStart = $currentYear - 4;
+          $yearEnd   = $currentYear + 1;
+          for ( $yr = $yearEnd; $yr >= $yearStart; $yr-- ) {
+              $sel = ( $yr === $selectedYear ) ? 'selected' : '';
               echo "<option value=\"$yr\" $sel>$yr</option>";
           }
           ?>

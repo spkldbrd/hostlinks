@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://github.com/spkldbrd/hostlinks
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.0.5
+ * Version:     2.0.6
  * Author:      Digital Solution
  * License:     GPL2
  */
@@ -12,7 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.0.5' );
+define( 'HOSTLINKS_VERSION',    '2.0.6' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

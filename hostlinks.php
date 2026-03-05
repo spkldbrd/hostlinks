@@ -32,4 +32,6 @@ require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-updater.php';
 register_activation_hook( __FILE__, array( 'Hostlinks_Activation', 'on_activate' ) );
 
 new Hostlinks_Activation();
-new Hostlinks_Updater( __FILE__, HOSTLINKS_GITHUB_USER, HOSTLINKS_GITHUB_REPO );
+
+// Stored in a global so the Plugin Info admin page can call fetch/get methods
+$GLOBALS['hostlinks_updater'] = new Hostlinks_Updater( __FILE__, HOSTLINKS_GITHUB_USER, HOSTLINKS_GITHUB_REPO );

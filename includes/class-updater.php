@@ -39,6 +39,7 @@ class Hostlinks_Updater {
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
 		add_filter( 'plugins_api',                           array( $this, 'plugin_info' ), 10, 3 );
 		add_action( 'upgrader_process_complete',             array( $this, 'clear_cache' ), 10, 2 );
+		add_action( 'admin_post_hostlinks_force_check',      array( $this, 'handle_force_check' ) );
 	}
 
 	// ── Fetch latest release from GitHub (cached 12 h) ─────────────────────
@@ -148,5 +149,39 @@ class Hostlinks_Updater {
 		) {
 			delete_transient( $this->transient_key );
 		}
+	}
+
+	// ── Public helpers used by the Plugin Info admin page ───────────────────
+
+	// Bust the local cache and return a fresh release object (or false)
+	public function fetch_fresh_release() {
+		delete_transient( $this->transient_key );
+		return $this->get_release();
+	}
+
+	// Return cached release (fetches if not yet cached)
+	public function get_latest_release() {
+		return $this->get_release();
+	}
+
+	public function get_plugin_slug() {
+		return $this->plugin_slug;
+	}
+
+	// ── Handler: force-check button in the Plugin Info page ─────────────────
+
+	public function handle_force_check() {
+		check_admin_referer( 'hostlinks_force_check' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Unauthorized' );
+		}
+
+		// Clear our GitHub transient and the WP core update_plugins transient
+		delete_transient( $this->transient_key );
+		delete_site_transient( 'update_plugins' );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=hostlinks-plugin-info&hl_checked=1' ) );
+		exit;
 	}
 }

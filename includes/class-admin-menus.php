@@ -30,6 +30,7 @@ class Hostlinks_Admin_Menus {
 		add_submenu_page( 'booking-menu', 'Instructors',   'Instructors',   'manage_options', 'istructor-menu',           array( $this, 'page_instructor' ) );
 		add_submenu_page( 'booking-menu', 'Add Instructor','Add Instructor','manage_options', 'admin.php?page=istructor-menu&add=1' );
 		add_submenu_page( 'booking-menu', 'Import / Export','Import / Export','manage_options','hostlinks-import-export', array( $this, 'page_import_export' ) );
+		add_submenu_page( 'booking-menu', 'Plugin Info',   'Plugin Info',   'manage_options','hostlinks-plugin-info',   array( $this, 'page_plugin_info' ) );
 	}
 
 	public function page_events() {
@@ -50,6 +51,10 @@ class Hostlinks_Admin_Menus {
 
 	public function page_import_export() {
 		include HOSTLINKS_PLUGIN_DIR . 'admin/import-export.php';
+	}
+
+	public function page_plugin_info() {
+		include HOSTLINKS_PLUGIN_DIR . 'admin/plugin-info.php';
 	}
 }
 

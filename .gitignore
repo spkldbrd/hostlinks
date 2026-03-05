@@ -1,0 +1,18 @@
+# WordPress auto-generated
+*.log
+*.bak
+*.swp
+*.orig
+
+# Node / build tools (if ever added)
+node_modules/
+vendor/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.sublime-workspace

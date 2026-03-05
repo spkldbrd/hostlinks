@@ -1,0 +1,152 @@
+<?php
+/**
+ * GitHub-based auto-updater for the Hostlinks plugin.
+ *
+ * How it works:
+ *  1. On every WP update check, this class calls the GitHub Releases API for the
+ *     configured repo and caches the response for 12 hours.
+ *  2. If the latest release tag is newer than the installed version, WordPress
+ *     shows the standard "update available" notice in Plugins > Installed Plugins.
+ *  3. WordPress handles the actual download using the zipball URL from the release.
+ *
+ * To ship a new version:
+ *  - Bump HOSTLINKS_VERSION in hostlinks.php
+ *  - Push to GitHub and create a new Release with a tag matching the version
+ *    number (e.g. tag "2.1.0" for version 2.1.0 – no "v" prefix needed).
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+class Hostlinks_Updater {
+
+	private $plugin_slug;
+	private $plugin_file;
+	private $github_user;
+	private $github_repo;
+	private $api_url;
+	private $transient_key;
+
+	public function __construct( $plugin_file, $github_user, $github_repo ) {
+		$this->plugin_file   = $plugin_file;
+		$this->plugin_slug   = plugin_basename( $plugin_file );
+		$this->github_user   = $github_user;
+		$this->github_repo   = $github_repo;
+		$this->api_url       = "https://api.github.com/repos/{$github_user}/{$github_repo}/releases/latest";
+		$this->transient_key = 'hostlinks_github_update_' . md5( $this->api_url );
+
+		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_for_update' ) );
+		add_filter( 'plugins_api',                           array( $this, 'plugin_info' ), 10, 3 );
+		add_action( 'upgrader_process_complete',             array( $this, 'clear_cache' ), 10, 2 );
+	}
+
+	// ── Fetch latest release from GitHub (cached 12 h) ─────────────────────
+
+	private function get_release() {
+		$cached = get_transient( $this->transient_key );
+		if ( $cached !== false ) {
+			return $cached;
+		}
+
+		$response = wp_remote_get( $this->api_url, array(
+			'timeout' => 10,
+			'headers' => array(
+				'Accept'     => 'application/vnd.github.v3+json',
+				'User-Agent' => 'WordPress/' . get_bloginfo('version') . '; ' . get_bloginfo('url'),
+			),
+		) );
+
+		if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
+			return false;
+		}
+
+		$release = json_decode( wp_remote_retrieve_body( $response ) );
+		if ( empty( $release->tag_name ) ) {
+			return false;
+		}
+
+		set_transient( $this->transient_key, $release, 12 * HOUR_IN_SECONDS );
+		return $release;
+	}
+
+	// Strip optional leading "v" from tag names like "v2.1.0"
+	private function clean_version( $tag ) {
+		return ltrim( $tag, 'vV' );
+	}
+
+	// ── Hook: inject update data into the WP update transient ───────────────
+
+	public function check_for_update( $transient ) {
+		if ( empty( $transient->checked ) ) {
+			return $transient;
+		}
+
+		$release = $this->get_release();
+		if ( ! $release ) {
+			return $transient;
+		}
+
+		$remote_version   = $this->clean_version( $release->tag_name );
+		$current_version  = $transient->checked[ $this->plugin_slug ] ?? HOSTLINKS_VERSION;
+
+		if ( version_compare( $remote_version, $current_version, '>' ) ) {
+			$transient->response[ $this->plugin_slug ] = (object) array(
+				'id'          => $this->plugin_slug,
+				'slug'        => dirname( $this->plugin_slug ),
+				'plugin'      => $this->plugin_slug,
+				'new_version' => $remote_version,
+				'url'         => "https://github.com/{$this->github_user}/{$this->github_repo}",
+				'package'     => $release->zipball_url,
+				'icons'       => array(),
+				'banners'     => array(),
+				'tested'      => '',
+				'requires_php'=> '',
+			);
+		}
+
+		return $transient;
+	}
+
+	// ── Hook: supply plugin info for the "View details" popup ───────────────
+
+	public function plugin_info( $result, $action, $args ) {
+		if ( $action !== 'plugin_information' ) {
+			return $result;
+		}
+		if ( ! isset( $args->slug ) || $args->slug !== dirname( $this->plugin_slug ) ) {
+			return $result;
+		}
+
+		$release = $this->get_release();
+		if ( ! $release ) {
+			return $result;
+		}
+
+		return (object) array(
+			'name'          => 'Hostlinks',
+			'slug'          => dirname( $this->plugin_slug ),
+			'version'       => $this->clean_version( $release->tag_name ),
+			'author'        => '<a href="https://grantwritingusa.com">Grant Writing USA</a>',
+			'homepage'      => "https://github.com/{$this->github_user}/{$this->github_repo}",
+			'download_link' => $release->zipball_url,
+			'sections'      => array(
+				'description' => 'Event management tool for tracking hosted events, marketers, instructors, and types.',
+				'changelog'   => nl2br( esc_html( $release->body ?? '' ) ),
+			),
+		);
+	}
+
+	// ── Hook: clear cached release after a plugin update ───────────────────
+
+	public function clear_cache( $upgrader, $options ) {
+		if (
+			$options['action'] === 'update' &&
+			$options['type']   === 'plugin' &&
+			isset( $options['plugins'] ) &&
+			in_array( $this->plugin_slug, $options['plugins'], true )
+		) {
+			delete_transient( $this->transient_key );
+		}
+	}
+}

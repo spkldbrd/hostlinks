@@ -1,0 +1,32 @@
+<?php
+/**
+ * Plugin Name: Hostlinks
+ * Plugin URI:  https://github.com/spkldbrd/hostlinks
+ * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
+ * Version:     2.0.0
+ * Author:      Grant Writing USA
+ * License:     GPL2
+ * Update URI:  https://github.com/spkldbrd/hostlinks
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+define( 'HOSTLINKS_VERSION',    '2.0.0' );
+define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+
+define( 'HOSTLINKS_GITHUB_USER', 'spkldbrd' );
+define( 'HOSTLINKS_GITHUB_REPO', 'hostlinks' );
+
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-db.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-assets.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-admin-menus.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-shortcodes.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-import-export.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-updater.php';
+
+register_activation_hook( __FILE__, array( 'Hostlinks_DB', 'create_tables' ) );
+
+new Hostlinks_Updater( __FILE__, HOSTLINKS_GITHUB_USER, HOSTLINKS_GITHUB_REPO );

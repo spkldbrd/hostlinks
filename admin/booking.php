@@ -11,26 +11,51 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 
 	$sucessmsg = '';
 	if ( isset( $_POST['createdriveruser'] ) ) {
-		$eve_location    = trim( $_POST['eve_location'] );
-		$eve_paid        = trim( $_POST['eve_paid'] );
-		$eve_free        = trim( $_POST['eve_free'] );
-		$eve_tot_date    = trim( $_POST['evedate'] );
-		$evedatearray    = explode( '-', $eve_tot_date );
-		$eve_start       = date( 'Y-m-d', strtotime( trim( $evedatearray[0] ) ) );
-		$eve_end         = date( 'Y-m-d', strtotime( trim( $evedatearray[1] ) ) );
-		$eve_type        = trim( $_POST['eve_type'] );
-		$eve_zoom        = trim( $_POST['eve_zoom'] );
-		$eve_marketer    = trim( $_POST['eve_marketer'] );
-		$eve_host_url    = trim( $_POST['eve_host_url'] );
-		$eve_roster_url  = trim( $_POST['eve_roster_url'] );
-		$eve_trainner_url = trim( $_POST['eve_trainner_url'] );
-		$eve_sign_in_url = trim( $_POST['eve_sign_in_url'] );
-		$eve_instructor  = trim( $_POST['eve_instructor'] );
+		check_admin_referer( 'hostlinks_add_event' );
+		$eve_location     = sanitize_text_field( $_POST['eve_location'] );
+		$eve_paid         = intval( $_POST['eve_paid'] );
+		$eve_free         = intval( $_POST['eve_free'] );
+		$eve_tot_date     = sanitize_text_field( $_POST['evedate'] );
+		$evedatearray     = explode( '-', $eve_tot_date );
+		$eve_start        = date( 'Y-m-d', strtotime( trim( $evedatearray[0] ) ) );
+		$eve_end          = date( 'Y-m-d', strtotime( trim( $evedatearray[1] ) ) );
+		$eve_type         = intval( $_POST['eve_type'] );
+		$eve_zoom         = sanitize_text_field( $_POST['eve_zoom'] ?? '' );
+		$eve_marketer     = intval( $_POST['eve_marketer'] );
+		$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'] ) );
+		$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'] ) );
+		$eve_trainner_url = esc_url_raw( trim( $_POST['eve_trainner_url'] ) );
+		$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'] ) );
+		$eve_instructor   = intval( $_POST['eve_instructor'] );
 		update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
-		$wpdb->query( "INSERT INTO $table11 (`eve_location`,`eve_paid`,`eve_free`,`eve_start`,`eve_end`,`eve_type`,`eve_zoom`,`eve_marketer`,`eve_host_url`,`eve_roster_url`,`eve_trainner_url`,`eve_sign_in_url`,`eve_instructor`,`eve_tot_date`,`eve_status`)
-			VALUES ('$eve_location','$eve_paid','$eve_free','$eve_start','$eve_end','$eve_type','$eve_zoom','$eve_marketer','$eve_host_url','$eve_roster_url','$eve_trainner_url','$eve_sign_in_url','$eve_instructor','$eve_tot_date','1')" );
+		$wpdb->insert(
+			$table11,
+			array(
+				'eve_location'    => $eve_location,
+				'eve_paid'        => $eve_paid,
+				'eve_free'        => $eve_free,
+				'eve_start'       => $eve_start,
+				'eve_end'         => $eve_end,
+				'eve_type'        => $eve_type,
+				'eve_zoom'        => $eve_zoom,
+				'eve_marketer'    => $eve_marketer,
+				'eve_host_url'    => $eve_host_url,
+				'eve_roster_url'  => $eve_roster_url,
+				'eve_trainner_url'=> $eve_trainner_url,
+				'eve_sign_in_url' => $eve_sign_in_url,
+				'eve_instructor'  => $eve_instructor,
+				'eve_tot_date'    => $eve_tot_date,
+				'eve_status'      => 1,
+			),
+			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%d','%s','%d' )
+		);
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Event Sucessfully added. <a href="admin.php?page=booking-menu">View Event</a></p></div>';
 	}
+
+	// Pre-fetch lookup tables for dropdowns (only once, on page load)
+	$all_pending_toter   = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_type_status` = '1'", ARRAY_A );
+	$all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
+	$all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
 	?>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
 <div class="wrap">
@@ -39,6 +64,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
   <p>Add new Event to this site.</p>
   <?php echo $sucessmsg; ?>
   <form name="createdriver" method="post" action="" class="anewpostcode">
+    <?php wp_nonce_field( 'hostlinks_add_event' ); ?>
     <table class="form-table"><tbody>
       <tr class="form-field">
         <th><label for="eve_location">Location <span class="description">(required)</span></label></th>
@@ -61,10 +87,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <td>
           <select name="eve_type" id="eve_type" class="evetype" required>
             <option value="">Please Choose</option>
-            <?php
-            $all_pending_toter = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_type_status` = '1'", ARRAY_A );
-            foreach ( $all_pending_toter as $alldriverx1 ) { ?>
-              <option value="<?php echo $alldriverx1['event_type_id']; ?>"><?php echo $alldriverx1['event_type_name']; ?></option>
+            <?php foreach ( $all_pending_toter as $alldriverx1 ) { ?>
+              <option value="<?php echo esc_attr( $alldriverx1['event_type_id'] ); ?>"><?php echo esc_html( $alldriverx1['event_type_name'] ); ?></option>
             <?php } ?>
           </select>
         </td>
@@ -78,10 +102,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <td>
           <select name="eve_marketer" id="eve_marketer" class="evetype" required>
             <option value="">Please Choose</option>
-            <?php
-            $all_pending_toterx = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
-            foreach ( $all_pending_toterx as $alldriverx2 ) { ?>
-              <option value="<?php echo $alldriverx2['event_marketer_id']; ?>"><?php echo $alldriverx2['event_marketer_name']; ?></option>
+            <?php foreach ( $all_pending_toterx as $alldriverx2 ) { ?>
+              <option value="<?php echo esc_attr( $alldriverx2['event_marketer_id'] ); ?>"><?php echo esc_html( $alldriverx2['event_marketer_name'] ); ?></option>
             <?php } ?>
           </select>
         </td>
@@ -107,10 +129,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <td>
           <select name="eve_instructor" id="eve_instructor" class="evetype" required>
             <option value="">Please Choose</option>
-            <?php
-            $all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
-            foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
-              <option value="<?php echo $alldriverx3['event_instructor_id']; ?>"><?php echo $alldriverx3['event_instructor_name']; ?></option>
+            <?php foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
+              <option value="<?php echo esc_attr( $alldriverx3['event_instructor_id'] ); ?>"><?php echo esc_html( $alldriverx3['event_instructor_name'] ); ?></option>
             <?php } ?>
           </select>
         </td>
@@ -142,34 +162,60 @@ jQuery(function() {
 	$userid = intval( $_GET['editu'] );
 	$sucessmsgnew = '';
 	if ( isset( $_POST['updatethepcode'] ) ) {
-		$eve_location     = trim( $_POST['eve_location'] );
-		$eve_paid         = trim( $_POST['eve_paid'] );
-		$eve_free         = trim( $_POST['eve_free'] );
-		$eve_tot_date     = trim( $_POST['evedate'] );
+		check_admin_referer( 'hostlinks_edit_event' );
+		$eve_location     = sanitize_text_field( $_POST['eve_location'] );
+		$eve_paid         = intval( $_POST['eve_paid'] );
+		$eve_free         = intval( $_POST['eve_free'] );
+		$eve_tot_date     = sanitize_text_field( $_POST['evedate'] );
 		$evedatearray     = explode( '-', $eve_tot_date );
 		$eve_start        = date( 'Y-m-d H:i:s', strtotime( trim( $evedatearray[0] ) ) );
 		$eve_end          = date( 'Y-m-d H:i:s', strtotime( trim( $evedatearray[1] ) ) );
-		$eve_type         = trim( $_POST['eve_type'] );
-		$eve_zoom         = trim( $_POST['eve_zoom'] );
-		$eve_marketer     = trim( $_POST['eve_marketer'] );
-		$eve_host_url     = trim( $_POST['eve_host_url'] );
-		$eve_roster_url   = trim( $_POST['eve_roster_url'] );
-		$eve_trainner_url = trim( $_POST['eve_trainner_url'] );
-		$eve_sign_in_url  = trim( $_POST['eve_sign_in_url'] );
-		$eve_instructor   = trim( $_POST['eve_instructor'] );
+		$eve_type         = intval( $_POST['eve_type'] );
+		$eve_zoom         = sanitize_text_field( $_POST['eve_zoom'] ?? '' );
+		$eve_marketer     = intval( $_POST['eve_marketer'] );
+		$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'] ) );
+		$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'] ) );
+		$eve_trainner_url = esc_url_raw( trim( $_POST['eve_trainner_url'] ) );
+		$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'] ) );
+		$eve_instructor   = intval( $_POST['eve_instructor'] );
 		update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
-		$wpdb->query( "UPDATE $table11 SET `eve_location`='$eve_location',`eve_paid`='$eve_paid',`eve_free`='$eve_free',`eve_start`='$eve_start',`eve_end`='$eve_end',`eve_type`='$eve_type',`eve_zoom`='$eve_zoom',
-			`eve_marketer`='$eve_marketer',`eve_host_url`='$eve_host_url',`eve_roster_url`='$eve_roster_url',`eve_trainner_url`='$eve_trainner_url',`eve_sign_in_url`='$eve_sign_in_url',
-			`eve_instructor`='$eve_instructor',`eve_tot_date`='$eve_tot_date' WHERE `eve_id`=$userid" );
+		$wpdb->update(
+			$table11,
+			array(
+				'eve_location'    => $eve_location,
+				'eve_paid'        => $eve_paid,
+				'eve_free'        => $eve_free,
+				'eve_start'       => $eve_start,
+				'eve_end'         => $eve_end,
+				'eve_type'        => $eve_type,
+				'eve_zoom'        => $eve_zoom,
+				'eve_marketer'    => $eve_marketer,
+				'eve_host_url'    => $eve_host_url,
+				'eve_roster_url'  => $eve_roster_url,
+				'eve_trainner_url'=> $eve_trainner_url,
+				'eve_sign_in_url' => $eve_sign_in_url,
+				'eve_instructor'  => $eve_instructor,
+				'eve_tot_date'    => $eve_tot_date,
+			),
+			array( 'eve_id' => $userid ),
+			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%d','%s' ),
+			array( '%d' )
+		);
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event Sucessfully Updated. <a href="admin.php?page=booking-menu">View Event</a></p></div>';
 	}
-	$bokdetsx = $wpdb->get_row( "SELECT * FROM $table11 WHERE `eve_id` = $userid" );
+	$bokdetsx = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table11 WHERE `eve_id` = %d", $userid ) );
+
+	// Pre-fetch lookup tables for dropdowns (only once, on page load)
+	$all_pending_toter   = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_type_status` = '1'", ARRAY_A );
+	$all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
+	$all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
 	?>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
 <div class="wrap">
   <h2 id="add-new-user">Update Event</h2>
   <?php echo $sucessmsgnew; ?>
   <form name="createdriver" method="post" action="" class="updpocode">
+    <?php wp_nonce_field( 'hostlinks_edit_event' ); ?>
     <table class="form-table"><tbody>
       <tr class="form-field">
         <th><label for="eve_location">Location <span class="description">(required)</span></label></th>
@@ -192,27 +238,23 @@ jQuery(function() {
         <td>
           <select name="eve_type" id="eve_type" class="evetype" required>
             <option value="">Please Choose</option>
-            <?php
-            $all_pending_toter = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_type_status` = '1'", ARRAY_A );
-            foreach ( $all_pending_toter as $alldriverx1 ) { ?>
-              <option value="<?php echo $alldriverx1['event_type_id']; ?>" <?php if ( $bokdetsx->eve_type == $alldriverx1['event_type_id'] ) echo 'selected'; ?>><?php echo $alldriverx1['event_type_name']; ?></option>
+            <?php foreach ( $all_pending_toter as $alldriverx1 ) { ?>
+              <option value="<?php echo esc_attr( $alldriverx1['event_type_id'] ); ?>" <?php if ( ( $bokdetsx->eve_type ?? 0 ) == $alldriverx1['event_type_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx1['event_type_name'] ); ?></option>
             <?php } ?>
           </select>
         </td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_zoom">Zoom</label></th>
-        <td><input type="checkbox" value="yes" id="eve_zoom" name="eve_zoom" <?php if ( $bokdetsx->eve_zoom == 'yes' ) echo 'checked'; ?>></td>
+        <td><input type="checkbox" value="yes" id="eve_zoom" name="eve_zoom" <?php if ( ( $bokdetsx->eve_zoom ?? '' ) == 'yes' ) echo 'checked'; ?>></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_marketer">Marketer <span class="description">(required)</span></label></th>
         <td>
           <select name="eve_marketer" id="eve_marketer" class="evetype" required>
             <option value="">Please Choose</option>
-            <?php
-            $all_pending_toterx = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
-            foreach ( $all_pending_toterx as $alldriverx2 ) { ?>
-              <option value="<?php echo $alldriverx2['event_marketer_id']; ?>" <?php if ( $bokdetsx->eve_marketer == $alldriverx2['event_marketer_id'] ) echo 'selected'; ?>><?php echo $alldriverx2['event_marketer_name']; ?></option>
+            <?php foreach ( $all_pending_toterx as $alldriverx2 ) { ?>
+              <option value="<?php echo esc_attr( $alldriverx2['event_marketer_id'] ); ?>" <?php if ( ( $bokdetsx->eve_marketer ?? 0 ) == $alldriverx2['event_marketer_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx2['event_marketer_name'] ); ?></option>
             <?php } ?>
           </select>
         </td>
@@ -238,10 +280,8 @@ jQuery(function() {
         <td>
           <select name="eve_instructor" id="eve_instructor" class="evetype" required>
             <option value="">Please Choose</option>
-            <?php
-            $all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
-            foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
-              <option value="<?php echo $alldriverx3['event_instructor_id']; ?>" <?php if ( $bokdetsx->eve_instructor == $alldriverx3['event_instructor_id'] ) echo 'selected'; ?>><?php echo $alldriverx3['event_instructor_name']; ?></option>
+            <?php foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
+              <option value="<?php echo esc_attr( $alldriverx3['event_instructor_id'] ); ?>" <?php if ( ( $bokdetsx->eve_instructor ?? 0 ) == $alldriverx3['event_instructor_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx3['event_instructor_name'] ); ?></option>
             <?php } ?>
           </select>
         </td>
@@ -286,10 +326,12 @@ jQuery(function() {
 	// ── Bulk action processing (POST) ────────────────────────────────────────
 	$sucessmsgnew = '';
 	if ( isset( $_POST['deleteentire'] ) ) {
+		check_admin_referer( 'hostlinks_manage_events' );
+
 		if ( $_POST['actiondelete'] === 'delete' ) {
 			$users = isset( $_POST['users'] ) ? (array) $_POST['users'] : array();
 			foreach ( $users as $user ) {
-				$wpdb->query( "UPDATE $table11 SET `eve_status` = '2' WHERE `eve_id` = " . intval( $user ) );
+				$wpdb->update( $table11, array( 'eve_status' => 2 ), array( 'eve_id' => intval( $user ) ), array( '%d' ), array( '%d' ) );
 			}
 			update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
 			$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) deleted. <a href="admin.php?page=booking-menu&syear=' . esc_attr( $syear ) . '">Back to list</a></p></div>';
@@ -302,39 +344,44 @@ jQuery(function() {
 				foreach ( $users as $key => $user ) {
 					if ( in_array( $user, $usersadvance ) ) {
 						$userid           = intval( $user );
-						$eve_location     = trim( $_POST['eve_location'][ $key ] );
-						$eve_paid         = trim( $_POST['eve_paid'][ $key ] );
-						$eve_free         = trim( $_POST['eve_free'][ $key ] );
-						$eve_tot_date     = trim( $_POST['evedate'][ $key ] );
+						$eve_location     = sanitize_text_field( $_POST['eve_location'][ $key ] );
+						$eve_paid         = intval( $_POST['eve_paid'][ $key ] );
+						$eve_free         = intval( $_POST['eve_free'][ $key ] );
+						$eve_tot_date     = sanitize_text_field( $_POST['evedate'][ $key ] );
 						$evedatearray     = explode( '-', $eve_tot_date );
 						$eve_start        = date( 'Y-m-d', strtotime( trim( $evedatearray[0] ) ) );
 						$eve_end          = date( 'Y-m-d', strtotime( trim( $evedatearray[1] ) ) );
-						$eve_type         = trim( $_POST['eve_type'][ $key ] );
+						$eve_type         = intval( $_POST['eve_type'][ $key ] );
 						$eve_zoom_array   = isset( $_POST['eve_zoom'] ) ? (array) $_POST['eve_zoom'] : array();
 						$eve_zoom         = in_array( (string) $user, $eve_zoom_array ) ? 'yes' : '';
-						$eve_marketer     = trim( $_POST['eve_marketer'][ $key ] );
-						$eve_host_url     = trim( $_POST['eve_host_url'][ $key ] );
-						$eve_roster_url   = trim( $_POST['eve_roster_url'][ $key ] );
-						$eve_trainner_url = trim( $_POST['eve_trainner_url'][ $key ] );
-						$eve_sign_in_url  = trim( $_POST['eve_sign_in_url'][ $key ] );
-						$eve_instructor   = trim( $_POST['eve_instructor'][ $key ] );
-						$wpdb->query( $wpdb->prepare(
-							"UPDATE $table11 SET
-								`eve_location`=%s, `eve_paid`=%d, `eve_free`=%d,
-								`eve_start`=%s, `eve_end`=%s, `eve_type`=%d,
-								`eve_zoom`=%s, `eve_marketer`=%d,
-								`eve_host_url`=%s, `eve_roster_url`=%s,
-								`eve_trainner_url`=%s, `eve_sign_in_url`=%s,
-								`eve_instructor`=%d, `eve_tot_date`=%s
-							WHERE `eve_id`=%d",
-							$eve_location, $eve_paid, $eve_free,
-							$eve_start, $eve_end, $eve_type,
-							$eve_zoom, $eve_marketer,
-							$eve_host_url, $eve_roster_url,
-							$eve_trainner_url, $eve_sign_in_url,
-							$eve_instructor, $eve_tot_date,
-							$userid
-						) );
+						$eve_marketer     = intval( $_POST['eve_marketer'][ $key ] );
+						$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'][ $key ] ) );
+						$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'][ $key ] ) );
+						$eve_trainner_url = esc_url_raw( trim( $_POST['eve_trainner_url'][ $key ] ) );
+						$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'][ $key ] ) );
+						$eve_instructor   = intval( $_POST['eve_instructor'][ $key ] );
+						$wpdb->update(
+							$table11,
+							array(
+								'eve_location'    => $eve_location,
+								'eve_paid'        => $eve_paid,
+								'eve_free'        => $eve_free,
+								'eve_start'       => $eve_start,
+								'eve_end'         => $eve_end,
+								'eve_type'        => $eve_type,
+								'eve_zoom'        => $eve_zoom,
+								'eve_marketer'    => $eve_marketer,
+								'eve_host_url'    => $eve_host_url,
+								'eve_roster_url'  => $eve_roster_url,
+								'eve_trainner_url'=> $eve_trainner_url,
+								'eve_sign_in_url' => $eve_sign_in_url,
+								'eve_instructor'  => $eve_instructor,
+								'eve_tot_date'    => $eve_tot_date,
+							),
+							array( 'eve_id' => $userid ),
+							array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%d','%s' ),
+							array( '%d' )
+						);
 					}
 				}
 				update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
@@ -343,16 +390,29 @@ jQuery(function() {
 		}
 	}
 
-	// ── Query events for the active filter ───────────────────────────────────
+	// ── Pre-fetch lookup tables once (used for dropdowns in every row) ────────
+	$all_pending_toter   = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_type_status` = '1'", ARRAY_A );
+	$all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
+	$all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
+
+	// ── Single JOIN query — eliminates N+1 per-row lookups ───────────────────
 	$all_pending_bookings = $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT * FROM $table11 WHERE `eve_status` = '1' AND `eve_start` LIKE %s ORDER BY `eve_start` ASC",
+			"SELECT e.*,
+			        t.event_type_name,
+			        m.event_marketer_name,
+			        i.event_instructor_name
+			 FROM   {$table11} e
+			 LEFT JOIN {$table12} t ON e.eve_type       = t.event_type_id
+			 LEFT JOIN {$table13} m ON e.eve_marketer   = m.event_marketer_id
+			 LEFT JOIN {$table14} i ON e.eve_instructor = i.event_instructor_id
+			 WHERE  e.eve_status = '1' AND e.eve_start LIKE %s
+			 ORDER BY e.eve_start ASC",
 			$syear . '%'
 		),
 		ARRAY_A
 	);
-	$resulttotapplijobscnt = $wpdb->num_rows;
-	$tot1                  = $resulttotapplijobscnt;
+	$tot1 = count( $all_pending_bookings );
 	?>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.1/jquery.min.js"></script>
 <div id="wpbody">
@@ -403,6 +463,7 @@ jQuery(function() {
     </script>
 
     <form method="post" action="admin.php?page=booking-menu&syear=<?php echo esc_attr( $syear ); ?>" id="posts-filter">
+      <?php wp_nonce_field( 'hostlinks_manage_events' ); ?>
       <div class="tablenav-pages">
         <table border="0" cellspacing="0" cellpadding="0" class="listtable" width="100%"><tr>
           <td align="left">
@@ -429,18 +490,12 @@ jQuery(function() {
         </thead>
         <tbody id="the-list">
           <?php
-          if ( $resulttotapplijobscnt > 0 ) {
+          if ( $tot1 > 0 ) {
               foreach ( $all_pending_bookings as $alldriver ) {
-                  $all_pending_sex1 = $wpdb->get_row( "SELECT * FROM $table12 WHERE `event_type_id` = " . $alldriver['eve_type'], ARRAY_A );
-                  $all_pending_sex2 = $wpdb->get_row( "SELECT * FROM $table13 WHERE `event_marketer_id` = " . $alldriver['eve_marketer'], ARRAY_A );
-                  $all_pending_sex3 = $wpdb->get_row( "SELECT * FROM $table14 WHERE `event_instructor_id` = " . $alldriver['eve_instructor'], ARRAY_A );
-                  $all_pending_toter   = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_type_status` = '1'", ARRAY_A );
-                  $all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
-                  $all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
                   ?>
-          <tr class="alternate" id="user-<?php echo $alldriver['eve_id']; ?>">
-            <th class="check-column"><input type="checkbox" value="<?php echo $alldriver['eve_id']; ?>" class="administrator splchkkr" name="users[]"></th>
-            <input type="hidden" name="originalid[]" value="<?php echo $alldriver['eve_id']; ?>">
+          <tr class="alternate" id="user-<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
+            <th class="check-column"><input type="checkbox" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" class="administrator splchkkr" name="users[]"></th>
+            <input type="hidden" name="originalid[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
               <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required></td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_paid'] ?? '' ); ?></p>
@@ -448,25 +503,25 @@ jQuery(function() {
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_free'] ?? '' ); ?></p>
               <input type="number" value="<?php echo esc_attr( $alldriver['eve_free'] ?? '' ); ?>" name="eve_free[]" required style="width:50px;"></td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_start'] ?? '' ); ?></p>
-              <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot" id="eventenddertot<?php echo $alldriver['eve_id']; ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required></td>
+              <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot" id="eventenddertot<?php echo esc_attr( $alldriver['eve_id'] ); ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required></td>
             <td>
               <select name="eve_type[]" class="evetype" required style="width:100px;">
                 <option value="">Please Choose</option>
                 <?php foreach ( $all_pending_toter as $alldriverx1 ) { ?>
-                  <option value="<?php echo $alldriverx1['event_type_id']; ?>" <?php if ( $alldriverx1['event_type_name'] == $all_pending_sex1['event_type_name'] ) echo 'selected'; ?>><?php echo $alldriverx1['event_type_name']; ?></option>
+                  <option value="<?php echo esc_attr( $alldriverx1['event_type_id'] ); ?>" <?php if ( $alldriverx1['event_type_id'] == $alldriver['eve_type'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx1['event_type_name'] ); ?></option>
                 <?php } ?>
               </select>
-              <?php foreach ( $all_pending_toter as $alldriverx1 ) { if ( $alldriverx1['event_type_name'] == $all_pending_sex1['event_type_name'] ) { ?><p class="hidder"><?php echo $alldriverx1['event_type_name']; ?></p><?php } } ?>
+              <p class="hidder"><?php echo esc_html( $alldriver['event_type_name'] ?? '' ); ?></p>
             </td>
-            <td><input type="checkbox" class="splchkkr" value="<?php echo $alldriver['eve_id']; ?>" name="eve_zoom[]" <?php if ( $alldriver['eve_zoom'] == 'yes' ) echo 'checked'; ?>></td>
+            <td><input type="checkbox" class="splchkkr" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" name="eve_zoom[]" <?php if ( ( $alldriver['eve_zoom'] ?? '' ) == 'yes' ) echo 'checked'; ?>></td>
             <td>
               <select name="eve_marketer[]" class="evetype" required style="width:100px;">
                 <option value="">Please Choose</option>
                 <?php foreach ( $all_pending_toterx as $alldriverx2 ) { ?>
-                  <option value="<?php echo $alldriverx2['event_marketer_id']; ?>" <?php if ( $alldriver['eve_marketer'] == $alldriverx2['event_marketer_id'] ) echo 'selected'; ?>><?php echo $alldriverx2['event_marketer_name']; ?></option>
+                  <option value="<?php echo esc_attr( $alldriverx2['event_marketer_id'] ); ?>" <?php if ( $alldriver['eve_marketer'] == $alldriverx2['event_marketer_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx2['event_marketer_name'] ); ?></option>
                 <?php } ?>
               </select>
-              <?php foreach ( $all_pending_toterx as $alldriverx2 ) { if ( $alldriver['eve_marketer'] == $alldriverx2['event_marketer_id'] ) { ?><p class="hidder"><?php echo $alldriverx2['event_marketer_name']; ?></p><?php } } ?>
+              <p class="hidder"><?php echo esc_html( $alldriver['event_marketer_name'] ?? '' ); ?></p>
             </td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" required style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" required style="width:140px;"></td>
@@ -476,10 +531,10 @@ jQuery(function() {
               <select name="eve_instructor[]" class="evetype" required style="width:100px;">
                 <option value="">Please Choose</option>
                 <?php foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
-                  <option value="<?php echo $alldriverx3['event_instructor_id']; ?>" <?php if ( $alldriver['eve_instructor'] == $alldriverx3['event_instructor_id'] ) echo 'selected'; ?>><?php echo $alldriverx3['event_instructor_name']; ?></option>
+                  <option value="<?php echo esc_attr( $alldriverx3['event_instructor_id'] ); ?>" <?php if ( $alldriver['eve_instructor'] == $alldriverx3['event_instructor_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx3['event_instructor_name'] ); ?></option>
                 <?php } ?>
               </select>
-              <?php foreach ( $all_pending_toterxx as $alldriverx3 ) { if ( $alldriver['eve_instructor'] == $alldriverx3['event_instructor_id'] ) { ?><p class="hidder"><?php echo $alldriverx3['event_instructor_name']; ?></p><?php } } ?>
+              <p class="hidder"><?php echo esc_html( $alldriver['event_instructor_name'] ?? '' ); ?></p>
             </td>
           </tr>
                   <?php
@@ -535,5 +590,3 @@ th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertica
 </style>
 	<?php
 }
-
-

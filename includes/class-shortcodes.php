@@ -11,6 +11,10 @@ class Hostlinks_Shortcodes {
 	}
 
 	public function render_eventlisto() {
+		if ( ! is_user_logged_in() ) {
+			wp_safe_redirect( home_url() );
+			exit;
+		}
 		global $wpdb, $post;
 		ob_start();
 		include HOSTLINKS_PLUGIN_DIR . 'shortcode/initial_eventlisto.php';
@@ -18,6 +22,10 @@ class Hostlinks_Shortcodes {
 	}
 
 	public function render_old_eventlisto() {
+		if ( ! is_user_logged_in() ) {
+			wp_safe_redirect( home_url() );
+			exit;
+		}
 		global $wpdb, $post;
 		ob_start();
 		include HOSTLINKS_PLUGIN_DIR . 'shortcode/old_eventlisto.php';

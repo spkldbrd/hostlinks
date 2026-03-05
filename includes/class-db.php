@@ -5,6 +5,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Hostlinks_DB {
 
+	/**
+	 * Run dbDelta only when the stored schema version is behind HOSTLINKS_DB_VERSION.
+	 * Called on 'plugins_loaded' so it fires after every plugin update, not just activation.
+	 */
+	public static function maybe_upgrade() {
+		$installed = get_option( 'hostlinks_db_version', '0' );
+		if ( version_compare( $installed, HOSTLINKS_DB_VERSION, '<' ) ) {
+			self::create_tables();
+			update_option( 'hostlinks_db_version', HOSTLINKS_DB_VERSION );
+		}
+	}
+
 	public static function create_tables() {
 		global $wpdb;
 		$charset_collate = $wpdb->get_charset_collate();

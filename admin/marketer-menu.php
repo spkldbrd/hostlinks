@@ -7,8 +7,13 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 
 	$sucessmsg = '';
 	if ( isset( $_POST['createdriveruser'] ) ) {
-		$postcodename = trim( $_POST['first_name'] );
-		$wpdb->query( "INSERT INTO $table11 (`event_marketer_name`) VALUES ('$postcodename')" );
+		check_admin_referer( 'hostlinks_add_marketer' );
+		$postcodename = sanitize_text_field( $_POST['first_name'] );
+		$wpdb->insert(
+			$table11,
+			array( 'event_marketer_name' => $postcodename, 'event_marketer_status' => 1 ),
+			array( '%s', '%d' )
+		);
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Marketer Sucessfully added. <a href="admin.php?page=marketer-menu">View Marketer</a></p></div>';
 	}
 	?>
@@ -16,6 +21,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
   <h2 id="add-new-user">Add New Marketer</h2>
   <?php echo $sucessmsg; ?>
   <form name="createdriver" method="post" action="" class="anewpostcode">
+    <?php wp_nonce_field( 'hostlinks_add_marketer' ); ?>
     <table class="form-table"><tbody>
       <tr class="form-field">
         <th><label for="first_name">Name Of the Marketer <span class="description">(required)</span></label></th>
@@ -34,16 +40,24 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	$userid       = intval( $_GET['editu'] );
 	$sucessmsgnew = '';
 	if ( isset( $_POST['updatethepcode'] ) ) {
-		$postcodename = trim( $_POST['first_name'] );
-		$wpdb->query( "UPDATE $table11 SET `event_marketer_name`='$postcodename' WHERE `event_marketer_id`=$userid" );
+		check_admin_referer( 'hostlinks_edit_marketer' );
+		$postcodename = sanitize_text_field( $_POST['first_name'] );
+		$wpdb->update(
+			$table11,
+			array( 'event_marketer_name' => $postcodename ),
+			array( 'event_marketer_id'   => $userid ),
+			array( '%s' ),
+			array( '%d' )
+		);
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Marketer Sucessfully Updated. <a href="admin.php?page=marketer-menu">View Marketer</a></p></div>';
 	}
-	$bokdetsx = $wpdb->get_row( "SELECT * FROM $table11 WHERE `event_marketer_id`=$userid" );
+	$bokdetsx = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table11 WHERE `event_marketer_id` = %d", $userid ) );
 	?>
 <div class="wrap">
   <h2 id="add-new-user">Update Marketer</h2>
   <?php echo $sucessmsgnew; ?>
   <form name="createdriver" method="post" action="" class="updpocode">
+    <?php wp_nonce_field( 'hostlinks_edit_marketer' ); ?>
     <table class="form-table"><tbody>
       <tr class="form-field">
         <th><label for="first_name">Name Of the Marketer <span class="description">(required)</span></label></th>
@@ -60,15 +74,14 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 } else {
 
 	if ( isset( $_POST['deleteentire'] ) ) {
-		$users = $_POST['users'];
-		if ( count( $users ) > 0 ) {
-			foreach ( $users as $user ) {
-				$wpdb->query( "UPDATE $table11 SET `event_marketer_status` = '2' WHERE `event_marketer_id`=" . intval( $user ) );
-			}
+		check_admin_referer( 'hostlinks_manage_marketers' );
+		$users = isset( $_POST['users'] ) ? (array) $_POST['users'] : array();
+		foreach ( $users as $user ) {
+			$wpdb->update( $table11, array( 'event_marketer_status' => 2 ), array( 'event_marketer_id' => intval( $user ) ), array( '%d' ), array( '%d' ) );
 		}
 	}
 	$all_pending_bookings = $wpdb->get_results( "SELECT * FROM $table11 WHERE `event_marketer_status`='1'", ARRAY_A );
-	$tot1                 = $wpdb->num_rows;
+	$tot1                 = count( $all_pending_bookings );
 	?>
 <div id="wpbody">
   <div tabindex="0" id="wpbody-content">
@@ -78,6 +91,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <li class="all"><a class="current">All <span class="count">(<?php echo $tot1; ?>)</span></a> |</li>
       </ul>
       <form method="post" action="" id="posts-filter">
+        <?php wp_nonce_field( 'hostlinks_manage_marketers' ); ?>
         <div class="alignleft actions bulkactions">
           <select id="bulk-action-selector-top" name="actiondelete">
             <option selected value="-1">Bulk Actions</option>
@@ -96,9 +110,9 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
           <tbody id="the-list">
             <?php foreach ( $all_pending_bookings as $alldriver ) { ?>
             <tr class="alternate">
-              <th class="check-column"><input type="checkbox" value="<?php echo $alldriver['event_marketer_id']; ?>" class="administrator" name="users[]"></th>
-              <td><strong><?php echo $alldriver['event_marketer_name']; ?></strong>
-                <div class="row-actions"><span class="edit"><a href="admin.php?page=marketer-menu&editu=<?php echo $alldriver['event_marketer_id']; ?>">Edit</a></span></div>
+              <th class="check-column"><input type="checkbox" value="<?php echo esc_attr( $alldriver['event_marketer_id'] ); ?>" class="administrator" name="users[]"></th>
+              <td><strong><?php echo esc_html( $alldriver['event_marketer_name'] ); ?></strong>
+                <div class="row-actions"><span class="edit"><a href="admin.php?page=marketer-menu&editu=<?php echo esc_attr( $alldriver['event_marketer_id'] ); ?>">Edit</a></span></div>
               </td>
             </tr>
             <?php } ?>
@@ -128,5 +142,3 @@ th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertica
 .TFtable tr:nth-child(odd){background:#f9f9f9;}
 .TFtable tr:nth-child(even){background:#ededed;}
 </style>
-
-

@@ -1,10 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 global $wpdb, $post;
-if ( ! is_user_logged_in() ) {
-	wp_redirect( home_url() );
-	exit;
-}
 // CSS is enqueued via class-assets.php (wp_enqueue_style) — no inline tags needed.
 
 $table11 = $wpdb->prefix . 'event_details_list';

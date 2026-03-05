@@ -1,10 +1,6 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 global $wpdb, $post;
-if ( ! is_user_logged_in() ) {
-	wp_redirect( home_url() );
-	exit;
-}
 
 if ( isset( $_POST['applyfilter'] ) ) {
 	$thispage   = get_permalink();

@@ -2,7 +2,7 @@
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
 // Notification messages
-$hl_msg = isset( $_GET['hl_msg'] ) ? $_GET['hl_msg'] : '';
+$hl_msg = isset( $_GET['hl_msg'] ) ? sanitize_key( $_GET['hl_msg'] ) : '';
 $messages = array(
 	'imported' => sprintf(
 		'<div class="notice notice-success"><p>Import complete: <strong>%d</strong> records imported, <strong>%d</strong> skipped (duplicates).</p></div>',

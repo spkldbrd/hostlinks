@@ -21,12 +21,31 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Hostlinks_Updater {
 
+	private static $instance = null;
+
 	private $plugin_slug;
 	private $plugin_file;
 	private $github_user;
 	private $github_repo;
 	private $api_url;
 	private $transient_key;
+
+	/**
+	 * Initialize the updater (call once from the main plugin file).
+	 */
+	public static function init( $plugin_file, $github_user, $github_repo ) {
+		if ( null === self::$instance ) {
+			self::$instance = new self( $plugin_file, $github_user, $github_repo );
+		}
+		return self::$instance;
+	}
+
+	/**
+	 * Retrieve the already-initialized instance (for use in admin pages).
+	 */
+	public static function instance() {
+		return self::$instance;
+	}
 
 	public function __construct( $plugin_file, $github_user, $github_repo ) {
 		$this->plugin_file   = $plugin_file;

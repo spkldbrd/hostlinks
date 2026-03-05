@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://github.com/spkldbrd/hostlinks
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.2.0
+ * Version:     2.2.1
  * Author:      Digital Solution
  * License:     GPL2
  */
@@ -12,7 +12,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.2.0' );
+define( 'HOSTLINKS_VERSION',    '2.2.1' );
+define( 'HOSTLINKS_DB_VERSION', '1.0' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -32,5 +33,7 @@ register_activation_hook( __FILE__, array( 'Hostlinks_Activation', 'on_activate'
 
 new Hostlinks_Activation();
 
-// Stored in a global so the Plugin Info admin page can call fetch/get methods
-$GLOBALS['hostlinks_updater'] = new Hostlinks_Updater( __FILE__, HOSTLINKS_GITHUB_USER, HOSTLINKS_GITHUB_REPO );
+Hostlinks_Updater::init( __FILE__, HOSTLINKS_GITHUB_USER, HOSTLINKS_GITHUB_REPO );
+
+// Run schema upgrades on every load — safe because dbDelta only alters when needed
+add_action( 'plugins_loaded', array( 'Hostlinks_DB', 'maybe_upgrade' ) );

@@ -7,9 +7,14 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 
 	$sucessmsg = '';
 	if ( isset( $_POST['createdriveruser'] ) ) {
-		$postcodename = trim( $_POST['first_name'] );
-		$lat_long     = trim( $_POST['lat_long'] );
-		$wpdb->query( "INSERT INTO $table11 (`event_type_name`,`event_type_color`) VALUES ('$postcodename','$lat_long')" );
+		check_admin_referer( 'hostlinks_add_type' );
+		$postcodename = sanitize_text_field( $_POST['first_name'] );
+		$lat_long     = sanitize_text_field( $_POST['lat_long'] );
+		$wpdb->insert(
+			$table11,
+			array( 'event_type_name' => $postcodename, 'event_type_color' => $lat_long, 'event_type_status' => 1 ),
+			array( '%s', '%s', '%d' )
+		);
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Type Sucessfully added. <a href="admin.php?page=types-menu">View Type</a></p></div>';
 	}
 	?>
@@ -17,6 +22,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
   <h2 id="add-new-user">Add New Type</h2>
   <?php echo $sucessmsg; ?>
   <form name="createdriver" method="post" action="" class="anewpostcode">
+    <?php wp_nonce_field( 'hostlinks_add_type' ); ?>
     <table class="form-table"><tbody>
       <tr class="form-field">
         <th><label for="first_name">Name Of the Type <span class="description">(required)</span></label></th>
@@ -30,7 +36,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
             <?php
             $arclr = array( 'bg-primary' => 'bg-primary', 'bg-secondary' => 'bg-secondary', 'bg-success' => 'bg-success', 'bg-danger' => 'bg-danger', 'bg-warning' => 'bg-warning', 'bg-info' => 'bg-info', 'bg-dark' => 'bg-dark' );
             foreach ( $arclr as $key => $value ) { ?>
-              <option value="<?php echo $value; ?>"><?php echo $key; ?></option>
+              <option value="<?php echo esc_attr( $value ); ?>"><?php echo esc_html( $key ); ?></option>
             <?php } ?>
           </select>
         </td>
@@ -48,17 +54,25 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	$userid       = intval( $_GET['editu'] );
 	$sucessmsgnew = '';
 	if ( isset( $_POST['updatethepcode'] ) ) {
-		$postcodename = trim( $_POST['first_name'] );
-		$lat_long     = trim( $_POST['lat_long'] );
-		$wpdb->query( "UPDATE $table11 SET `event_type_name`='$postcodename',`event_type_color`='$lat_long' WHERE `event_type_id`=$userid" );
+		check_admin_referer( 'hostlinks_edit_type' );
+		$postcodename = sanitize_text_field( $_POST['first_name'] );
+		$lat_long     = sanitize_text_field( $_POST['lat_long'] );
+		$wpdb->update(
+			$table11,
+			array( 'event_type_name' => $postcodename, 'event_type_color' => $lat_long ),
+			array( 'event_type_id'   => $userid ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Type Sucessfully Updated. <a href="admin.php?page=types-menu">View Type</a></p></div>';
 	}
-	$bokdetsx = $wpdb->get_row( "SELECT * FROM $table11 WHERE `event_type_id`=$userid" );
+	$bokdetsx = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table11 WHERE `event_type_id` = %d", $userid ) );
 	?>
 <div class="wrap">
   <h2 id="add-new-user">Update Type</h2>
   <?php echo $sucessmsgnew; ?>
   <form name="createdriver" method="post" action="" class="updpocode">
+    <?php wp_nonce_field( 'hostlinks_edit_type' ); ?>
     <table class="form-table"><tbody>
       <tr class="form-field">
         <th><label for="first_name">Name Of the Type <span class="description">(required)</span></label></th>
@@ -72,7 +86,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
             <?php
             $arclr = array( 'bg-primary' => 'bg-primary', 'bg-secondary' => 'bg-secondary', 'bg-success' => 'bg-success', 'bg-danger' => 'bg-danger', 'bg-warning' => 'bg-warning', 'bg-info' => 'bg-info', 'bg-dark' => 'bg-dark' );
             foreach ( $arclr as $key => $value ) { ?>
-              <option value="<?php echo $value; ?>" <?php if ( $bokdetsx->event_type_color == $value ) echo 'selected'; ?>><?php echo $key; ?></option>
+              <option value="<?php echo esc_attr( $value ); ?>" <?php if ( ( $bokdetsx->event_type_color ?? '' ) == $value ) echo 'selected'; ?>><?php echo esc_html( $key ); ?></option>
             <?php } ?>
           </select>
         </td>
@@ -88,15 +102,14 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 } else {
 
 	if ( isset( $_POST['deleteentire'] ) ) {
-		$users = $_POST['users'];
-		if ( count( $users ) > 0 ) {
-			foreach ( $users as $user ) {
-				$wpdb->query( "UPDATE $table11 SET `event_type_status` = '2' WHERE `event_type_id`=" . intval( $user ) );
-			}
+		check_admin_referer( 'hostlinks_manage_types' );
+		$users = isset( $_POST['users'] ) ? (array) $_POST['users'] : array();
+		foreach ( $users as $user ) {
+			$wpdb->update( $table11, array( 'event_type_status' => 2 ), array( 'event_type_id' => intval( $user ) ), array( '%d' ), array( '%d' ) );
 		}
 	}
 	$all_pending_bookings = $wpdb->get_results( "SELECT * FROM $table11 WHERE `event_type_status`='1'", ARRAY_A );
-	$tot1                 = $wpdb->num_rows;
+	$tot1                 = count( $all_pending_bookings );
 	?>
 <div id="wpbody">
   <div tabindex="0" id="wpbody-content" class="ddddd">
@@ -106,6 +119,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <li class="all"><a class="current">All <span class="count">(<?php echo $tot1; ?>)</span></a> |</li>
       </ul>
       <form method="post" action="" id="posts-filter">
+        <?php wp_nonce_field( 'hostlinks_manage_types' ); ?>
         <div class="alignleft actions bulkactions">
           <select id="bulk-action-selector-top" name="actiondelete">
             <option selected value="-1">Bulk Actions</option>
@@ -125,11 +139,11 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
           <tbody id="the-list">
             <?php foreach ( $all_pending_bookings as $alldriver ) { ?>
             <tr class="alternate">
-              <th class="check-column"><input type="checkbox" value="<?php echo $alldriver['event_type_id']; ?>" class="administrator" name="users[]"></th>
-              <td><strong><?php echo $alldriver['event_type_name']; ?></strong>
-                <div class="row-actions"><span class="edit"><a href="admin.php?page=types-menu&editu=<?php echo $alldriver['event_type_id']; ?>">Edit</a></span></div>
+              <th class="check-column"><input type="checkbox" value="<?php echo esc_attr( $alldriver['event_type_id'] ); ?>" class="administrator" name="users[]"></th>
+              <td><strong><?php echo esc_html( $alldriver['event_type_name'] ); ?></strong>
+                <div class="row-actions"><span class="edit"><a href="admin.php?page=types-menu&editu=<?php echo esc_attr( $alldriver['event_type_id'] ); ?>">Edit</a></span></div>
               </td>
-              <td><div class="struter <?php echo $alldriver['event_type_color']; ?>" style="width:50px;">&nbsp;</div></td>
+              <td><div class="struter <?php echo esc_attr( $alldriver['event_type_color'] ); ?>" style="width:50px;">&nbsp;</div></td>
             </tr>
             <?php } ?>
           </tbody>
@@ -158,5 +172,3 @@ th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertica
 .TFtable tr:nth-child(odd){background:#f9f9f9;}
 .TFtable tr:nth-child(even){background:#ededed;}
 </style>
-
-

@@ -4,7 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /** @var Hostlinks_Updater $updater */
-$updater         = $GLOBALS['hostlinks_updater'];
+$updater         = Hostlinks_Updater::instance();
 $just_checked    = isset( $_GET['hl_checked'] ) && $_GET['hl_checked'] === '1';
 $current_version = HOSTLINKS_VERSION;
 

@@ -15,18 +15,36 @@ class Hostlinks_DB {
 			return;
 		}
 
-		// Always run dbDelta to add missing columns / tables.
-		self::create_tables();
+		global $wpdb;
 
-		// v1.1 — rename misspelled column eve_trainner_url → eve_trainer_url
+		// Suppress error output so a failed query never prints to the browser
+		// before headers are sent (which cascades into cookie/redirect failures).
+		$prev_suppress = $wpdb->suppress_errors( true );
+
+		// v1.1 — rename misspelled column BEFORE dbDelta runs.
+		// Running dbDelta first caused it to ADD eve_trainer_url as a new column
+		// while eve_trainner_url still existed, then the CHANGE failed with
+		// "Duplicate column name". Three states are handled:
+		//   old only  → CHANGE (normal rename)
+		//   both      → DROP old (recovery: dbDelta already added the new column)
+		//   new only  → nothing to do (already migrated)
 		if ( version_compare( $installed, '1.1', '<' ) ) {
-			global $wpdb;
-			$table = $wpdb->prefix . 'event_details_list';
-			$cols  = $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_trainner_url' ) );
-			if ( ! empty( $cols ) ) {
+			$table   = $wpdb->prefix . 'event_details_list';
+			$has_old = ! empty( $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_trainner_url' ) ) );
+			$has_new = ! empty( $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_trainer_url' ) ) );
+
+			if ( $has_old && ! $has_new ) {
 				$wpdb->query( "ALTER TABLE `{$table}` CHANGE `eve_trainner_url` `eve_trainer_url` text NOT NULL DEFAULT ''" );
+			} elseif ( $has_old && $has_new ) {
+				// Both columns exist: the broken state. Drop the misspelled one.
+				$wpdb->query( "ALTER TABLE `{$table}` DROP COLUMN `eve_trainner_url`" );
 			}
 		}
+
+		// Now run dbDelta — sees the correct schema and makes no conflicting changes.
+		self::create_tables();
+
+		$wpdb->suppress_errors( $prev_suppress );
 
 		update_option( 'hostlinks_db_version', HOSTLINKS_DB_VERSION );
 	}

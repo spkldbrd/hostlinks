@@ -389,17 +389,17 @@ jQuery(function() {
             }
             ?>
           </select>
-          <button type="button" id="hl-apply-filter" class="button action">Apply Filter</button>
-          <a href="admin.php?page=booking-menu" class="button" style="margin-left:6px;">Reset</a>
         </td>
       </tr></table>
     </div>
     <script>
-    document.getElementById('hl-apply-filter').addEventListener('click', function() {
-        var yr  = document.getElementById('hl-chooseyear').value;
-        var mo  = document.getElementById('hl-choosemonth').value;
+    function hlApplyFilter() {
+        var yr = document.getElementById('hl-chooseyear').value;
+        var mo = document.getElementById('hl-choosemonth').value;
         window.location.href = 'admin.php?page=booking-menu&syear=' + yr + '-' + mo;
-    });
+    }
+    document.getElementById('hl-chooseyear').addEventListener('change', hlApplyFilter);
+    document.getElementById('hl-choosemonth').addEventListener('change', hlApplyFilter);
     </script>
 
     <form method="post" action="admin.php?page=booking-menu&syear=<?php echo esc_attr( $syear ); ?>" id="posts-filter">

@@ -16,15 +16,52 @@ $table11 = $wpdb->prefix . 'event_details_list';
 $table12 = $wpdb->prefix . 'event_type';
 $table13 = $wpdb->prefix . 'event_marketer';
 $table14 = $wpdb->prefix . 'event_instructor';
-$currentYear   = date('Y');
-$month         = date('m');
-$stop_date     = new DateTime( date('Y-m-d') );
-$stop_date->modify('-1 month');
-$holday        = $stop_date->format('m');
-$start_date    = date('Y-m-01');
 
-$all_pending_bookings    = $wpdb->get_results( "SELECT * FROM $table11 WHERE `eve_status` = '1' AND `eve_start` >= '$start_date' ORDER BY `eve_start` ASC", ARRAY_A );
-$resulttotapplijobscnt   = $wpdb->num_rows;
+$start_date = date('Y-m-01');
+
+// ── Single JOIN query — replaces 3 per-row lookups (N+1 fix) ────────────────
+$all_pending_bookings = $wpdb->get_results( $wpdb->prepare(
+	"SELECT e.*,
+	        t.event_type_name,
+	        m.event_marketer_name,
+	        i.event_instructor_name
+	 FROM {$table11} e
+	 LEFT JOIN {$table12} t ON e.eve_type        = t.event_type_id
+	 LEFT JOIN {$table13} m ON e.eve_marketer    = m.event_marketer_id
+	 LEFT JOIN {$table14} i ON e.eve_instructor  = i.event_instructor_id
+	 WHERE e.eve_status = '1' AND e.eve_start >= %s
+	 ORDER BY e.eve_start ASC",
+	$start_date
+), ARRAY_A );
+
+$resulttotapplijobscnt = count( $all_pending_bookings );
+
+// ── Pass 1: pre-calculate monthly totals ─────────────────────────────────────
+// Doing this BEFORE rendering means we can echo values directly in the
+// month-header row instead of injecting them via JavaScript after page load.
+$totals = array(); // $totals[$year][$month] = [ paid, count, wrpaid, wrcount, mgpaid, mgcount ]
+
+foreach ( $all_pending_bookings as $ev ) {
+	$parts  = explode( '-', $ev['eve_start'] );
+	$yr     = $parts[0];
+	$mo     = $parts[1];
+	$type   = trim( $ev['event_type_name'] ?? '' );
+
+	if ( ! isset( $totals[$yr][$mo] ) ) {
+		$totals[$yr][$mo] = [ 'paid'=>0,'cnt'=>0,'wrpaid'=>0,'wrcnt'=>0,'mgpaid'=>0,'mgcnt'=>0 ];
+	}
+
+	$totals[$yr][$mo]['paid'] += (int) $ev['eve_paid'];
+	$totals[$yr][$mo]['cnt']  += 1;
+
+	if ( $type === 'Writing' ) {
+		$totals[$yr][$mo]['wrpaid'] += (int) $ev['eve_paid'];
+		$totals[$yr][$mo]['wrcnt']  += 1;
+	} elseif ( $type === 'Management' ) {
+		$totals[$yr][$mo]['mgpaid'] += (int) $ev['eve_paid'];
+		$totals[$yr][$mo]['mgcnt']  += 1;
+	}
+}
 ?>
 <div class="alignwide">
 	<div class="col-lg-12">
@@ -40,52 +77,48 @@ $resulttotapplijobscnt   = $wpdb->num_rows;
 <table valign="top" cellspacing="0" cellpadding="8" border="0" bgcolor="ffffff" align="center">
 <tbody>
 <?php
-$yearss   = 0;
-$tt       = 1;
-$papaya   = 1;
-$totsum   = array();
-$toteve   = array();
-$totsumwr = array();
-$totevewr = array();
-$totsummg = array();
-$totevemg = array();
+$yearss = 0;
+$tt     = 1;
+$today  = new DateTime();
 
 if ( $resulttotapplijobscnt > 0 ) {
 
 	foreach ( $all_pending_bookings as $alldriver ) {
-		$all_pending_sex1 = $wpdb->get_row( "SELECT * FROM $table12 WHERE `event_type_id` = " . $alldriver['eve_type'], ARRAY_A );
-		$all_pending_sex2 = $wpdb->get_row( "SELECT * FROM $table13 WHERE `event_marketer_id` = " . $alldriver['eve_marketer'], ARRAY_A );
-		$all_pending_sex3 = $wpdb->get_row( "SELECT * FROM $table14 WHERE `event_instructor_id` = " . $alldriver['eve_instructor'], ARRAY_A );
+
+		$type_name       = trim( $alldriver['event_type_name']       ?? '' );
+		$marketer_name   = $alldriver['event_marketer_name']   ?? '';
+		$instructor_name = $alldriver['event_instructor_name'] ?? '';
 
 		$dater = explode( '-', $alldriver['eve_start'] );
-		if ( $yearss != $dater[0] . '' . $dater[1] ) {
+		$yr    = $dater[0];
+		$mo    = $dater[1];
+
+		// ── Month header row (printed once per new month) ────────────────
+		if ( $yearss != $yr . $mo ) {
 			$tt     = 1;
-			$yearss = $dater[0] . '' . $dater[1];
+			$yearss = $yr . $mo;
+
+			// Totals for this month — already computed, no JS needed
+			$t        = $totals[$yr][$mo];
+			$avg      = $t['cnt']   > 0 ? round( $t['paid']   / $t['cnt'] )   : 0;
+			$avgwr    = $t['wrcnt'] > 0 ? round( $t['wrpaid'] / $t['wrcnt'] ) : 0;
+			$avgmg    = $t['mgcnt'] > 0 ? round( $t['mgpaid'] / $t['mgcnt'] ) : 0;
 			?>
-	<tr bgcolor="ffffe1"><td><p><b><?php echo date("F Y", strtotime( $alldriver['eve_start'] ) )?></b>
-	<br/><b id="sectionone<?php echo $papaya;?>"></b></p></td>
-	<td><p><b id="wrsectionone<?php echo $papaya;?>"></b></p></td>
-	<td><p><b id="mgsectionone<?php echo $papaya;?>"></b></p></td>
-	<td></td><td></td></tr>
+	<tr bgcolor="ffffe1">
+		<td><p><b><?php echo date("F Y", strtotime( $alldriver['eve_start'] ) )?></b><br/>
+		<b><?php echo "{$t['paid']} / {$t['cnt']} / {$avg}"; ?></b></p></td>
+		<td><p><b>W&nbsp;<?php echo "{$t['wrpaid']} / {$t['wrcnt']} / {$avgwr}"; ?></b></p></td>
+		<td><p><b>M&nbsp;<?php echo "{$t['mgpaid']} / {$t['mgcnt']} / {$avgmg}"; ?></b></p></td>
+		<td></td><td></td>
+	</tr>
 	<tr>
 			<?php
-			$papaya++;
 		}
 
-		$totsum[$dater[0]][$dater[1]] = ( $totsum[$dater[0]][$dater[1]] ?? 0 ) + $alldriver['eve_paid'];
-		$toteve[$dater[0]][$dater[1]] = ( $toteve[$dater[0]][$dater[1]] ?? 0 ) + 1;
-
-		if ( trim( $all_pending_sex1['event_type_name'] ) == 'Writing' ) {
-			$totsumwr[$dater[0]][$dater[1]] = ( $totsumwr[$dater[0]][$dater[1]] ?? 0 ) + $alldriver['eve_paid'];
-			$totevewr[$dater[0]][$dater[1]] = ( $totevewr[$dater[0]][$dater[1]] ?? 0 ) + 1;
-		} elseif ( trim( $all_pending_sex1['event_type_name'] ) == 'Management' ) {
-			$totsummg[$dater[0]][$dater[1]] = ( $totsummg[$dater[0]][$dater[1]] ?? 0 ) + $alldriver['eve_paid'];
-			$totevemg[$dater[0]][$dater[1]] = ( $totevemg[$dater[0]][$dater[1]] ?? 0 ) + 1;
-		}
-
+		// ── Event cell ───────────────────────────────────────────────────
 		if ( $tt % 5 == 0 ) { ?>
 <td>
-<span class="zoom<?php echo trim( strtolower( $alldriver['eve_zoom'] ) );?>"><a href="<?php echo $alldriver['eve_host_url']; ?>" target="_blank"><?php echo $alldriver['eve_location']; ?></a> <?php echo $alldriver['eve_paid']; ?> + <?php echo $alldriver['eve_free']; ?> <?php echo $all_pending_sex2['event_marketer_name'];?></span><br/>
+<span class="zoom<?php echo trim( strtolower( $alldriver['eve_zoom'] ) );?>"><a href="<?php echo $alldriver['eve_host_url']; ?>" target="_blank"><?php echo $alldriver['eve_location']; ?></a> <?php echo $alldriver['eve_paid']; ?> + <?php echo $alldriver['eve_free']; ?> <?php echo esc_html( $marketer_name );?></span><br/>
 <a href="<?php echo $alldriver['eve_roster_url']; ?>" target="_blank" class="rosterlink">Roster</a><br/>
 <?php
 			$fsarray = explode( '-', $alldriver['eve_start'] );
@@ -102,18 +135,14 @@ if ( $resulttotapplijobscnt > 0 ) {
 			}
 			?>
 <br/>
-<span class="<?php echo trim( strtolower( $all_pending_sex1['event_type_name'] ) );?>">Instructor: <?php echo $all_pending_sex3['event_instructor_name'];?></span><br/>
+<span class="<?php echo trim( strtolower( $type_name ) );?>">Instructor: <?php echo esc_html( $instructor_name );?></span><br/>
 <?php
-			$date1   = new DateTime();
-			$date2   = new DateTime( $alldriver['eve_start'] );
-			$date3   = new DateTime( $alldriver['eve_end'] );
-			if ( $date1 > $date2 ) {
-				echo ( $date1 > $date3 ) ? 'The Event is History' : 'Event Started';
+			$date2 = new DateTime( $alldriver['eve_start'] );
+			$date3 = new DateTime( $alldriver['eve_end'] );
+			if ( $today > $date2 ) {
+				echo ( $today > $date3 ) ? 'The Event is History' : 'Event Started';
 			} else {
-				$date111 = date_create( $alldriver['eve_start'] );
-				$date211 = date_create( date('Y-m-d') );
-				$diff1   = date_diff( $date111, $date211 );
-				echo $diff1->format("%a days") . ' to event';
+				echo $today->diff($date2)->days . ' days to event';
 			}
 			?>
 </td>
@@ -121,7 +150,7 @@ if ( $resulttotapplijobscnt > 0 ) {
 		<?php
 		} else { ?>
 <td>
-<span class="zoom<?php echo trim( strtolower( $alldriver['eve_zoom'] ) );?>"><a href="<?php echo $alldriver['eve_host_url']; ?>" target="_blank"><?php echo $alldriver['eve_location']; ?></a> <?php echo $alldriver['eve_paid']; ?>+<?php echo $alldriver['eve_free']; ?> <?php echo $all_pending_sex2['event_marketer_name'];?></span><br/>
+<span class="zoom<?php echo trim( strtolower( $alldriver['eve_zoom'] ) );?>"><a href="<?php echo $alldriver['eve_host_url']; ?>" target="_blank"><?php echo $alldriver['eve_location']; ?></a> <?php echo $alldriver['eve_paid']; ?>+<?php echo $alldriver['eve_free']; ?> <?php echo esc_html( $marketer_name );?></span><br/>
 <a href="<?php echo $alldriver['eve_roster_url']; ?>" target="_blank" class="rosterlink">Roster</a><br/>
 <?php
 			$fsarray = explode( '-', $alldriver['eve_start'] );
@@ -137,13 +166,12 @@ if ( $resulttotapplijobscnt > 0 ) {
 				echo date( "M", strtotime( $alldriver['eve_start'] ) ); ?><?php echo ',' . $fsarray[2] . ',' . $fsarray[0] . '-'; ?><?php echo date( "M", strtotime( $alldriver['eve_end'] ) ); ?><?php echo ',' . $lsarray[2] . ',' . $lsarray[0];
 			}
 			?><br/>
-<span class="<?php echo trim( strtolower( $all_pending_sex1['event_type_name'] ) );?>">Instructor: <?php echo $all_pending_sex3['event_instructor_name'];?></span><br/>
+<span class="<?php echo trim( strtolower( $type_name ) );?>">Instructor: <?php echo esc_html( $instructor_name );?></span><br/>
 <?php
-			$date1   = new DateTime();
-			$date2   = new DateTime( $alldriver['eve_start'] );
-			$date3   = new DateTime( $alldriver['eve_end'] );
-			if ( $date1 > $date2 ) {
-				echo ( $date1 > $date3 ) ? 'The Event is History' : 'Event Started';
+			$date2 = new DateTime( $alldriver['eve_start'] );
+			$date3 = new DateTime( $alldriver['eve_end'] );
+			if ( $today > $date2 ) {
+				echo ( $today > $date3 ) ? 'The Event is History' : 'Event Started';
 			} else {
 				$date11 = date_create( $alldriver['eve_start'] );
 				$date21 = date_create( date('Y-m-d') );
@@ -176,40 +204,6 @@ if ( $resulttotapplijobscnt > 0 ) {
 <script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/moment/min/moment.min.js"></script>
 <script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/libs/jquery-ui-dist/jquery-ui.min.js"></script>
 <script src="<?php echo HOSTLINKS_PLUGIN_URL; ?>assets/js/app.js"></script>
-<?php
-$ryy = 1;
-foreach ( $totsum as $keyx => $totsumx ) {
-	foreach ( $totsumx as $key => $totsumxx ) {
-		$disblval   = 0;
-		$_evetot    = $toteve[$keyx][$key] ?? 0;
-		if ( $_evetot > 0 ) {
-			$disblval = round( $totsumxx / $_evetot );
-		}
-		$disblvalon = 0;
-		$_sumwr     = $totsumwr[$keyx][$key] ?? 0;
-		$_evewr     = $totevewr[$keyx][$key] ?? 0;
-		if ( $_sumwr != 0 && $_evewr != 0 ) {
-			$disblvalon = round( $_sumwr / $_evewr );
-		}
-		$disblvalto = 0;
-		$_summg     = $totsummg[$keyx][$key] ?? 0;
-		$_evemg     = $totevemg[$keyx][$key] ?? 0;
-		if ( $_summg != 0 && $_evemg != 0 ) {
-			$disblvalto = round( $_summg / $_evemg );
-		}
-		?>
-<script>
-jQuery(document).ready(function(){
-	jQuery('#sectionone<?php echo $ryy;?>').html('<?php echo $totsumxx;?> / <?php echo $_evetot; ?> / <?php echo $disblval;?>');
-	jQuery('#wrsectionone<?php echo $ryy;?>').html('W &nbsp;<?php echo $_sumwr; ?> / <?php echo $_evewr; ?> / <?php echo $disblvalon;?>');
-	jQuery('#mgsectionone<?php echo $ryy;?>').html('M &nbsp;<?php echo $_summg; ?> / <?php echo $_evemg; ?> / <?php echo $disblvalto;?>');
-});
-</script>
-		<?php
-		$ryy++;
-	}
-}
-?>
 <style>
 .card-body table{width:100%;}
 td p{margin-bottom:0px;}
@@ -220,10 +214,3 @@ tr{border-bottom-style:dashed;border-bottom-color:#b2b2b2;border-bottom-width:1p
 .card{max-width:100%;}
 .rosterlink,.trainerlink,.signinurllink{font-size:1.05em;}
 </style>
-<script>
-jQuery(document).ready(function(){
-	jQuery('#addformer').hide();
-	jQuery('#editformer').hide();
-});
-</script>
-

@@ -54,25 +54,21 @@ foreach ( $all_pending_bookings as $ev ) {
 }
 // CSS is enqueued via class-assets.php (wp_enqueue_style) — no inline tags needed.
 ?>
-<div class="alignwide">
+<div class="alignwide" style="padding-top:20px;">
 	<div class="col-lg-12">
 		<div class="card">
-<div class="tablenav-pages" style="margin-bottom:10px;">
-  <table border="0" cellspacing="0" cellpadding="30" class="listtable" width="100%"><tr>
-    <td align="left">
-      Filter By Year:
-      <select id="hl-old-chooseyear" class="mosifyy">
-        <?php
-        $yearStart = 2022;
-        $yearEnd   = $currentYear + 1;
-        for ( $yr = $yearEnd; $yr >= $yearStart; $yr-- ) {
-            $sel = ( $yr === $selectedYear ) ? 'selected' : '';
-            echo "<option value=\"$yr\" $sel>$yr</option>";
-        }
-        ?>
-      </select>
-    </td>
-  </tr></table>
+<div style="margin-bottom:10px;">
+  Filter By Year:
+  <select id="hl-old-chooseyear" class="mosifyy">
+    <?php
+    $yearStart = 2022;
+    $yearEnd   = $currentYear + 1;
+    for ( $yr = $yearEnd; $yr >= $yearStart; $yr-- ) {
+        $sel = ( $yr === $selectedYear ) ? 'selected' : '';
+        echo "<option value=\"$yr\" $sel>$yr</option>";
+    }
+    ?>
+  </select>
 </div>
 <script>
 document.getElementById('hl-old-chooseyear').addEventListener('change', function() {

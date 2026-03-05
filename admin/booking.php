@@ -370,7 +370,7 @@ jQuery(function() {
         <td align="left">
           <select id="hl-chooseyear">
             <?php
-            $yearStart = $currentYear - 4;
+            $yearStart = 2022;
             $yearEnd   = $currentYear + 1;
             for ( $yr = $yearEnd; $yr >= $yearStart; $yr-- ) {
                 $sel = ( $yr === $filterYear ) ? 'selected' : '';

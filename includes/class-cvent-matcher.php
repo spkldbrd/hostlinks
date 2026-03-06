@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Bootstrap matching: find the best CVENT event for a Hostlinks event.
  *
- * Scoring (max 265 points):
+ * Scoring (max 290 points):
  *   +25  same start calendar day (UTC — CVENT stores UTC ISO timestamps)
  *   +25  date ranges overlap (HL start..end overlaps CVENT start..end)
  *   +40  normalized city matches (from CVENT venue data)
@@ -19,12 +19,17 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   +35  event type matches (Writing / Management extracted from CVENT title
  *         vs eve_type_name from Hostlinks event_type table)
  *   +30  both are zoom events (CVENT title contains "zoom", HL eve_zoom = 1)
+ *   +15  subaward match: "SUB" in HL eve_location AND "subaward" in CVENT title
+ *   +10  zoom region side match: timezone abbreviation in CVENT zoom title
+ *         (EST/Eastern → east, PST/Pacific → west, CST/Central → central,
+ *          MST/Mountain → mountain) matches the region prefix of HL eve_location
  *
  * Auto-match: top score >= 90 AND at least 20 points ahead of second-best.
  * Otherwise: status = needs_review (admin picks manually).
  *
  * Zoom auto-match path: overlap(25) + type(35) + zoom(30) = 90.
  * City auto-match path: overlap(25) + title_location(65) = 90.
+ * Zoom subaward path:   sameday(25) + overlap(25) + zoom(30) + subaward(15) + region(10) = 105.
  */
 class Hostlinks_CVENT_Matcher {
 
@@ -124,28 +129,32 @@ class Hostlinks_CVENT_Matcher {
 	public static function score_candidate( $hl_event, $cvent_event ) {
 		$score     = 0;
 		$breakdown = array(
-			'dates_same_day' => 0,
-			'dates_overlap'  => 0,
-			'city'           => 0,
-			'state'          => 0,
-			'venue'          => 0,
-			'title'          => 0,
-			'title_location' => 0,
-			'type_match'     => 0,
-			'zoom_match'     => 0,
-			'hl_city'        => '',
-			'hl_state'       => '',
-			'cv_city'        => '',
-			'cv_state'       => '',
-			'hl_start'       => '',
-			'cv_start'       => '',
-			'title_overlap'  => 0.0,
-			'hl_loc_base'    => '',
-			'cv_title_loc'   => '',
-			'cv_type'        => '',
-			'hl_type'        => '',
-			'cv_is_zoom'     => false,
-			'hl_is_zoom'     => false,
+			'dates_same_day'   => 0,
+			'dates_overlap'    => 0,
+			'city'             => 0,
+			'state'            => 0,
+			'venue'            => 0,
+			'title'            => 0,
+			'title_location'   => 0,
+			'type_match'       => 0,
+			'zoom_match'       => 0,
+			'subaward_match'   => 0,
+			'zoom_region_match'=> 0,
+			'hl_city'          => '',
+			'hl_state'         => '',
+			'cv_city'          => '',
+			'cv_state'         => '',
+			'hl_start'         => '',
+			'cv_start'         => '',
+			'title_overlap'    => 0.0,
+			'hl_loc_base'      => '',
+			'cv_title_loc'     => '',
+			'cv_type'          => '',
+			'hl_type'          => '',
+			'cv_is_zoom'       => false,
+			'hl_is_zoom'       => false,
+			'cv_zoom_region'   => '',
+			'hl_zoom_region'   => '',
 		);
 
 		// ── Date scoring ─────────────────────────────────────────────────────
@@ -291,6 +300,60 @@ class Hostlinks_CVENT_Matcher {
 		if ( $cv_is_zoom && $hl_is_zoom ) {
 			$score += 30;
 			$breakdown['zoom_match'] = 30;
+		}
+
+		// ── Subaward match (+15) ─────────────────────────────────────────────
+		// HL subaward events have "SUB" in eve_location (e.g. "East Management SUB").
+		// CVENT subaward events contain "subaward" in their title
+		// (e.g. "Managing Subawards Training - EST Live Zoom Webinar").
+		$hl_is_sub  = false !== stripos( $hl_event['eve_location'] ?? '', 'sub' );
+		$cv_is_sub  = false !== stripos( $cvent_event['title'] ?? '', 'subaward' );
+
+		if ( $hl_is_sub && $cv_is_sub ) {
+			$score += 15;
+			$breakdown['subaward_match'] = 15;
+		}
+
+		// ── Zoom region side match (+10) ─────────────────────────────────────
+		// CVENT zoom titles include a timezone side abbreviation
+		// (e.g. "EST Live Zoom Webinar" or "PST Live Zoom Webinar").
+		// HL zoom event locations carry the matching region prefix
+		// (e.g. "East Management SUB", "West Writing").
+		// Map both to a canonical region keyword and compare.
+		$cv_zoom_region = '';
+		$hl_zoom_region = '';
+
+		if ( $cv_is_zoom ) {
+			if ( preg_match( '/\best\b|\beastern\b/i', $cvent_event['title'] ?? '' ) ) {
+				$cv_zoom_region = 'east';
+			} elseif ( preg_match( '/\bpst\b|\bpacific\b/i', $cvent_event['title'] ?? '' ) ) {
+				$cv_zoom_region = 'west';
+			} elseif ( preg_match( '/\bcst\b|\bcentral\b/i', $cvent_event['title'] ?? '' ) ) {
+				$cv_zoom_region = 'central';
+			} elseif ( preg_match( '/\bmst\b|\bmountain\b/i', $cvent_event['title'] ?? '' ) ) {
+				$cv_zoom_region = 'mountain';
+			}
+		}
+
+		if ( $hl_is_zoom ) {
+			$hl_loc_lower = strtolower( $hl_event['eve_location'] ?? '' );
+			if ( str_starts_with( $hl_loc_lower, 'east' ) ) {
+				$hl_zoom_region = 'east';
+			} elseif ( str_starts_with( $hl_loc_lower, 'west' ) ) {
+				$hl_zoom_region = 'west';
+			} elseif ( str_starts_with( $hl_loc_lower, 'central' ) ) {
+				$hl_zoom_region = 'central';
+			} elseif ( str_starts_with( $hl_loc_lower, 'mountain' ) ) {
+				$hl_zoom_region = 'mountain';
+			}
+		}
+
+		$breakdown['cv_zoom_region'] = $cv_zoom_region;
+		$breakdown['hl_zoom_region'] = $hl_zoom_region;
+
+		if ( $cv_zoom_region && $hl_zoom_region && $cv_zoom_region === $hl_zoom_region ) {
+			$score += 10;
+			$breakdown['zoom_region_match'] = 10;
 		}
 
 		return array(

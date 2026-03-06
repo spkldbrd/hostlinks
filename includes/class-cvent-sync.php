@@ -81,6 +81,15 @@ class Hostlinks_CVENT_Sync {
 		) );
 		$row['eve_type_name'] = strtolower( trim( $type_name ?? '' ) );
 
+		// Skip PRIVATE-marketer events — they are not listed in CVENT.
+		$marketer_name = $wpdb->get_var( $wpdb->prepare(
+			"SELECT event_marketer_name FROM `{$wpdb->prefix}event_marketer` WHERE event_marketer_id = %d",
+			(int) ( $row['eve_marketer'] ?? 0 )
+		) );
+		if ( strtoupper( trim( $marketer_name ?? '' ) ) === 'PRIVATE' ) {
+			return self::result( $eve_id, 'no_candidates', 'Skipped — Private event (not in CVENT).', dry_run: $dry_run );
+		}
+
 		// Always capture current HL counts for comparison display in every result.
 		$hl_paid = (int) ( $row['eve_paid'] ?? 0 );
 		$hl_free = (int) ( $row['eve_free'] ?? 0 );
@@ -223,12 +232,21 @@ class Hostlinks_CVENT_Sync {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
 
+		$mktr = $wpdb->prefix . 'event_marketer';
+
 		if ( $limit > 0 ) {
 			// Limit mode: only upcoming events (starting today or later), nearest first.
+			// Excludes events whose marketer is named 'PRIVATE' — those are not in CVENT.
 			$today = gmdate( 'Y-m-d' );
 			$rows  = $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT eve_id FROM `{$table}` WHERE eve_status = 1 AND eve_start >= %s ORDER BY eve_start ASC LIMIT %d",
+					"SELECT edl.eve_id FROM `{$table}` edl
+					 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
+					 WHERE edl.eve_status = 1
+					   AND edl.eve_start >= %s
+					   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
+					 ORDER BY edl.eve_start ASC
+					 LIMIT %d",
 					$today,
 					$limit
 				),
@@ -236,9 +254,17 @@ class Hostlinks_CVENT_Sync {
 			);
 		} else {
 			// Normal mode: all events ending within the last 60 days or in the future.
+			// Excludes events whose marketer is named 'PRIVATE' — those are not in CVENT.
 			$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
 			$rows   = $wpdb->get_results(
-				$wpdb->prepare( "SELECT eve_id FROM `{$table}` WHERE eve_status = 1 AND eve_end >= %s", $cutoff ),
+				$wpdb->prepare(
+					"SELECT edl.eve_id FROM `{$table}` edl
+					 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
+					 WHERE edl.eve_status = 1
+					   AND edl.eve_end >= %s
+					   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')",
+					$cutoff
+				),
 				ARRAY_A
 			);
 		}

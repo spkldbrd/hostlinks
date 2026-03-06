@@ -95,17 +95,23 @@ if ( isset( $_POST['hostlinks_cvent_manual_save'] ) ) {
 
 // ── Load events for the table ─────────────────────────────────────────────────
 global $wpdb;
-$tbl   = $wpdb->prefix . 'event_details_list';
+$tbl  = $wpdb->prefix . 'event_details_list';
+$mktr = $wpdb->prefix . 'event_marketer';
 // Show only events ending within the last 60 days or in the future.
+// Exclude PRIVATE-marketer events — they are not in CVENT.
 $cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
 $events = $wpdb->get_results(
 	$wpdb->prepare(
-		"SELECT eve_id, eve_location, eve_start, eve_end, eve_paid, eve_free,
-		        eve_zoom, cvent_event_id, cvent_event_title, cvent_match_score,
-		        cvent_match_status, cvent_last_synced
-		 FROM `{$tbl}`
-		 WHERE eve_status = 1 AND eve_end >= %s
-		 ORDER BY eve_start DESC",
+		"SELECT edl.eve_id, edl.eve_location, edl.eve_start, edl.eve_end,
+		        edl.eve_paid, edl.eve_free, edl.eve_zoom,
+		        edl.cvent_event_id, edl.cvent_event_title, edl.cvent_match_score,
+		        edl.cvent_match_status, edl.cvent_last_synced
+		 FROM `{$tbl}` edl
+		 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
+		 WHERE edl.eve_status = 1
+		   AND edl.eve_end >= %s
+		   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
+		 ORDER BY edl.eve_start DESC",
 		$cutoff
 	),
 	ARRAY_A
@@ -266,17 +272,19 @@ function hl_cvent_status_badge( $status ) {
 									$would_match = ( $i === 0 && $top_score >= 90 && ( isset($r['candidates'][1]) ? ($top_score - $r['candidates'][1]['score']) >= 20 : true ) );
 									$bd = $cand['breakdown'] ?? array();
 									// Build a colour-coded breakdown label for each criterion.
-									$pts = array(
-										'SameDay'  => isset( $bd['dates_same_day'] ) ? (int)$bd['dates_same_day'] : null,
-										'Overlap'  => isset( $bd['dates_overlap'] )  ? (int)$bd['dates_overlap']  : null,
-										'City'     => isset( $bd['city'] )           ? (int)$bd['city']           : null,
-										'State'    => isset( $bd['state'] )          ? (int)$bd['state']          : null,
-										'Venue'    => isset( $bd['venue'] )          ? (int)$bd['venue']          : null,
-										'TitleLoc' => isset( $bd['title_location'] ) ? (int)$bd['title_location'] : null,
-										'Title'    => isset( $bd['title'] )          ? (int)$bd['title']          : null,
-										'Type'     => isset( $bd['type_match'] )     ? (int)$bd['type_match']     : null,
-										'Zoom'     => isset( $bd['zoom_match'] )     ? (int)$bd['zoom_match']     : null,
-									);
+								$pts = array(
+									'SameDay'  => isset( $bd['dates_same_day'] )    ? (int)$bd['dates_same_day']    : null,
+									'Overlap'  => isset( $bd['dates_overlap'] )     ? (int)$bd['dates_overlap']     : null,
+									'City'     => isset( $bd['city'] )              ? (int)$bd['city']              : null,
+									'State'    => isset( $bd['state'] )             ? (int)$bd['state']             : null,
+									'Venue'    => isset( $bd['venue'] )             ? (int)$bd['venue']             : null,
+									'TitleLoc' => isset( $bd['title_location'] )    ? (int)$bd['title_location']    : null,
+									'Title'    => isset( $bd['title'] )             ? (int)$bd['title']             : null,
+									'Type'     => isset( $bd['type_match'] )        ? (int)$bd['type_match']        : null,
+									'Zoom'     => isset( $bd['zoom_match'] )        ? (int)$bd['zoom_match']        : null,
+									'Sub'      => isset( $bd['subaward_match'] )    ? (int)$bd['subaward_match']    : null,
+									'Region'   => isset( $bd['zoom_region_match'] ) ? (int)$bd['zoom_region_match'] : null,
+								);
 								?>
 									<tr style="<?php echo $would_match ? 'background:#e6f4ea;' : ''; ?>">
 										<td><strong><?php echo (int)$cand['score']; ?></strong></td>
@@ -309,9 +317,12 @@ function hl_cvent_status_badge( $status ) {
 											<?php if ( isset( $bd['cv_type'] ) && $bd['cv_type'] !== '' ) : ?>
 												| type: <em><?php echo esc_html( $bd['hl_type'] ?? '' ); ?></em> vs <em><?php echo esc_html( $bd['cv_type'] ); ?></em>
 											<?php endif; ?>
-											<?php if ( isset( $bd['cv_is_zoom'] ) ) : ?>
-												| zoom: CVENT<?php echo $bd['cv_is_zoom'] ? '&#10003;' : '&#10007;'; ?> HL<?php echo ( $bd['hl_is_zoom'] ?? false ) ? '&#10003;' : '&#10007;'; ?>
-											<?php endif; ?>
+										<?php if ( isset( $bd['cv_is_zoom'] ) ) : ?>
+											| zoom: CVENT<?php echo $bd['cv_is_zoom'] ? '&#10003;' : '&#10007;'; ?> HL<?php echo ( $bd['hl_is_zoom'] ?? false ) ? '&#10003;' : '&#10007;'; ?>
+										<?php endif; ?>
+										<?php if ( ( $bd['cv_zoom_region'] ?? '' ) !== '' || ( $bd['hl_zoom_region'] ?? '' ) !== '' ) : ?>
+											| region: <em><?php echo esc_html( $bd['hl_zoom_region'] ?? '' ); ?></em> vs <em><?php echo esc_html( $bd['cv_zoom_region'] ?? '' ); ?></em>
+										<?php endif; ?>
 											</span>
 										<?php endif; ?>
 										</td>

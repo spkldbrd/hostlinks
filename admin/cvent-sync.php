@@ -98,7 +98,7 @@ global $wpdb;
 $tbl  = $wpdb->prefix . 'event_details_list';
 $mktr = $wpdb->prefix . 'event_marketer';
 // Show only events ending within the last 60 days or in the future.
-// Exclude PRIVATE-marketer events — they are not in CVENT.
+// Exclude PRIVATE-marketer events and events whose location contains "| Private".
 $cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
 $events = $wpdb->get_results(
 	$wpdb->prepare(
@@ -111,6 +111,8 @@ $events = $wpdb->get_results(
 		 WHERE edl.eve_status = 1
 		   AND edl.eve_end >= %s
 		   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
+		   AND UPPER(edl.eve_location) NOT LIKE '%|PRIVATE%'
+		   AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'
 		 ORDER BY edl.eve_start DESC",
 		$cutoff
 	),

@@ -162,6 +162,13 @@ class Hostlinks_CVENT_Sync {
 			return self::result( $eve_id, 'no_candidates', 'Skipped — Private event (not in CVENT).', dry_run: $dry_run );
 		}
 
+		// Skip events whose location contains "| private" (with or without space,
+		// any case). These are private/internal events stored with a pipe modifier
+		// in HL (e.g. "GM MT Zoom | Private") and are not listed in CVENT.
+		if ( preg_match( '/\|\s*private\b/i', $row['eve_location'] ?? '' ) ) {
+			return self::result( $eve_id, 'no_candidates', 'Skipped — Private event (location contains "| Private").', dry_run: $dry_run );
+		}
+
 		// Always capture current HL counts for comparison display in every result.
 		$hl_paid = (int) ( $row['eve_paid'] ?? 0 );
 		$hl_free = (int) ( $row['eve_free'] ?? 0 );
@@ -308,7 +315,7 @@ class Hostlinks_CVENT_Sync {
 
 		if ( $limit > 0 ) {
 			// Limit mode: only upcoming events (starting today or later), nearest first.
-			// Excludes events whose marketer is named 'PRIVATE' — those are not in CVENT.
+			// Excludes PRIVATE-marketer events and events whose location contains "| Private".
 			$today = gmdate( 'Y-m-d' );
 			$rows  = $wpdb->get_results(
 				$wpdb->prepare(
@@ -317,6 +324,8 @@ class Hostlinks_CVENT_Sync {
 					 WHERE edl.eve_status = 1
 					   AND edl.eve_start >= %s
 					   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
+					   AND UPPER(edl.eve_location) NOT LIKE '%|PRIVATE%'
+					   AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'
 					 ORDER BY edl.eve_start ASC
 					 LIMIT %d",
 					$today,
@@ -326,7 +335,7 @@ class Hostlinks_CVENT_Sync {
 			);
 		} else {
 			// Normal mode: all events ending within the last 60 days or in the future.
-			// Excludes events whose marketer is named 'PRIVATE' — those are not in CVENT.
+			// Excludes PRIVATE-marketer events and events whose location contains "| Private".
 			$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
 			$rows   = $wpdb->get_results(
 				$wpdb->prepare(
@@ -334,7 +343,9 @@ class Hostlinks_CVENT_Sync {
 					 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
 					 WHERE edl.eve_status = 1
 					   AND edl.eve_end >= %s
-					   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')",
+					   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
+					   AND UPPER(edl.eve_location) NOT LIKE '%|PRIVATE%'
+					   AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'",
 					$cutoff
 				),
 				ARRAY_A

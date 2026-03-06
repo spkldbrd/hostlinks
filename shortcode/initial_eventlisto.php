@@ -52,7 +52,9 @@ foreach ( $all_pending_bookings as $ev ) {
 // ── Pass 2: render ─────────────────────────────────────────────────────────
 $today        = new DateTime();
 $current_month = null;
-$last_updated  = wp_date( 'm/d', strtotime( get_option( 'last_data_updation', '' ) ?: 'now' ) );
+$_upd_raw     = get_option( 'last_data_updation', '' );
+$_upd_dt      = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;
+$last_updated = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->format( 'm/d' );
 
 // Build past-events page URL dynamically; fall back to slug.
 $past_events_url = home_url( '/old-event-list/' );

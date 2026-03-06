@@ -6,6 +6,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 $s     = Hostlinks_CVENT_API::get_settings();
 $ready = ! empty( $s['client_id'] ) && ! empty( $s['client_secret'] ) && ! empty( $s['account_number'] );
 
+// ── Dry-run toggle (persistent via wp_option) ─────────────────────────────────
+if ( isset( $_POST['hostlinks_cvent_toggle_dryrun'] ) ) {
+	check_admin_referer( 'hostlinks_cvent_sync' );
+	$new_val = isset( $_POST['cvent_dry_run'] ) ? 1 : 0;
+	update_option( 'hostlinks_cvent_dry_run', $new_val );
+}
+$dry_run = (bool) get_option( 'hostlinks_cvent_dry_run', 0 );
+
 // ── Action handlers ───────────────────────────────────────────────────────────
 
 $notice      = '';
@@ -14,7 +22,7 @@ $sync_report = null;
 // Sync All
 if ( isset( $_POST['hostlinks_cvent_sync_all'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
-	$sync_report = Hostlinks_CVENT_Sync::sync_all();
+	$sync_report = Hostlinks_CVENT_Sync::sync_all( $dry_run );
 }
 
 // Sync One
@@ -22,8 +30,8 @@ if ( isset( $_POST['hostlinks_cvent_sync_one'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
 	$eve_id = intval( $_POST['hostlinks_cvent_eve_id'] ?? 0 );
 	if ( $eve_id ) {
-		$r = Hostlinks_CVENT_Sync::sync_one( $eve_id );
-		$sync_report = array( 'results' => array( $r ), 'synced' => (int)('synced'==$r['action']), 'matched' => (int)('matched'==$r['action']), 'needs_review' => (int)('needs_review'==$r['action']), 'no_candidates' => (int)('no_candidates'==$r['action']), 'errors' => (int)('error'==$r['action']) );
+		$r = Hostlinks_CVENT_Sync::sync_one( $eve_id, $dry_run );
+		$sync_report = array( 'results' => array( $r ), 'dry_run' => $dry_run, 'synced' => (int)('synced'==$r['action']), 'matched' => (int)('matched'==$r['action']), 'needs_review' => (int)('needs_review'==$r['action']), 'no_candidates' => (int)('no_candidates'==$r['action']), 'errors' => (int)('error'==$r['action']) );
 	}
 }
 
@@ -32,9 +40,11 @@ if ( isset( $_POST['hostlinks_cvent_rebootstrap'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
 	$eve_id = intval( $_POST['hostlinks_cvent_eve_id'] ?? 0 );
 	if ( $eve_id ) {
-		Hostlinks_CVENT_Sync::clear_cvent_mapping( $eve_id );
-		$r = Hostlinks_CVENT_Sync::sync_one( $eve_id );
-		$sync_report = array( 'results' => array( $r ), 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );
+		if ( ! $dry_run ) {
+			Hostlinks_CVENT_Sync::clear_cvent_mapping( $eve_id );
+		}
+		$r = Hostlinks_CVENT_Sync::sync_one( $eve_id, $dry_run );
+		$sync_report = array( 'results' => array( $r ), 'dry_run' => $dry_run, 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );
 	}
 }
 
@@ -116,33 +126,113 @@ function hl_cvent_status_badge( $status ) {
 		</div>
 	<?php endif; ?>
 
+	<!-- Dry Run toggle -->
+	<form method="post" style="margin-bottom:0;">
+		<?php wp_nonce_field( 'hostlinks_cvent_sync' ); ?>
+		<div style="display:flex;align-items:center;gap:12px;background:<?php echo $dry_run ? '#fff3cd' : '#f6f7f7'; ?>;border:1px solid <?php echo $dry_run ? '#ffc107' : '#ddd'; ?>;padding:10px 16px;border-radius:4px;margin-bottom:16px;">
+			<label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;margin:0;">
+				<input type="checkbox" name="cvent_dry_run" value="1" <?php checked( $dry_run ); ?>
+					onchange="this.form.submit();">
+				Dry Run Mode
+			</label>
+			<?php if ( $dry_run ) : ?>
+				<span style="background:#ffc107;color:#000;padding:2px 10px;border-radius:3px;font-size:12px;font-weight:700;">ACTIVE — nothing will be written to the database</span>
+			<?php else : ?>
+				<span style="color:#666;font-size:12px;">Enable to preview what Sync would do without saving any changes.</span>
+			<?php endif; ?>
+		</div>
+		<input type="hidden" name="hostlinks_cvent_toggle_dryrun" value="1">
+	</form>
+
 	<?php echo $notice; ?>
 
 	<?php if ( $sync_report ) : ?>
-		<div class="notice notice-info is-dismissible">
-			<p><strong>Sync complete:</strong>
-			<?php echo (int)$sync_report['synced']; ?> synced &bull;
-			<?php echo (int)$sync_report['matched']; ?> newly matched &bull;
-			<?php echo (int)$sync_report['needs_review']; ?> need review &bull;
-			<?php echo (int)$sync_report['no_candidates']; ?> no candidates &bull;
-			<?php echo (int)$sync_report['errors']; ?> errors</p>
+		<?php $is_dry = ! empty( $sync_report['dry_run'] ); ?>
+		<div class="notice <?php echo $is_dry ? 'notice-warning' : 'notice-info'; ?> is-dismissible">
+			<p>
+				<?php if ( $is_dry ) : ?><strong>[DRY RUN — no data was saved]</strong> &nbsp;<?php endif; ?>
+				<strong><?php echo $is_dry ? 'Preview complete:' : 'Sync complete:'; ?></strong>
+				<?php echo (int)$sync_report['synced']; ?> <?php echo $is_dry ? 'would sync' : 'synced'; ?> &bull;
+				<?php echo (int)$sync_report['matched']; ?> <?php echo $is_dry ? 'would match' : 'newly matched'; ?> &bull;
+				<?php echo (int)$sync_report['needs_review']; ?> need review &bull;
+				<?php echo (int)$sync_report['no_candidates']; ?> no candidates &bull;
+				<?php echo (int)$sync_report['errors']; ?> errors
+			</p>
 		</div>
-		<details style="margin-bottom:16px;">
-			<summary style="cursor:pointer;font-weight:600;padding:4px 0;">Sync details (click to expand)</summary>
-			<table class="widefat striped" style="margin-top:8px;">
-				<thead><tr><th>Event #</th><th>Result</th><th>Message</th><th>Paid</th><th>Free</th></tr></thead>
-				<tbody>
-				<?php foreach ( $sync_report['results'] as $r ) : ?>
-					<tr>
-						<td><?php echo (int)$r['eve_id']; ?></td>
-						<td><?php echo hl_cvent_status_badge( $r['action'] ); ?></td>
-						<td><?php echo esc_html( $r['message'] ); ?></td>
-						<td><?php echo isset( $r['paid'] ) ? (int)$r['paid'] : '—'; ?></td>
-						<td><?php echo isset( $r['free'] ) ? (int)$r['free'] : '—'; ?></td>
-					</tr>
-				<?php endforeach; ?>
-				</tbody>
-			</table>
+		<details open style="margin-bottom:16px;">
+			<summary style="cursor:pointer;font-weight:600;padding:4px 0;"><?php echo $is_dry ? 'Dry Run preview details' : 'Sync details'; ?> (click to collapse)</summary>
+			<?php foreach ( $sync_report['results'] as $r ) : ?>
+				<div style="border:1px solid #ddd;border-radius:4px;padding:12px;margin:8px 0;background:#fff;">
+					<table style="width:100%;border-collapse:collapse;">
+						<tr>
+							<td style="width:80px;font-weight:600;">Event #<?php echo (int)$r['eve_id']; ?></td>
+							<td style="width:130px;"><?php echo hl_cvent_status_badge( $r['action'] ); ?><?php if ( $is_dry ) echo ' <span style="font-size:10px;color:#888;">(preview)</span>'; ?></td>
+							<td><?php echo esc_html( $r['message'] ); ?></td>
+							<td style="width:80px;text-align:center;">
+								<?php if ( isset( $r['paid'] ) && $r['paid'] !== null ) : ?>
+									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?> paid</span>
+								<?php endif; ?>
+							</td>
+							<td style="width:80px;text-align:center;">
+								<?php if ( isset( $r['free'] ) && $r['free'] !== null ) : ?>
+									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?> free</span>
+								<?php endif; ?>
+							</td>
+						</tr>
+					</table>
+
+					<?php if ( $is_dry && ! empty( $r['candidates'] ) ) : ?>
+						<details style="margin-top:8px;">
+							<summary style="cursor:pointer;color:#555;font-size:12px;">Match candidates (<?php echo count( $r['candidates'] ); ?>)</summary>
+							<table class="widefat striped" style="margin-top:6px;font-size:12px;">
+								<thead><tr><th>Score</th><th>Would auto-match?</th><th>CVENT Title</th><th>Start</th><th>CVENT ID</th></tr></thead>
+								<tbody>
+								<?php
+								$top_score = $r['candidates'][0]['score'] ?? 0;
+								foreach ( $r['candidates'] as $i => $cand ) :
+									$would_match = ( $i === 0 && $top_score >= 90 && ( isset($r['candidates'][1]) ? ($top_score - $r['candidates'][1]['score']) >= 20 : true ) );
+								?>
+									<tr style="<?php echo $would_match ? 'background:#e6f4ea;' : ''; ?>">
+										<td><strong><?php echo (int)$cand['score']; ?></strong></td>
+										<td><?php echo $would_match ? '<strong style="color:#0a6b00;">YES</strong>' : '<span style="color:#888;">No</span>'; ?></td>
+										<td><?php echo esc_html( $cand['event']['title'] ?? '(no title)' ); ?></td>
+										<td><?php echo esc_html( isset( $cand['event']['start'] ) ? wp_date( 'M j, Y', strtotime( $cand['event']['start'] ) ) : '—' ); ?></td>
+										<td><code style="font-size:10px;"><?php echo esc_html( $cand['event']['id'] ?? '' ); ?></code></td>
+									</tr>
+								<?php endforeach; ?>
+								</tbody>
+							</table>
+						</details>
+					<?php endif; ?>
+
+					<?php if ( $is_dry && ! empty( $r['attendees_preview'] ) ) : ?>
+						<details style="margin-top:8px;">
+							<summary style="cursor:pointer;color:#555;font-size:12px;">
+								Attendee preview — first <?php echo count( $r['attendees_preview'] ); ?> of <?php echo (int)( $r['total_fetched'] ?? 0 ); ?> fetched
+								(<?php echo (int)( $r['filtered_out'] ?? 0 ); ?> filtered out as cancelled/test)
+							</summary>
+							<table class="widefat striped" style="margin-top:6px;font-size:12px;">
+								<thead><tr><th>Attendee ID</th><th>Status</th><th>Discount strings found</th><th>Counted as</th></tr></thead>
+								<tbody>
+								<?php foreach ( $r['attendees_preview'] as $att ) : ?>
+									<tr>
+										<td><code style="font-size:10px;"><?php echo esc_html( $att['id'] ); ?></code></td>
+										<td><?php echo esc_html( $att['status'] ); ?></td>
+										<td><?php echo esc_html( implode( ', ', $att['discount_strings'] ) ?: '(none)' ); ?></td>
+										<td><strong style="color:<?php echo $att['counted_as'] === 'FREE' ? '#0073aa' : '#0a6b00'; ?>;">
+											<?php echo esc_html( $att['counted_as'] ); ?>
+										</strong></td>
+									</tr>
+								<?php endforeach; ?>
+								</tbody>
+							</table>
+						</details>
+					<?php elseif ( $is_dry && isset( $r['total_fetched'] ) && $r['total_fetched'] === 0 ) : ?>
+						<p style="margin:6px 0 0;font-size:12px;color:#888;">No attendees returned from CVENT for this event.</p>
+					<?php endif; ?>
+
+				</div>
+			<?php endforeach; ?>
 		</details>
 	<?php endif; ?>
 

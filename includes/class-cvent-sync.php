@@ -43,19 +43,25 @@ class Hostlinks_CVENT_Sync {
 	/**
 	 * Sync a single Hostlinks event against CVENT.
 	 *
-	 * @param int $eve_id Row ID in event_details_list.
+	 * @param int  $eve_id   Row ID in event_details_list.
+	 * @param bool $dry_run  If true, run full logic but write nothing to the DB.
 	 * @return array {
-	 *   eve_id       : int,
-	 *   action       : 'synced'|'matched'|'needs_review'|'no_candidates'|'skipped'|'error',
-	 *   message      : string,
-	 *   paid         : int|null,
-	 *   free         : int|null,
-	 *   cvent_title  : string|null,
-	 *   cvent_id     : string|null,
-	 *   score        : int|null,
+	 *   eve_id            : int,
+	 *   dry_run           : bool,
+	 *   action            : 'synced'|'matched'|'needs_review'|'no_candidates'|'skipped'|'error',
+	 *   message           : string,
+	 *   paid              : int|null,
+	 *   free              : int|null,
+	 *   cvent_title       : string|null,
+	 *   cvent_id          : string|null,
+	 *   score             : int|null,
+	 *   // dry-run extras:
+	 *   candidates        : array|null   scored match candidates
+	 *   attendees_preview : array|null   first 10 valid attendees with discount info
+	 *   filtered_out      : int|null     attendees removed by status filter
 	 * }
 	 */
-	public static function sync_one( $eve_id ) {
+	public static function sync_one( $eve_id, $dry_run = false ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
 
@@ -65,7 +71,7 @@ class Hostlinks_CVENT_Sync {
 		);
 
 		if ( ! $row ) {
-			return self::result( $eve_id, 'error', 'Event not found or inactive.' );
+			return self::result( $eve_id, 'error', 'Event not found or inactive.', dry_run: $dry_run );
 		}
 
 		$stored_id = $row['cvent_event_id'] ?? '';
@@ -76,23 +82,26 @@ class Hostlinks_CVENT_Sync {
 			$check = Hostlinks_CVENT_API::get_event( $stored_id );
 			if ( is_wp_error( $check ) && strpos( $check->get_error_message(), 'HTTP 404' ) !== false ) {
 				// Stored event gone — clear mapping and re-bootstrap.
-				self::clear_cvent_mapping( $eve_id );
+				if ( ! $dry_run ) {
+					self::clear_cvent_mapping( $eve_id );
+				}
 				$stored_id = '';
 				$status    = 'unlinked';
 			} elseif ( is_wp_error( $check ) ) {
-				return self::result( $eve_id, 'error', $check->get_error_message() );
+				return self::result( $eve_id, 'error', $check->get_error_message(), dry_run: $dry_run );
 			} else {
 				// Verify staleness hash hasn't changed drastically.
 				$new_hash = Hostlinks_CVENT_Matcher::staleness_hash( $check );
 				if ( $new_hash !== ( $row['cvent_staleness_hash'] ?? '' ) ) {
-					// Data changed on CVENT side — flag for review but still sync.
-					$wpdb->update(
-						$table,
-						array( 'cvent_match_status' => 'needs_review', 'cvent_staleness_hash' => $new_hash ),
-						array( 'eve_id' => $eve_id ),
-						array( '%s', '%s' ),
-						array( '%d' )
-					);
+					if ( ! $dry_run ) {
+						$wpdb->update(
+							$table,
+							array( 'cvent_match_status' => 'needs_review', 'cvent_staleness_hash' => $new_hash ),
+							array( 'eve_id' => $eve_id ),
+							array( '%s', '%s' ),
+							array( '%d' )
+						);
+					}
 					$status = 'needs_review';
 				}
 			}
@@ -103,52 +112,68 @@ class Hostlinks_CVENT_Sync {
 			$match = Hostlinks_CVENT_Matcher::bootstrap_match( $row );
 
 			if ( 'error' === $match['status'] ) {
-				return self::result( $eve_id, 'error', $match['error'] );
+				return self::result( $eve_id, 'error', $match['error'], dry_run: $dry_run );
 			}
 
 			if ( 'no_candidates' === $match['status'] ) {
-				return self::result( $eve_id, 'no_candidates', 'No CVENT events found in date window.' );
+				return self::result( $eve_id, 'no_candidates', 'No CVENT events found in date window.', dry_run: $dry_run );
 			}
 
 			$best  = $match['best'];
 			$score = $match['best_score'];
 			$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $best );
 
-			$wpdb->update(
-				$table,
-				array(
-					'cvent_event_id'        => $best['id'],
-					'cvent_event_title'     => $best['title'] ?? '',
-					'cvent_event_start_utc' => isset( $best['start'] ) ? date( 'Y-m-d H:i:s', strtotime( $best['start'] ) ) : null,
-					'cvent_match_score'     => $score,
-					'cvent_match_status'    => $match['status'],
-					'cvent_staleness_hash'  => $hash,
-				),
-				array( 'eve_id' => $eve_id ),
-				array( '%s', '%s', '%s', '%d', '%s', '%s' ),
-				array( '%d' )
-			);
+			if ( ! $dry_run ) {
+				$wpdb->update(
+					$table,
+					array(
+						'cvent_event_id'        => $best['id'],
+						'cvent_event_title'     => $best['title'] ?? '',
+						'cvent_event_start_utc' => isset( $best['start'] ) ? date( 'Y-m-d H:i:s', strtotime( $best['start'] ) ) : null,
+						'cvent_match_score'     => $score,
+						'cvent_match_status'    => $match['status'],
+						'cvent_staleness_hash'  => $hash,
+					),
+					array( 'eve_id' => $eve_id ),
+					array( '%s', '%s', '%s', '%d', '%s', '%s' ),
+					array( '%d' )
+				);
+			}
 
 			if ( 'needs_review' === $match['status'] ) {
-				return self::result(
+				$r = self::result(
 					$eve_id,
 					'needs_review',
 					sprintf( 'Best candidate "%s" scored %d — needs manual review.', $best['title'] ?? '(no title)', $score ),
-					null, null, $best['title'] ?? '', $best['id'], $score
+					null, null, $best['title'] ?? '', $best['id'], $score,
+					dry_run: $dry_run
 				);
+				$r['candidates'] = $match['candidates'];
+				return $r;
 			}
 
 			$stored_id = $best['id'];
 			$status    = 'auto';
 
-			return array_merge(
-				self::result( $eve_id, 'matched', sprintf( 'Auto-matched to "%s" (score %d). Run sync again to update counts.', $best['title'] ?? '', $score ), null, null, $best['title'] ?? '', $stored_id, $score ),
-				array()
-			);
+			// In dry-run, also preview the attendee counts for the auto-matched event.
+			if ( $dry_run ) {
+				$count_preview = self::do_count_sync( $eve_id, $stored_id, $row, true );
+				$r = self::result( $eve_id, 'matched',
+					sprintf( 'DRY RUN — would auto-match to "%s" (score %d).', $best['title'] ?? '', $score ),
+					$count_preview['paid'] ?? null, $count_preview['free'] ?? null,
+					$best['title'] ?? '', $stored_id, $score, dry_run: true
+				);
+				$r['candidates']        = $match['candidates'];
+				$r['attendees_preview'] = $count_preview['attendees_preview'] ?? null;
+				$r['filtered_out']      = $count_preview['filtered_out'] ?? null;
+				return $r;
+			}
+
+			return self::result( $eve_id, 'matched', sprintf( 'Auto-matched to "%s" (score %d). Run sync again to update counts.', $best['title'] ?? '', $score ), null, null, $best['title'] ?? '', $stored_id, $score );
 		}
 
 		// ── Step 3: fetch attendees and count PAID/FREE ───────────────────────
-		return self::do_count_sync( $eve_id, $stored_id, $row );
+		return self::do_count_sync( $eve_id, $stored_id, $row, $dry_run );
 	}
 
 	// -------------------------------------------------------------------------
@@ -158,24 +183,27 @@ class Hostlinks_CVENT_Sync {
 	/**
 	 * Sync all active Hostlinks events.
 	 *
+	 * @param bool $dry_run  If true, run full logic but write nothing to the DB.
 	 * @return array {
-	 *   results  : array of sync_one() result arrays,
-	 *   synced   : int,
-	 *   matched  : int,
+	 *   results      : array of sync_one() result arrays,
+	 *   dry_run      : bool,
+	 *   synced       : int,
+	 *   matched      : int,
 	 *   needs_review : int,
-	 *   errors   : int,
+	 *   no_candidates: int,
+	 *   errors       : int,
 	 * }
 	 */
-	public static function sync_all() {
+	public static function sync_all( $dry_run = false ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
 		$rows  = $wpdb->get_results( "SELECT eve_id FROM `{$table}` WHERE eve_status = 1", ARRAY_A );
 
-		$results      = array();
-		$counts       = array( 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );
+		$results = array();
+		$counts  = array( 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );
 
 		foreach ( $rows as $r ) {
-			$res       = self::sync_one( (int) $r['eve_id'] );
+			$res       = self::sync_one( (int) $r['eve_id'], $dry_run );
 			$results[] = $res;
 			$action    = $res['action'] ?? 'error';
 			if ( isset( $counts[ $action ] ) ) {
@@ -185,7 +213,7 @@ class Hostlinks_CVENT_Sync {
 			}
 		}
 
-		return array_merge( array( 'results' => $results ), $counts );
+		return array_merge( array( 'results' => $results, 'dry_run' => $dry_run ), $counts );
 	}
 
 	// -------------------------------------------------------------------------
@@ -263,20 +291,29 @@ class Hostlinks_CVENT_Sync {
 
 	/**
 	 * Fetch all attendees for a CVENT event, then count PAID/FREE.
+	 *
+	 * @param int    $eve_id
+	 * @param string $cvent_id
+	 * @param array  $row
+	 * @param bool   $dry_run  If true, skip DB write and include attendee preview in return value.
+	 * @return array
 	 */
-	private static function do_count_sync( $eve_id, $cvent_id, $row ) {
+	private static function do_count_sync( $eve_id, $cvent_id, $row, $dry_run = false ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
 
 		$attendees = self::fetch_attendees_for_event( $cvent_id );
 		if ( is_wp_error( $attendees ) ) {
-			return self::result( $eve_id, 'error', $attendees->get_error_message() );
+			return self::result( $eve_id, 'error', $attendees->get_error_message(), dry_run: $dry_run );
 		}
 
-		$valid = self::filter_valid_attendees( $attendees );
+		$valid       = self::filter_valid_attendees( $attendees );
+		$filtered_out = count( $attendees ) - count( $valid );
 
-		$paid = 0;
-		$free = 0;
+		$paid    = 0;
+		$free    = 0;
+		$preview = array(); // for dry-run: first 10 with discount info
+
 		foreach ( $valid as $att ) {
 			$discount_strings = self::extract_discount_strings( $att );
 			$is_free          = false;
@@ -291,30 +328,55 @@ class Hostlinks_CVENT_Sync {
 			} else {
 				$paid++;
 			}
+
+			// Collect first 10 attendees for dry-run preview.
+			if ( $dry_run && count( $preview ) < 10 ) {
+				$preview[] = array(
+					'id'               => $att['id'] ?? '?',
+					'status'           => $att['status'] ?? '(no status field)',
+					'discount_strings' => $discount_strings,
+					'counted_as'       => $is_free ? 'FREE' : 'PAID',
+				);
+			}
 		}
 
-		$wpdb->update(
-			$table,
-			array(
-				'eve_paid'         => $paid,
-				'eve_free'         => $free,
-				'cvent_last_synced' => current_time( 'mysql' ),
-			),
-			array( 'eve_id' => $eve_id ),
-			array( '%d', '%d', '%s' ),
-			array( '%d' )
-		);
+		if ( ! $dry_run ) {
+			$wpdb->update(
+				$table,
+				array(
+					'eve_paid'          => $paid,
+					'eve_free'          => $free,
+					'cvent_last_synced' => current_time( 'mysql' ),
+				),
+				array( 'eve_id' => $eve_id ),
+				array( '%d', '%d', '%s' ),
+				array( '%d' )
+			);
+		}
 
-		return self::result(
+		$msg = $dry_run
+			? sprintf( 'DRY RUN — would write: %d paid, %d free (%d valid, %d filtered out).', $paid, $free, count( $valid ), $filtered_out )
+			: sprintf( 'Synced: %d paid, %d free (%d total valid attendees).', $paid, $free, count( $valid ) );
+
+		$r = self::result(
 			$eve_id,
-			'synced',
-			sprintf( 'Synced: %d paid, %d free (%d total valid attendees).', $paid, $free, count( $valid ) ),
+			$dry_run ? 'synced' : 'synced',
+			$msg,
 			$paid,
 			$free,
 			$row['cvent_event_title'] ?? '',
 			$cvent_id,
-			$row['cvent_match_score'] ?? null
+			$row['cvent_match_score'] ?? null,
+			dry_run: $dry_run
 		);
+
+		if ( $dry_run ) {
+			$r['attendees_preview'] = $preview;
+			$r['filtered_out']      = $filtered_out;
+			$r['total_fetched']     = count( $attendees );
+		}
+
+		return $r;
 	}
 
 	/**
@@ -439,16 +501,21 @@ class Hostlinks_CVENT_Sync {
 	// Internal helpers
 	// -------------------------------------------------------------------------
 
-	private static function result( $eve_id, $action, $message, $paid = null, $free = null, $cvent_title = null, $cvent_id = null, $score = null ) {
+	private static function result( $eve_id, $action, $message, $paid = null, $free = null, $cvent_title = null, $cvent_id = null, $score = null, bool $dry_run = false ) {
 		return array(
-			'eve_id'      => $eve_id,
-			'action'      => $action,
-			'message'     => $message,
-			'paid'        => $paid,
-			'free'        => $free,
-			'cvent_title' => $cvent_title,
-			'cvent_id'    => $cvent_id,
-			'score'       => $score,
+			'eve_id'            => $eve_id,
+			'dry_run'           => $dry_run,
+			'action'            => $action,
+			'message'           => $message,
+			'paid'              => $paid,
+			'free'              => $free,
+			'cvent_title'       => $cvent_title,
+			'cvent_id'          => $cvent_id,
+			'score'             => $score,
+			'candidates'        => null,
+			'attendees_preview' => null,
+			'filtered_out'      => null,
+			'total_fetched'     => null,
 		);
 	}
 }

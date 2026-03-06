@@ -189,7 +189,7 @@ class Hostlinks_CVENT_API {
 	 * @return array|WP_Error Raw API response (has 'data' key).
 	 */
 	public static function list_active_events( $days_back = 10 ) {
-		$cutoff = gmdate( 'Y-m-d', strtotime( "-{$days_back} days" ) );
+		$cutoff = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( "-{$days_back} days" ) );
 
 		// CVENT EA filter syntax (OData-style).
 		// Retrieve events whose end date is on or after the cutoff.

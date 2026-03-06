@@ -197,8 +197,11 @@ class Hostlinks_Updater {
 			}
 		}
 
-		// Fallback: archive URL (folder will be renamed by fix_source_dir)
-		return "https://github.com/{$this->github_user}/{$this->github_repo}/archive/refs/tags/{$version}.zip";
+		// Fallback: use the raw tag_name so the 'v' prefix is preserved in the URL.
+		// clean_version() strips 'v' for version_compare(), but GitHub archive URLs
+		// require the exact tag — e.g. refs/tags/v2.4.19.zip, not refs/tags/2.4.19.zip.
+		$tag = isset( $release->tag_name ) ? $release->tag_name : $version;
+		return "https://github.com/{$this->github_user}/{$this->github_repo}/archive/refs/tags/{$tag}.zip";
 	}
 
 	// ── Hook: rename GitHub's extracted folder to the correct plugin slug ────

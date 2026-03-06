@@ -35,79 +35,74 @@ if ( isset( $_POST['hostlinks_cvent_test'] ) ) {
 	}
 }
 
-// ── Attendee Fetch Diagnostic ──────────────────────────────────────────────────
+// ── Order Items / Attendee Diagnostic ─────────────────────────────────────────
+// Tests the event-scoped endpoints confirmed correct after v2.4.16 diagnosis:
+//   GET /ea/events/{UUID}/orders/items  (primary — discount codes + attendee IDs)
+//   GET /ea/events/{UUID}/attendees     (fallback — status only, no discounts)
+//   GET /ea/events/{UUID}/orders        (bonus — show order-level structure)
+// Previous paths that all failed:
+//   /attendees?filter=eventId…          → HTTP 400 "Unsupported filter field eventId"
+//   /attendees/filter?filter=eventId…   → HTTP 400 "Not a valid UUID"
+//   /orders/items?filter=eventId…       → HTTP 404 "Unrecognized request URL"
 $diag_result = null;
 if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_settings' );
-	$diag_id  = sanitize_text_field( trim( $_POST['diag_event_id'] ?? '' ) );
-	$diag_id  = Hostlinks_CVENT_API::sanitize_uuid( $diag_id );
+	$diag_id = sanitize_text_field( trim( $_POST['diag_event_id'] ?? '' ) );
+	$diag_id = Hostlinks_CVENT_API::sanitize_uuid( $diag_id );
 
 	if ( ! $diag_id ) {
-		// Auto-pick: grab first event from list and use its ID.
 		$list = Hostlinks_CVENT_API::list_active_events( 90 );
 		if ( is_wp_error( $list ) ) {
 			$diag_result = array( 'step' => 'list_events', 'error' => $list->get_error_message() );
 		} elseif ( empty( $list['data'] ) ) {
 			$diag_result = array( 'step' => 'list_events', 'error' => 'No events returned by API.' );
 		} else {
-			$first    = $list['data'][0];
-			$diag_id  = Hostlinks_CVENT_API::sanitize_uuid( $first['id'] ?? '' );
+			$first   = $list['data'][0];
+			$diag_id = Hostlinks_CVENT_API::sanitize_uuid( $first['id'] ?? '' );
 			$diag_result = array( 'step' => 'auto_pick', 'event' => $first, 'raw_id' => $first['id'] ?? '', 'clean_id' => $diag_id );
 		}
 	}
 
 	if ( $diag_id && ( ! isset( $diag_result['error'] ) ) ) {
-		// Hex-dump of the ID to surface invisible characters.
 		$hex = '';
 		for ( $i = 0; $i < strlen( $diag_id ); $i++ ) {
 			$hex .= sprintf( '%02X ', ord( $diag_id[ $i ] ) );
 		}
 
-		// Test all three endpoint / format combinations.
-		$filter_quoted   = "eventId eq '" . $diag_id . "'";
-		$filter_unquoted = 'eventId eq ' . $diag_id;
-
+		// Event-scoped endpoints to probe (3 records each).
 		$endpoints_to_test = array(
-			'attendees (quoted)'          => array( 'ep' => 'attendees',        'filter' => $filter_quoted ),
-			'attendees (no quotes)'        => array( 'ep' => 'attendees',        'filter' => $filter_unquoted ),
-			'attendees/filter (quoted)'    => array( 'ep' => 'attendees/filter', 'filter' => $filter_quoted ),
-			'orders/items (quoted)'        => array( 'ep' => 'orders/items',     'filter' => $filter_quoted ),
+			'events/{UUID}/orders/items (primary)'  => 'events/' . $diag_id . '/orders/items',
+			'events/{UUID}/attendees (fallback)'    => 'events/' . $diag_id . '/attendees',
+			'events/{UUID}/orders (structure check)' => 'events/' . $diag_id . '/orders',
 		);
 
 		$endpoint_results = array();
-		foreach ( $endpoints_to_test as $label => $cfg ) {
-			$params = array( 'filter' => $cfg['filter'], 'limit' => 3 );
-			$res    = Hostlinks_CVENT_API::request( $cfg['ep'], $params );
+		foreach ( $endpoints_to_test as $label => $ep ) {
+			$params = array( 'limit' => 3 );
+			$res    = Hostlinks_CVENT_API::request( $ep, $params );
 			$endpoint_results[ $label ] = array(
-				'url'     => Hostlinks_CVENT_API::BASE_URL . $cfg['ep'] . '?' . http_build_query( $params, '', '&', PHP_QUERY_RFC3986 ),
-				'ok'      => ! is_wp_error( $res ),
-				'error'   => is_wp_error( $res ) ? $res->get_error_message() : null,
-				'count'   => is_wp_error( $res ) ? null : count( $res['data'] ?? array() ),
-				'sample'  => is_wp_error( $res ) ? null : array_slice( $res['data'] ?? array(), 0, 1 ),
+				'url'    => Hostlinks_CVENT_API::BASE_URL . $ep . '?' . http_build_query( $params, '', '&', PHP_QUERY_RFC3986 ),
+				'ok'     => ! is_wp_error( $res ),
+				'error'  => is_wp_error( $res ) ? $res->get_error_message() : null,
+				'count'  => is_wp_error( $res ) ? null : count( $res['data'] ?? array() ),
+				'sample' => is_wp_error( $res ) ? null : array_slice( $res['data'] ?? array(), 0, 1 ),
 			);
 		}
 
-		// Current code path (attendees collection, quoted filter).
-		$filter_str = $filter_quoted;
-		$test_url   = Hostlinks_CVENT_API::BASE_URL . 'attendees?' .
-		              http_build_query( array( 'filter' => $filter_str, 'limit' => 5 ), '', '&', PHP_QUERY_RFC3986 );
-
-		// Perform the actual attendee fetch (uses current code path).
-		$attendees = Hostlinks_CVENT_Sync::fetch_attendees_for_event( $diag_id );
+		// Full order-items fetch using current production code path.
+		$order_items = Hostlinks_CVENT_API::get_order_items( $diag_id );
 
 		$diag_result = array_merge( $diag_result ?? array(), array(
-			'step'             => 'attendee_fetch',
+			'step'             => 'order_items_fetch',
 			'clean_id'         => $diag_id,
 			'hex_dump'         => trim( $hex ),
-			'filter_str'       => $filter_str,
-			'filter_quoted'    => $filter_quoted,
-			'filter_unquoted'  => $filter_unquoted,
-			'test_url'         => $test_url,
+			'primary_url'      => Hostlinks_CVENT_API::BASE_URL . 'events/' . $diag_id . '/orders/items?' .
+			                      http_build_query( array( 'limit' => 5 ), '', '&', PHP_QUERY_RFC3986 ),
 			'endpoint_results' => $endpoint_results,
-			'is_error'    => is_wp_error( $attendees ),
-			'error_msg'   => is_wp_error( $attendees ) ? $attendees->get_error_message() : null,
-			'count'       => is_wp_error( $attendees ) ? null : count( $attendees ),
-			'first_few'   => is_wp_error( $attendees ) ? null : array_slice( $attendees, 0, 3 ),
+			'is_error'         => is_wp_error( $order_items ),
+			'error_msg'        => is_wp_error( $order_items ) ? $order_items->get_error_message() : null,
+			'count'            => is_wp_error( $order_items ) ? null : count( $order_items ),
+			'first_few'        => is_wp_error( $order_items ) ? null : array_slice( $order_items, 0, 3 ),
 		) );
 	}
 }
@@ -202,8 +197,9 @@ $s = Hostlinks_CVENT_API::get_settings();
 	</table>
 
 	<hr />
-	<h2>Attendee Fetch Diagnostic</h2>
-	<p>Tests the <code>attendees/filter</code> endpoint directly. Leave the ID blank to auto-pick the first event from the API, or paste a specific CVENT event UUID to test it.</p>
+	<h2>Order Items / Attendee Diagnostic</h2>
+	<p>Tests the <strong>event-scoped endpoints</strong> now used in v2.4.17. Leave the UUID blank to auto-pick the first event from the API, or paste a specific CVENT event UUID.</p>
+	<p style="color:#666;font-size:12px;">Previous flat-collection paths all failed: <code>/attendees?filter=eventId…</code> → 400 "Unsupported filter field", <code>/attendees/filter</code> → 400 "Not a valid UUID", <code>/orders/items?filter=eventId…</code> → 404. Now using event-scoped paths.</p>
 
 	<form method="post">
 		<?php wp_nonce_field( 'hostlinks_cvent_settings' ); ?>
@@ -236,7 +232,7 @@ $s = Hostlinks_CVENT_API::get_settings();
 
 			<table class="widefat striped" style="margin-bottom:12px;">
 				<tr>
-					<th style="width:200px;">Clean UUID used</th>
+					<th style="width:220px;">Clean UUID used</th>
 					<td><code><?php echo esc_html( $diag_result['clean_id'] ?? '' ); ?></code></td>
 				</tr>
 				<tr>
@@ -245,28 +241,18 @@ $s = Hostlinks_CVENT_API::get_settings();
 					<br><small style="color:#888;">A clean UUID starts: <code>63 XX XX XX</code> ('c') — no BOM = no leading <code>EF BB BF</code></small></td>
 				</tr>
 				<tr>
-					<th>Filter (quoted — v2.4.15)</th>
-					<td><code><?php echo esc_html( $diag_result['filter_quoted'] ?? '' ); ?></code>
-					<br><small style="color:#888;">Encoded: <code>filter=<?php echo esc_html( rawurlencode( $diag_result['filter_quoted'] ?? '' ) ); ?></code></small></td>
+					<th>Primary URL (order items)</th>
+					<td><code style="word-break:break-all;font-size:11px;"><?php echo esc_html( $diag_result['primary_url'] ?? '' ); ?></code></td>
 				</tr>
 				<tr>
-					<th>Filter (no quotes — v2.4.12–14)</th>
-					<td><code><?php echo esc_html( $diag_result['filter_unquoted'] ?? '' ); ?></code>
-					<br><small style="color:#888;">Encoded: <code>filter=<?php echo esc_html( rawurlencode( $diag_result['filter_unquoted'] ?? '' ) ); ?></code></small></td>
-				</tr>
-				<tr>
-					<th>Full URL sent (quoted)</th>
-					<td><code style="word-break:break-all;font-size:11px;"><?php echo esc_html( $diag_result['test_url'] ?? '' ); ?></code></td>
-				</tr>
-				<tr>
-					<th>Result</th>
+					<th>Full order-items fetch result</th>
 					<td>
 					<?php if ( $diag_result['is_error'] ) : ?>
 						<span style="color:#d63638;font-weight:600;">&#9888; FAILED</span> &mdash;
 						<?php echo esc_html( $diag_result['error_msg'] ); ?>
 					<?php else : ?>
 						<span style="color:#0a6b00;font-weight:600;">&#10003; SUCCESS</span> &mdash;
-						<?php echo (int) $diag_result['count']; ?> attendee(s) returned
+						<?php echo (int) $diag_result['count']; ?> order item(s) returned (all pages)
 					<?php endif; ?>
 					</td>
 				</tr>
@@ -275,7 +261,7 @@ $s = Hostlinks_CVENT_API::get_settings();
 			<?php if ( ! empty( $diag_result['endpoint_results'] ) ) : ?>
 			<h4>Endpoint probe results (3 records each, 1 API call each)</h4>
 			<table class="widefat striped" style="margin-bottom:12px;">
-				<thead><tr><th>Endpoint + format</th><th>Result</th><th>URL sent</th></tr></thead>
+				<thead><tr><th>Endpoint</th><th>Result</th><th>URL sent</th></tr></thead>
 				<tbody>
 				<?php foreach ( $diag_result['endpoint_results'] as $label => $er ) : ?>
 					<tr style="<?php echo $er['ok'] ? 'background:#e6f4ea;' : ''; ?>">
@@ -306,7 +292,7 @@ $s = Hostlinks_CVENT_API::get_settings();
 
 			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['first_few'] ) ) : ?>
 			<details>
-				<summary style="cursor:pointer;">First <?php echo count( $diag_result['first_few'] ); ?> raw attendee record(s)</summary>
+				<summary style="cursor:pointer;">First <?php echo count( $diag_result['first_few'] ); ?> raw order item record(s)</summary>
 				<pre style="background:#f0f0f1;padding:10px;overflow:auto;font-size:11px;max-height:300px;"><?php
 					echo esc_html( json_encode( $diag_result['first_few'], JSON_PRETTY_PRINT ) );
 				?></pre>

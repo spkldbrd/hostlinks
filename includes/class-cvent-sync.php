@@ -326,98 +326,117 @@ class Hostlinks_CVENT_Sync {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
 
-		// ── Step A: attendees (for valid-status count) ────────────────────────
-		$attendees = self::fetch_attendees_for_event( $cvent_id );
-		if ( is_wp_error( $attendees ) ) {
-			return self::result( $eve_id, 'error', 'Attendees: ' . $attendees->get_error_message(),
-				hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
-				hl_free: (int) ( $row['eve_free'] ?? 0 ),
-				dry_run: $dry_run
-			);
-		}
-		$valid        = self::filter_valid_attendees( $attendees );
-		$filtered_out = count( $attendees ) - count( $valid );
-
-		// Build a set of valid attendee IDs for the join below.
-		$valid_ids = array();
-		foreach ( $valid as $att ) {
-			$id = $att['id'] ?? null;
-			if ( $id ) {
-				$valid_ids[ $id ] = true;
-			}
-		}
-
-		// ── Step B: order items (for discount / PAID vs FREE) ─────────────────
-		// Discount codes live on order items, not on the attendee record.
-		$order_items    = Hostlinks_CVENT_API::get_order_items( $cvent_id );
-		$orders_ok      = ! is_wp_error( $order_items );
-		$order_item_map = array(); // attendeeId → discount strings
+		// ── Step A: order items via event-scoped path ─────────────────────────
+		// GET /ea/events/{UUID}/orders/items — primary source for count + discounts.
+		// Flat /orders/items?filter=... returns 404. /attendees?filter=eventId=...
+		// returns 400 "Unsupported filter field eventId".
+		$order_items = Hostlinks_CVENT_API::get_order_items( $cvent_id );
+		$orders_ok   = ! is_wp_error( $order_items );
 
 		if ( $orders_ok ) {
+			// ── Count from order items ────────────────────────────────────────
+			$cancelled = array( 'cancelled', 'canceled', 'deleted', 'voided' );
+			$seen      = array(); // attendeeId → 'free'|'paid'
+			$preview   = array();
+
 			foreach ( $order_items as $item ) {
-				$att_id = $item['attendeeId'] ?? ( $item['attendee']['id'] ?? null );
-				if ( ! $att_id ) {
+				// Skip cancelled/voided items.
+				if ( in_array( strtolower( trim( $item['status'] ?? '' ) ), $cancelled, true ) ) {
 					continue;
 				}
-				if ( ! isset( $order_item_map[ $att_id ] ) ) {
-					$order_item_map[ $att_id ] = array();
+
+				$att_id = $item['attendeeId']
+					?? ( $item['attendee']['id'] ?? ( $item['contactId'] ?? null ) );
+				if ( ! $att_id || isset( $seen[ $att_id ] ) ) {
+					continue;
 				}
-				// Collect all discount-related strings from the order item.
-				foreach ( array( 'discountCode', 'discountName', 'discount_code', 'discount_name' ) as $f ) {
+
+				// Collect discount strings from every possible field location.
+				$discount_strings = array();
+				foreach ( array( 'discountCode', 'DiscountCode', 'discount_code', 'discountName', 'DiscountName' ) as $f ) {
 					if ( ! empty( $item[ $f ] ) ) {
-						$order_item_map[ $att_id ][] = (string) $item[ $f ];
+						$discount_strings[] = (string) $item[ $f ];
 					}
 				}
 				if ( ! empty( $item['discounts'] ) && is_array( $item['discounts'] ) ) {
 					foreach ( $item['discounts'] as $d ) {
-						foreach ( array( 'name', 'code', 'discountCode' ) as $f ) {
+						foreach ( array( 'code', 'name', 'discountCode' ) as $f ) {
 							if ( ! empty( $d[ $f ] ) ) {
-								$order_item_map[ $att_id ][] = (string) $d[ $f ];
+								$discount_strings[] = (string) $d[ $f ];
 							}
 						}
 					}
 				}
-			}
-		}
+				$discount_strings = array_unique( $discount_strings );
 
-		// ── Step C: count paid / free ─────────────────────────────────────────
-		$paid    = 0;
-		$free    = 0;
-		$preview = array();
+				$is_free = false;
+				foreach ( $discount_strings as $ds ) {
+					if ( preg_match( '/free/i', $ds ) ) {
+						$is_free = true;
+						break;
+					}
+				}
 
-		foreach ( $valid as $att ) {
-			$att_id = $att['id'] ?? null;
+				$seen[ $att_id ] = $is_free ? 'free' : 'paid';
 
-			// Discount strings: prefer order-item map, fall back to attendee record.
-			if ( $orders_ok && $att_id && isset( $order_item_map[ $att_id ] ) ) {
-				$discount_strings = array_unique( $order_item_map[ $att_id ] );
-			} else {
-				$discount_strings = self::extract_discount_strings( $att );
-			}
-
-			$is_free = false;
-			foreach ( $discount_strings as $ds ) {
-				if ( preg_match( '/free/i', $ds ) ) {
-					$is_free = true;
-					break;
+				if ( $dry_run && count( $preview ) < 10 ) {
+					$preview[] = array(
+						'id'               => $att_id,
+						'status'           => $item['status'] ?? '(no status)',
+						'discount_strings' => $discount_strings,
+						'counted_as'       => $is_free ? 'FREE' : 'PAID',
+						'source'           => 'order_items',
+					);
 				}
 			}
 
-			if ( $is_free ) {
-				$free++;
-			} else {
-				$paid++;
-			}
+			$free         = count( array_filter( $seen, function( $v ) { return $v === 'free'; } ) );
+			$paid         = count( $seen ) - $free;
+			$total        = count( $seen );
+			$filtered_out = count( $order_items ) - $total;
+			$source_note  = '';
 
-			if ( $dry_run && count( $preview ) < 10 ) {
-				$preview[] = array(
-					'id'               => $att_id ?? '?',
-					'status'           => $att['status'] ?? '(no status field)',
-					'discount_strings' => $discount_strings,
-					'counted_as'       => $is_free ? 'FREE' : 'PAID',
-					'source'           => ( $orders_ok && isset( $order_item_map[ $att_id ] ) ) ? 'order_items' : 'attendee_record',
+		} else {
+			// ── Fallback: event-scoped attendees ──────────────────────────────
+			$order_err   = $order_items->get_error_message();
+			$attendees   = Hostlinks_CVENT_API::get_event_attendees( $cvent_id );
+
+			if ( is_wp_error( $attendees ) ) {
+				return self::result( $eve_id, 'error',
+					'Order items: ' . $order_err . ' | Attendees fallback: ' . $attendees->get_error_message(),
+					hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
+					hl_free: (int) ( $row['eve_free'] ?? 0 ),
+					dry_run: $dry_run
 				);
 			}
+
+			$valid        = self::filter_valid_attendees( $attendees );
+			$filtered_out = count( $attendees ) - count( $valid );
+			$paid         = 0;
+			$free         = 0;
+			$preview      = array();
+
+			foreach ( $valid as $att ) {
+				$discount_strings = self::extract_discount_strings( $att );
+				$is_free          = false;
+				foreach ( $discount_strings as $ds ) {
+					if ( preg_match( '/free/i', $ds ) ) { $is_free = true; break; }
+				}
+				$is_free ? $free++ : $paid++;
+
+				if ( $dry_run && count( $preview ) < 10 ) {
+					$preview[] = array(
+						'id'               => $att['id'] ?? '?',
+						'status'           => $att['status'] ?? '(no status)',
+						'discount_strings' => $discount_strings,
+						'counted_as'       => $is_free ? 'FREE' : 'PAID',
+						'source'           => 'attendee_fallback',
+					);
+				}
+			}
+
+			$total       = count( $valid );
+			$source_note = ' (order items failed — used attendee fallback)';
 		}
 
 		if ( ! $dry_run ) {
@@ -434,10 +453,9 @@ class Hostlinks_CVENT_Sync {
 			);
 		}
 
-		$orders_note = $orders_ok ? '' : ' (order items unavailable — used attendee fallback)';
 		$msg = $dry_run
-			? sprintf( 'DRY RUN — would write: %d paid, %d free (%d valid, %d filtered out%s).', $paid, $free, count( $valid ), $filtered_out, $orders_note )
-			: sprintf( 'Synced: %d paid, %d free (%d total valid%s).', $paid, $free, count( $valid ), $orders_note );
+			? sprintf( 'DRY RUN — would write: %d paid, %d free (%d unique attendees, %d items skipped%s).', $paid, $free, $total, $filtered_out, $source_note )
+			: sprintf( 'Synced: %d paid, %d free (%d total%s).', $paid, $free, $total, $source_note );
 
 		$r = self::result(
 			$eve_id,
@@ -456,7 +474,7 @@ class Hostlinks_CVENT_Sync {
 		if ( $dry_run ) {
 			$r['attendees_preview'] = $preview;
 			$r['filtered_out']      = $filtered_out;
-			$r['total_fetched']     = count( $attendees );
+			$r['total_fetched']     = $orders_ok ? count( $order_items ) : 0;
 			$r['orders_ok']         = $orders_ok;
 		}
 

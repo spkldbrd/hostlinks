@@ -320,13 +320,10 @@ class Hostlinks_CVENT_API {
 
 	/**
 	 * Retrieve ALL order items for a CVENT event (paginated).
-	 * Order items carry the discount code used during registration — the correct
-	 * source for PAID/FREE classification (discount codes are NOT on the attendee record).
+	 * Uses the event-scoped path — flat /orders/items collection returns 404.
+	 * Order items carry attendeeId + discountCode for PAID/FREE classification.
 	 *
-	 * Endpoint: GET /ea/orders/items?filter=eventId eq '{id}'&limit=200
-	 *
-	 * Each item in the response is expected to contain at least:
-	 *   attendeeId, discountCode, discountName, status
+	 * Endpoint: GET /ea/events/{id}/orders/items?limit=200
 	 *
 	 * @param string $event_id CVENT event UUID.
 	 * @return array|WP_Error  Flat array of order-item records.
@@ -339,15 +336,48 @@ class Hostlinks_CVENT_API {
 		$max_pages = 20;
 
 		do {
-			$params = array(
-				'filter' => "eventId eq '" . $event_id . "'",
-				'limit'  => 200,
-			);
+			$params = array( 'limit' => 200 );
 			if ( $next ) {
 				$params['token'] = $next;
 			}
 
-			$result = self::request( 'orders/items', $params );
+			$result = self::request( 'events/' . $event_id . '/orders/items', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			$data = isset( $result['data'] ) ? $result['data'] : array();
+			$all  = array_merge( $all, $data );
+			$next = isset( $result['paging']['nextToken'] ) ? $result['paging']['nextToken'] : null;
+			$page++;
+		} while ( $next && $page < $max_pages );
+
+		return $all;
+	}
+
+	/**
+	 * Retrieve attendees via the event-scoped path (fallback when order items unavailable).
+	 * Flat /attendees?filter=eventId eq '...' returns 400 "Unsupported filter field eventId".
+	 *
+	 * Endpoint: GET /ea/events/{id}/attendees?limit=200
+	 *
+	 * @param string $event_id CVENT event UUID.
+	 * @return array|WP_Error  Raw API response array.
+	 */
+	public static function get_event_attendees( $event_id ) {
+		$event_id  = self::sanitize_uuid( $event_id );
+		$all       = array();
+		$next      = null;
+		$page      = 0;
+		$max_pages = 20;
+
+		do {
+			$params = array( 'limit' => 200 );
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+
+			$result = self::request( 'events/' . $event_id . '/attendees', $params );
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}

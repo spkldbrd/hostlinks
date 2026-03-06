@@ -27,6 +27,9 @@ if ( isset( $_POST['hostlinks_cvent_sync_all'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
 	$sync_limit  = ( $dry_run && $limit_test ) ? 10 : 0;
 	$sync_report = Hostlinks_CVENT_Sync::sync_all( $dry_run, $sync_limit );
+	if ( ! $dry_run && ( $sync_report['synced'] ?? 0 ) > 0 ) {
+		update_option( 'last_data_updation', current_time( 'Y-m-d' ) );
+	}
 }
 
 // Sync One
@@ -36,6 +39,9 @@ if ( isset( $_POST['hostlinks_cvent_sync_one'] ) ) {
 	if ( $eve_id ) {
 		$r = Hostlinks_CVENT_Sync::sync_one( $eve_id, $dry_run );
 		$sync_report = array( 'results' => array( $r ), 'dry_run' => $dry_run, 'synced' => (int)('synced'==$r['action']), 'matched' => (int)('matched'==$r['action']), 'needs_review' => (int)('needs_review'==$r['action']), 'no_candidates' => (int)('no_candidates'==$r['action']), 'errors' => (int)('error'==$r['action']) );
+		if ( ! $dry_run && ( $r['action'] ?? '' ) === 'synced' ) {
+			update_option( 'last_data_updation', current_time( 'Y-m-d' ) );
+		}
 	}
 }
 

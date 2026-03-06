@@ -102,7 +102,7 @@ $upcoming_url    = home_url( '/' );
 
 	<div class="hostlinks-actions">
 		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Upcoming Events</a>
-		<a href="<?php echo esc_url( $past_events_url . ( $focus_id ? '?focus=' . $focus_id : '' ) ); ?>" class="hostlinks-btn">Past Events</a>
+		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
 
 		<select id="hl-focus-marketer" class="hostlinks-year-filter" aria-label="Focus by marketer">
 			<option value="0" <?php selected( $focus_id, 0 ); ?>>All Marketers</option>

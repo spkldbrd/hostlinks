@@ -100,7 +100,7 @@ $page_url      = get_permalink();
 <div class="hostlinks-container">
 
 	<div class="hostlinks-actions">
-		<a href="<?php echo esc_url( $upcoming_url . ( $focus_id ? '?focus=' . $focus_id : '' ) ); ?>" class="hostlinks-btn">Upcoming Events</a>
+		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn">Upcoming Events</a>
 		<a href="<?php echo esc_url( $page_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Past Events</a>
 
 		<select id="hl-old-chooseyear" class="hostlinks-year-filter" aria-label="Filter by year">

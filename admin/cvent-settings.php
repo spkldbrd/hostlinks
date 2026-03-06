@@ -103,6 +103,25 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 		// Full order-items fetch using current production code path.
 		$order_items = Hostlinks_CVENT_API::get_order_items( $diag_id );
 
+		// Build a status frequency map and the excluded list so we can see exactly
+		// which records are being skipped (and which aren't but should be).
+		$status_map      = array();
+		$excluded_list   = array( 'cancelled', 'canceled', 'deleted', 'voided', 'waitlisted' );
+		$counted_records = array();
+		$skipped_records = array();
+		if ( ! is_wp_error( $order_items ) ) {
+			foreach ( $order_items as $item ) {
+				$raw_status = $item['status'] ?? '(no status field)';
+				$lc         = strtolower( trim( $raw_status ) );
+				$status_map[ $raw_status ] = ( $status_map[ $raw_status ] ?? 0 ) + 1;
+				if ( in_array( $lc, $excluded_list, true ) ) {
+					$skipped_records[] = $item;
+				} else {
+					$counted_records[] = $item;
+				}
+			}
+		}
+
 		$diag_result = array_merge( $diag_result ?? array(), array(
 			'step'             => 'order_items_fetch',
 			'clean_id'         => $diag_id,
@@ -115,7 +134,11 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			'is_error'         => is_wp_error( $order_items ),
 			'error_msg'        => is_wp_error( $order_items ) ? $order_items->get_error_message() : null,
 			'count'            => is_wp_error( $order_items ) ? null : count( $order_items ),
-			'first_few'        => is_wp_error( $order_items ) ? null : array_slice( $order_items, 0, 3 ),
+			'status_map'       => $status_map,
+			'excluded_list'    => $excluded_list,
+			'counted_records'  => $counted_records,
+			'skipped_records'  => $skipped_records,
+			'all_items'        => is_wp_error( $order_items ) ? null : $order_items,
 		) );
 	}
 }
@@ -332,12 +355,69 @@ $s = Hostlinks_CVENT_API::get_settings();
 			</table>
 			<?php endif; ?>
 
-			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['first_few'] ) ) : ?>
+			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['status_map'] ) ) : ?>
+			<h4>Status breakdown (all <?php echo (int) $diag_result['count']; ?> order items)</h4>
+			<table class="widefat striped" style="max-width:500px;margin-bottom:12px;">
+				<thead><tr><th>Status (exact string from CVENT)</th><th>Count</th><th>Plugin action</th></tr></thead>
+				<tbody>
+				<?php foreach ( $diag_result['status_map'] as $status => $qty ) :
+					$lc       = strtolower( trim( $status ) );
+					$excluded = in_array( $lc, $diag_result['excluded_list'], true );
+				?>
+					<tr style="<?php echo $excluded ? 'background:#fff0f0;' : 'background:#f0fff4;'; ?>">
+						<td><code><?php echo esc_html( $status ); ?></code></td>
+						<td><?php echo (int) $qty; ?></td>
+						<td>
+						<?php if ( $excluded ) : ?>
+							<span style="color:#d63638;">&#10007; Skipped (in exclusion list)</span>
+						<?php else : ?>
+							<span style="color:#0a6b00;">&#10003; Counted</span>
+						<?php endif; ?>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p style="font-size:12px;color:#555;">
+				Current exclusion list: <?php echo esc_html( implode( ', ', $diag_result['excluded_list'] ) ); ?>
+			</p>
+			<?php endif; ?>
+
+			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['skipped_records'] ) ) : ?>
 			<details>
-				<summary style="cursor:pointer;">First <?php echo count( $diag_result['first_few'] ); ?> raw order item record(s)</summary>
-				<pre style="background:#f0f0f1;padding:10px;overflow:auto;font-size:11px;max-height:300px;"><?php
-					echo esc_html( json_encode( $diag_result['first_few'], JSON_PRETTY_PRINT ) );
+				<summary style="cursor:pointer;font-weight:600;color:#d63638;">
+					Skipped records (<?php echo count( $diag_result['skipped_records'] ); ?>) — these are NOT counted
+				</summary>
+				<pre style="background:#fff0f0;padding:10px;overflow:auto;font-size:11px;max-height:300px;"><?php
+					echo esc_html( json_encode( $diag_result['skipped_records'], JSON_PRETTY_PRINT ) );
 				?></pre>
+			</details>
+			<?php endif; ?>
+
+			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['all_items'] ) ) : ?>
+			<details>
+				<summary style="cursor:pointer;">All <?php echo count( $diag_result['all_items'] ); ?> raw order item records (status + key fields)</summary>
+				<table class="widefat striped" style="margin-top:6px;font-size:11px;">
+					<thead><tr><th>#</th><th>attendeeId</th><th>status</th><th>discountCode</th><th>quantity</th></tr></thead>
+					<tbody>
+					<?php foreach ( $diag_result['all_items'] as $i => $item ) :
+						$lc  = strtolower( trim( $item['status'] ?? '' ) );
+						$exc = in_array( $lc, $diag_result['excluded_list'], true );
+					?>
+						<tr style="<?php echo $exc ? 'background:#fff0f0;' : ''; ?>">
+							<td><?php echo $i + 1; ?></td>
+							<td><code style="font-size:10px;"><?php echo esc_html( substr( $item['attendeeId'] ?? $item['attendee']['id'] ?? '—', 0, 8 ) . '…' ); ?></code></td>
+							<td><code><?php echo esc_html( $item['status'] ?? '—' ); ?></code></td>
+							<td><code><?php echo esc_html( $item['discountCode'] ?? $item['DiscountCode'] ?? $item['discount_code'] ?? '—' ); ?></code></td>
+							<td><?php echo esc_html( $item['quantity'] ?? $item['qty'] ?? '—' ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+				<details style="margin-top:8px;"><summary style="font-size:11px;cursor:pointer;">Full JSON of all records</summary>
+				<pre style="background:#f0f0f1;padding:10px;overflow:auto;font-size:10px;max-height:400px;"><?php
+					echo esc_html( json_encode( $diag_result['all_items'], JSON_PRETTY_PRINT ) );
+				?></pre></details>
 			</details>
 			<?php endif; ?>
 

@@ -265,16 +265,17 @@ $s = Hostlinks_CVENT_API::get_settings();
 					<?php
 					$meta = $diag_result['token_meta'] ?? null;
 					if ( $meta ) :
-						$granted = esc_html( $meta['scope'] );
-						$req     = $diag_result['requested_scope'] ?? '';
-						// Highlight if granted scope differs from requested.
-						$match   = ( trim( $meta['scope'] ) === trim( $req ) );
+						$granted_raw = $meta['scope'] ?? '';
+						$req         = $diag_result['requested_scope'] ?? '';
+						$not_returned = ( $granted_raw === '(not returned by server)' || $granted_raw === '' );
 					?>
-						<code><?php echo $granted; ?></code>
-						<?php if ( ! $match ) : ?>
-						<br><span style="color:#d63638;font-weight:600;">&#9888; Mismatch — server did not grant all requested scopes. Check your CVENT app permissions in the Developer Portal.</span>
-						<?php else : ?>
+						<code><?php echo esc_html( $granted_raw ?: '(not returned by server)' ); ?></code>
+						<?php if ( $not_returned ) : ?>
+						<br><small style="color:#888;">CVENT commonly omits the <code>scope</code> field from the token response — this is normal. Verify access by checking the endpoint probe results below.</small>
+						<?php elseif ( trim( $granted_raw ) === trim( $req ) ) : ?>
 						<br><span style="color:#0a6b00;">&#10003; Matches requested scope.</span>
+						<?php else : ?>
+						<br><span style="color:#d63638;font-weight:600;">&#9888; Mismatch — server granted different scopes. Check your CVENT app permissions in the Developer Portal.</span>
 						<?php endif; ?>
 					<?php else : ?>
 						<span style="color:#888;">(Token fetch failed or metadata not available — run Test Connection first.)</span>

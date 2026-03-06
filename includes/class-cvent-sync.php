@@ -397,46 +397,16 @@ class Hostlinks_CVENT_Sync {
 			$source_note  = '';
 
 		} else {
-			// ── Fallback: event-scoped attendees ──────────────────────────────
-			$order_err   = $order_items->get_error_message();
-			$attendees   = Hostlinks_CVENT_API::get_event_attendees( $cvent_id );
-
-			if ( is_wp_error( $attendees ) ) {
-				return self::result( $eve_id, 'error',
-					'Order items: ' . $order_err . ' | Attendees fallback: ' . $attendees->get_error_message(),
-					hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
-					hl_free: (int) ( $row['eve_free'] ?? 0 ),
-					dry_run: $dry_run
-				);
-			}
-
-			$valid        = self::filter_valid_attendees( $attendees );
-			$filtered_out = count( $attendees ) - count( $valid );
-			$paid         = 0;
-			$free         = 0;
-			$preview      = array();
-
-			foreach ( $valid as $att ) {
-				$discount_strings = self::extract_discount_strings( $att );
-				$is_free          = false;
-				foreach ( $discount_strings as $ds ) {
-					if ( preg_match( '/free/i', $ds ) ) { $is_free = true; break; }
-				}
-				$is_free ? $free++ : $paid++;
-
-				if ( $dry_run && count( $preview ) < 10 ) {
-					$preview[] = array(
-						'id'               => $att['id'] ?? '?',
-						'status'           => $att['status'] ?? '(no status)',
-						'discount_strings' => $discount_strings,
-						'counted_as'       => $is_free ? 'FREE' : 'PAID',
-						'source'           => 'attendee_fallback',
-					);
-				}
-			}
-
-			$total       = count( $valid );
-			$source_note = ' (order items failed — used attendee fallback)';
+			// ── No fallback available ─────────────────────────────────────────
+			// events/{UUID}/attendees returns 404 (not a valid CVENT path).
+			// Flat /attendees?filter=eventId returns 400 "Unsupported filter field".
+			// Surface the original order-items error so the user can act on it.
+			return self::result( $eve_id, 'error',
+				'Order items fetch failed: ' . $order_items->get_error_message(),
+				hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
+				hl_free: (int) ( $row['eve_free'] ?? 0 ),
+				dry_run: $dry_run
+			);
 		}
 
 		if ( ! $dry_run ) {

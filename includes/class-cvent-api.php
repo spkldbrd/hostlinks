@@ -379,16 +379,19 @@ class Hostlinks_CVENT_API {
 	}
 
 	/**
-	 * Retrieve attendees via the event-scoped path (fallback when order items unavailable).
-	 * Flat /attendees?filter=eventId eq '...' returns 400 "Unsupported filter field eventId".
+	 * Retrieve attendees via the flat /attendees endpoint (no event filter supported).
 	 *
-	 * Endpoint: GET /ea/events/{id}/attendees?limit=200
+	 * NOTE: /ea/events/{id}/attendees returns HTTP 404 — not a valid CVENT path.
+	 *       Flat /attendees?filter=eventId eq '...' returns 400 "Unsupported filter field".
+	 *       This method returns ALL attendees across all events (not event-scoped).
+	 *       Use get_order_items() instead for event-specific counts.
 	 *
-	 * @param string $event_id CVENT event UUID.
-	 * @return array|WP_Error  Raw API response array.
+	 * Kept for potential future use; currently not called by do_count_sync().
+	 *
+	 * @param string $event_id Unused — CVENT does not support eventId filtering here.
+	 * @return array|WP_Error  Flat array of attendee records (all events).
 	 */
 	public static function get_event_attendees( $event_id ) {
-		$event_id  = self::sanitize_uuid( $event_id );
 		$all       = array();
 		$next      = null;
 		$page      = 0;
@@ -400,7 +403,7 @@ class Hostlinks_CVENT_API {
 				$params['token'] = $next;
 			}
 
-			$result = self::request( 'events/' . $event_id . '/attendees', $params );
+			$result = self::request( 'attendees', $params );
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}

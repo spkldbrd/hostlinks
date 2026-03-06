@@ -197,7 +197,12 @@ class Hostlinks_CVENT_Sync {
 	public static function sync_all( $dry_run = false ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
-		$rows  = $wpdb->get_results( "SELECT eve_id FROM `{$table}` WHERE eve_status = 1", ARRAY_A );
+		// Only sync events ending within the last 60 days or in the future.
+		$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
+		$rows   = $wpdb->get_results(
+			$wpdb->prepare( "SELECT eve_id FROM `{$table}` WHERE eve_status = 1 AND eve_end >= %s", $cutoff ),
+			ARRAY_A
+		);
 
 		$results = array();
 		$counts  = array( 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );

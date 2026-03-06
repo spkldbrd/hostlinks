@@ -92,13 +92,18 @@ if ( isset( $_POST['hostlinks_cvent_manual_save'] ) ) {
 // ── Load events for the table ─────────────────────────────────────────────────
 global $wpdb;
 $tbl   = $wpdb->prefix . 'event_details_list';
+// Show only events ending within the last 60 days or in the future.
+$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
 $events = $wpdb->get_results(
-	"SELECT eve_id, eve_location, eve_start, eve_end, eve_paid, eve_free,
-	        cvent_event_id, cvent_event_title, cvent_match_score,
-	        cvent_match_status, cvent_last_synced
-	 FROM `{$tbl}`
-	 WHERE eve_status = 1
-	 ORDER BY eve_start DESC",
+	$wpdb->prepare(
+		"SELECT eve_id, eve_location, eve_start, eve_end, eve_paid, eve_free,
+		        cvent_event_id, cvent_event_title, cvent_match_score,
+		        cvent_match_status, cvent_last_synced
+		 FROM `{$tbl}`
+		 WHERE eve_status = 1 AND eve_end >= %s
+		 ORDER BY eve_start DESC",
+		$cutoff
+	),
 	ARRAY_A
 );
 
@@ -351,6 +356,7 @@ function hl_cvent_status_badge( $status ) {
 	</table>
 
 	<p style="margin-top:12px;color:#666;font-size:12px;">
+		Showing events ending within the last 60 days or in the future.
 		Auto-match requires score &ge; 90 with a &ge; 20-point gap over the second candidate.
 		Lower scores are flagged as &ldquo;Needs Review&rdquo; for manual selection.
 	</p>

@@ -112,6 +112,10 @@
   padding-right: 30px;
 }
 
+.hostlinks-month-stats span:first-child {
+  font-weight: 700;
+}
+
 /* Event card grid — 1 col mobile, 3 col tablet, 5 col desktop */
 .hostlinks-grid {
   display: grid;

@@ -95,9 +95,10 @@ if ( $resulttotapplijobscnt > 0 ) {
 
 	foreach ( $all_pending_bookings as $alldriver ) {
 
-		// Cache timestamps once per row (used multiple times for date formatting)
-		$ts_start = strtotime( $alldriver['eve_start'] );
-		$ts_end   = strtotime( $alldriver['eve_end'] );
+		// Use DateTime directly from DB date strings — avoids wp_date()/strtotime()
+		// timezone shifting (UTC midnight → previous day in US timezones).
+		$dt_start = new DateTime( $alldriver['eve_start'] );
+		$dt_end   = new DateTime( $alldriver['eve_end'] );
 
 		$type_name       = trim( $alldriver['event_type_name']       ?? '' );
 		$marketer_name   = $alldriver['event_marketer_name']   ?? '';
@@ -118,7 +119,7 @@ if ( $resulttotapplijobscnt > 0 ) {
 			$avgmg = $t['mgcnt'] > 0 ? round( $t['mgpaid'] / $t['mgcnt'] ) : 0;
 			?>
 	<tr bgcolor="ffffe1">
-		<td valign="bottom"><p><b><?php echo wp_date("F Y", $ts_start); ?></b><br/>
+		<td valign="bottom"><p><b><?php echo $dt_start->format("F Y"); ?></b><br/>
 		<?php echo "{$t['paid']} / {$t['cnt']} / {$avg}"; ?></p></td>
 		<td valign="bottom"><p>W&nbsp;<?php echo "{$t['wrpaid']} / {$t['wrcnt']} / {$avgwr}"; ?></p></td>
 		<td valign="bottom"><p>M&nbsp;<?php echo "{$t['mgpaid']} / {$t['mgcnt']} / {$avgmg}"; ?></p></td>
@@ -133,19 +134,20 @@ if ( $resulttotapplijobscnt > 0 ) {
 		$lsarray = explode( '-', $alldriver['eve_end'] );
 		if ( $fsarray[0] == $lsarray[0] ) {
 			if ( $fsarray[1] == $lsarray[1] ) {
-				$date_range = wp_date( "F", $ts_start ) . '&nbsp;' . $fsarray[2] . '-' . $lsarray[2] . ',&nbsp;' . $fsarray[0];
+				// Same year + month: "April 01-02, 2026"
+				$date_range = $dt_start->format("F") . '&nbsp;' . $fsarray[2] . '-' . $lsarray[2] . ',&nbsp;' . $fsarray[0];
 			} else {
-				$date_range = wp_date( "M", $ts_start ) . ',' . $fsarray[2] . '-' . wp_date( "M", $ts_end ) . ',' . $lsarray[2] . ',&nbsp;' . $fsarray[0];
+				// Same year, month boundary: "Mar 31-Apr 01, 2026"
+				$date_range = $dt_start->format("M") . '&nbsp;' . $fsarray[2] . '-' . $dt_end->format("M") . '&nbsp;' . $lsarray[2] . ',&nbsp;' . $fsarray[0];
 			}
 		} else {
-			$date_range = wp_date( "M", $ts_start ) . ',' . $fsarray[2] . ',' . $fsarray[0] . '-' . wp_date( "M", $ts_end ) . ',' . $lsarray[2] . ',' . $lsarray[0];
+			// Year boundary: "Dec 31, 2025-Jan 01, 2026"
+			$date_range = $dt_start->format("M") . '&nbsp;' . $fsarray[2] . ',&nbsp;' . $fsarray[0] . '-' . $dt_end->format("M") . '&nbsp;' . $lsarray[2] . ',&nbsp;' . $lsarray[0];
 		}
-		$date2 = new DateTime( $alldriver['eve_start'] );
-		$date3 = new DateTime( $alldriver['eve_end'] );
-		if ( $today > $date2 ) {
-			$days_label = ( $today > $date3 ) ? 'The Event is History' : 'Event Started';
+		if ( $today > $dt_start ) {
+			$days_label = ( $today > $dt_end ) ? 'The Event is History' : 'Event Started';
 		} else {
-			$days_label = $today->diff( $date2 )->days . ' days to event';
+			$days_label = $today->diff( $dt_start )->days . ' days to event';
 		}
 
 		// ── Event cell ───────────────────────────────────────────────────

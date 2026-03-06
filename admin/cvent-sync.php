@@ -124,6 +124,25 @@ function hl_cvent_status_badge( $status ) {
 <div class="wrap">
 	<h1>CVENT Sync</h1>
 
+	<!-- Daily API call counter -->
+	<?php
+	$calls_today = Hostlinks_CVENT_API::get_call_count_today();
+	$call_limit  = 1000;
+	$call_pct    = min( round( $calls_today / $call_limit * 100 ), 100 );
+	$bar_color   = $call_pct >= 90 ? '#d63638' : ( $call_pct >= 70 ? '#dba617' : '#0a6b00' );
+	?>
+	<div style="background:#f6f7f7;border:1px solid #ddd;border-radius:4px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:16px;">
+		<div style="flex:0 0 auto;">
+			<strong>API calls today:</strong>
+			<span style="font-size:18px;font-weight:700;color:<?php echo $bar_color; ?>;margin-left:6px;"><?php echo $calls_today; ?></span>
+			<span style="color:#888;font-size:12px;"> / <?php echo $call_limit; ?> (free tier daily limit)</span>
+		</div>
+		<div style="flex:1;background:#ddd;border-radius:3px;height:10px;max-width:300px;">
+			<div style="width:<?php echo $call_pct; ?>%;background:<?php echo $bar_color; ?>;height:10px;border-radius:3px;transition:width .3s;"></div>
+		</div>
+		<div style="flex:0 0 auto;font-size:11px;color:#888;">Resets midnight UTC · <?php echo gmdate( 'M j, Y' ); ?></div>
+	</div>
+
 	<?php if ( ! $ready ) : ?>
 		<div class="notice notice-warning">
 			<p>CVENT credentials are not configured.

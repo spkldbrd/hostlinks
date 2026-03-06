@@ -162,6 +162,9 @@ class Hostlinks_CVENT_API {
 			return self::request( $endpoint, $params, $attempt + 1 );
 		}
 
+		// Increment daily call counter (resets at midnight UTC).
+		self::increment_call_counter();
+
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 
 		if ( $code < 200 || $code >= 300 ) {
@@ -174,6 +177,37 @@ class Hostlinks_CVENT_API {
 		}
 
 		return $body;
+	}
+
+	// -------------------------------------------------------------------------
+	// Daily call counter
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Increment the daily API call counter.
+	 * Keyed by UTC date so it resets automatically at midnight UTC.
+	 * Transient TTL is 25 hours to survive the full day with a small buffer.
+	 */
+	private static function increment_call_counter() {
+		$key     = 'hostlinks_cvent_calls_' . gmdate( 'Y-m-d' );
+		$current = (int) get_transient( $key );
+		set_transient( $key, $current + 1, 25 * HOUR_IN_SECONDS );
+	}
+
+	/**
+	 * Get today's API call count (UTC day).
+	 *
+	 * @return int
+	 */
+	public static function get_call_count_today() {
+		return (int) get_transient( 'hostlinks_cvent_calls_' . gmdate( 'Y-m-d' ) );
+	}
+
+	/**
+	 * Reset today's call counter (useful for testing).
+	 */
+	public static function reset_call_counter() {
+		delete_transient( 'hostlinks_cvent_calls_' . gmdate( 'Y-m-d' ) );
 	}
 
 	// -------------------------------------------------------------------------

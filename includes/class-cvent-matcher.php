@@ -39,8 +39,10 @@ class Hostlinks_CVENT_Matcher {
 	 */
 	public static function bootstrap_match( $hl_event ) {
 		// Widen the search window by 1 day each side to absorb timezone drift.
-		$start_min = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $hl_event['eve_start'] . ' -1 day' ) );
-		$start_max = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( ( $hl_event['eve_end'] ?: $hl_event['eve_start'] ) . ' +1 day' ) );
+		// Anchor date-only DB strings to UTC noon before arithmetic to prevent
+		// server-local-midnight → UTC conversion shifting the date by 1 day.
+		$start_min = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $hl_event['eve_start'] . 'T12:00:00Z -1 day' ) );
+		$start_max = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( ( $hl_event['eve_end'] ?: $hl_event['eve_start'] ) . 'T12:00:00Z +1 day' ) );
 
 		$result = Hostlinks_CVENT_API::search_events( $start_min, $start_max );
 		if ( is_wp_error( $result ) ) {
@@ -118,9 +120,10 @@ class Hostlinks_CVENT_Matcher {
 		$cv_start_raw = $cvent_event['start'] ?? '';
 		$cv_end_raw   = $cvent_event['end']   ?? $cv_start_raw;
 
-		// Convert CVENT ISO datetimes to local date strings for comparison.
-		$cv_start = $cv_start_raw ? date( 'Y-m-d', strtotime( $cv_start_raw ) ) : '';
-		$cv_end   = $cv_end_raw   ? date( 'Y-m-d', strtotime( $cv_end_raw ) )   : '';
+		// CVENT timestamps are UTC ISO strings; extract calendar date in UTC
+		// to avoid local-timezone conversion shifting the date.
+		$cv_start = $cv_start_raw ? gmdate( 'Y-m-d', strtotime( $cv_start_raw ) ) : '';
+		$cv_end   = $cv_end_raw   ? gmdate( 'Y-m-d', strtotime( $cv_end_raw ) )   : '';
 
 		// +25 if start dates are the same calendar day.
 		if ( $hl_start && $cv_start && $hl_start === $cv_start ) {
@@ -206,7 +209,7 @@ class Hostlinks_CVENT_Matcher {
 		if ( ! empty( $cvent_event['venues'][0]['city'] ) ) {
 			$city = self::normalize( $cvent_event['venues'][0]['city'] );
 		}
-		$start = isset( $cvent_event['start'] ) ? date( 'Y-m-d', strtotime( $cvent_event['start'] ) ) : '';
+		$start = isset( $cvent_event['start'] ) ? gmdate( 'Y-m-d', strtotime( $cvent_event['start'] ) ) : '';
 		$title = self::normalize( $cvent_event['title'] ?? '' );
 		return sha1( $start . '|' . $city . '|' . $title );
 	}

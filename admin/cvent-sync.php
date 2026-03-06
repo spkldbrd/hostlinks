@@ -67,8 +67,8 @@ if ( isset( $_POST['hostlinks_cvent_manual_search'] ) ) {
 	$kw_start      = sanitize_text_field( $_POST['manual_start'] ?? '' );
 	$kw_end        = sanitize_text_field( $_POST['manual_end']   ?? '' );
 	if ( $kw_start ) {
-		$start_min = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $kw_start . ' -1 day' ) );
-		$start_max = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( ( $kw_end ?: $kw_start ) . ' +1 day' ) );
+	$start_min = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( $kw_start . 'T12:00:00Z -1 day' ) );
+	$start_max = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( ( $kw_end ?: $kw_start ) . 'T12:00:00Z +1 day' ) );
 		$res = Hostlinks_CVENT_API::search_events( $start_min, $start_max );
 		$manual_candidates = is_wp_error( $res ) ? array() : ( $res['data'] ?? array() );
 	}
@@ -201,7 +201,7 @@ function hl_cvent_status_badge( $status ) {
 										<td><strong><?php echo (int)$cand['score']; ?></strong></td>
 										<td><?php echo $would_match ? '<strong style="color:#0a6b00;">YES</strong>' : '<span style="color:#888;">No</span>'; ?></td>
 										<td><?php echo esc_html( $cand['event']['title'] ?? '(no title)' ); ?></td>
-										<td><?php echo esc_html( isset( $cand['event']['start'] ) ? wp_date( 'M j, Y', strtotime( $cand['event']['start'] ) ) : '—' ); ?></td>
+										<td><?php echo esc_html( isset( $cand['event']['start'] ) ? gmdate( 'M j, Y', strtotime( $cand['event']['start'] ) ) : '—' ); ?></td>
 										<td><code style="font-size:10px;"><?php echo esc_html( $cand['event']['id'] ?? '' ); ?></code></td>
 									</tr>
 								<?php endforeach; ?>
@@ -260,8 +260,8 @@ function hl_cvent_status_badge( $status ) {
 							<tr>
 								<td><input type="radio" name="hostlinks_cvent_chosen_id" value="<?php echo esc_attr( $ce['id'] ); ?>" required></td>
 								<td><?php echo esc_html( $ce['title'] ?? '(no title)' ); ?></td>
-								<td><?php echo esc_html( isset( $ce['start'] ) ? wp_date( 'M j, Y', strtotime( $ce['start'] ) ) : '—' ); ?></td>
-								<td><?php echo esc_html( isset( $ce['end'] )   ? wp_date( 'M j, Y', strtotime( $ce['end'] ) )   : '—' ); ?></td>
+								<td><?php echo esc_html( isset( $ce['start'] ) ? gmdate( 'M j, Y', strtotime( $ce['start'] ) ) : '—' ); ?></td>
+								<td><?php echo esc_html( isset( $ce['end'] )   ? gmdate( 'M j, Y', strtotime( $ce['end'] ) )   : '—' ); ?></td>
 								<td><?php echo esc_html( $cv_loc ?: '—' ); ?></td>
 								<td><code style="font-size:10px;"><?php echo esc_html( $ce['id'] ); ?></code></td>
 							</tr>
@@ -307,7 +307,11 @@ function hl_cvent_status_badge( $status ) {
 				$status  = $ev['cvent_match_status'] ?: 'unlinked';
 				$eve_id  = (int) $ev['eve_id'];
 				$loc     = esc_html( $ev['eve_location'] );
-				$dates   = esc_html( wp_date( 'M j', strtotime( $ev['eve_start'] ) ) . ' – ' . wp_date( 'M j, Y', strtotime( $ev['eve_end'] ?: $ev['eve_start'] ) ) );
+				// Use DateTime::createFromFormat to treat DB date strings as plain
+			// calendar dates with no timezone conversion.
+			$s_dt  = DateTime::createFromFormat( 'Y-m-d', $ev['eve_start'] );
+			$e_dt  = DateTime::createFromFormat( 'Y-m-d', $ev['eve_end'] ?: $ev['eve_start'] );
+			$dates = esc_html( $s_dt->format( 'M j' ) . ' – ' . $e_dt->format( 'M j, Y' ) );
 				$cv_title = esc_html( $ev['cvent_event_title'] ?: '—' );
 				$score    = isset( $ev['cvent_match_score'] ) && $ev['cvent_match_score'] !== null ? (int)$ev['cvent_match_score'] : '—';
 				$synced   = $ev['cvent_last_synced'] ? esc_html( wp_date( 'M j, Y g:ia', strtotime( $ev['cvent_last_synced'] ) ) ) : '—';

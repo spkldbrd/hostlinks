@@ -129,7 +129,7 @@ class Hostlinks_CVENT_Sync {
 					array(
 						'cvent_event_id'        => $best['id'],
 						'cvent_event_title'     => $best['title'] ?? '',
-						'cvent_event_start_utc' => isset( $best['start'] ) ? date( 'Y-m-d H:i:s', strtotime( $best['start'] ) ) : null,
+						'cvent_event_start_utc' => isset( $best['start'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $best['start'] ) ) : null,
 						'cvent_match_score'     => $score,
 						'cvent_match_status'    => $match['status'],
 						'cvent_staleness_hash'  => $hash,
@@ -248,7 +248,7 @@ class Hostlinks_CVENT_Sync {
 			array(
 				'cvent_event_id'        => $cvent_id,
 				'cvent_event_title'     => $cvent_event['title'] ?? '',
-				'cvent_event_start_utc' => isset( $cvent_event['start'] ) ? date( 'Y-m-d H:i:s', strtotime( $cvent_event['start'] ) ) : null,
+				'cvent_event_start_utc' => isset( $cvent_event['start'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $cvent_event['start'] ) ) : null,
 				'cvent_match_score'     => null,
 				'cvent_match_status'    => 'manual',
 				'cvent_staleness_hash'  => $hash,

@@ -335,13 +335,14 @@ class Hostlinks_CVENT_Sync {
 
 		if ( $orders_ok ) {
 			// ── Count from order items ────────────────────────────────────────
-			$cancelled = array( 'cancelled', 'canceled', 'deleted', 'voided', 'waitlisted' );
-			$seen      = array(); // attendeeId → 'free'|'paid'
-			$preview   = array();
+			// The API response has no 'status' field. Cancellation is indicated
+			// by the boolean 'active' field: active=false means cancelled/voided.
+			$seen    = array(); // attendeeId → 'free'|'paid'
+			$preview = array();
 
 			foreach ( $order_items as $item ) {
-				// Skip cancelled/voided items.
-				if ( in_array( strtolower( trim( $item['status'] ?? '' ) ), $cancelled, true ) ) {
+				// Skip inactive (cancelled/voided) order items.
+				if ( ! ( $item['active'] ?? true ) ) {
 					continue;
 				}
 
@@ -379,15 +380,15 @@ class Hostlinks_CVENT_Sync {
 
 				$seen[ $att_id ] = $is_free ? 'free' : 'paid';
 
-				if ( $dry_run && count( $preview ) < 10 ) {
-					$preview[] = array(
-						'id'               => $att_id,
-						'status'           => $item['status'] ?? '(no status)',
-						'discount_strings' => $discount_strings,
-						'counted_as'       => $is_free ? 'FREE' : 'PAID',
-						'source'           => 'order_items',
-					);
-				}
+			if ( $dry_run && count( $preview ) < 10 ) {
+				$preview[] = array(
+					'id'               => $att_id,
+					'active'           => $item['active'] ?? true,
+					'discount_strings' => $discount_strings,
+					'counted_as'       => $is_free ? 'FREE' : 'PAID',
+					'source'           => 'order_items',
+				);
+			}
 			}
 
 			$free         = count( array_filter( $seen, function( $v ) { return $v === 'free'; } ) );

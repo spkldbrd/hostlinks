@@ -117,21 +117,20 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 		// Full order-items fetch using current production code path.
 		$order_items = Hostlinks_CVENT_API::get_order_items( $diag_id );
 
-		// Build a status frequency map and the excluded list so we can see exactly
-		// which records are being skipped (and which aren't but should be).
-		$status_map      = array();
-		$excluded_list   = array( 'cancelled', 'canceled', 'deleted', 'voided', 'waitlisted' );
+		// Group by active=true (counted) vs active=false (skipped).
+		// The API has no 'status' field — 'active' is the cancellation signal.
+		$active_count   = 0;
+		$inactive_count = 0;
 		$counted_records = array();
 		$skipped_records = array();
 		if ( ! is_wp_error( $order_items ) ) {
 			foreach ( $order_items as $item ) {
-				$raw_status = $item['status'] ?? '(no status field)';
-				$lc         = strtolower( trim( $raw_status ) );
-				$status_map[ $raw_status ] = ( $status_map[ $raw_status ] ?? 0 ) + 1;
-				if ( in_array( $lc, $excluded_list, true ) ) {
-					$skipped_records[] = $item;
-				} else {
+				if ( $item['active'] ?? true ) {
+					$active_count++;
 					$counted_records[] = $item;
+				} else {
+					$inactive_count++;
+					$skipped_records[] = $item;
 				}
 			}
 		}
@@ -148,8 +147,8 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			'is_error'         => is_wp_error( $order_items ),
 			'error_msg'        => is_wp_error( $order_items ) ? $order_items->get_error_message() : null,
 			'count'            => is_wp_error( $order_items ) ? null : count( $order_items ),
-			'status_map'       => $status_map,
-			'excluded_list'    => $excluded_list,
+			'active_count'     => $active_count,
+			'inactive_count'   => $inactive_count,
 			'counted_records'  => $counted_records,
 			'skipped_records'  => $skipped_records,
 			'all_items'        => is_wp_error( $order_items ) ? null : $order_items,
@@ -445,32 +444,24 @@ $s = Hostlinks_CVENT_API::get_settings();
 			</table>
 			<?php endif; ?>
 
-			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['status_map'] ) ) : ?>
-			<h4>Status breakdown (all <?php echo (int) $diag_result['count']; ?> order items)</h4>
+			<?php if ( ! $diag_result['is_error'] ) : ?>
+			<h4>Active/inactive breakdown (all <?php echo (int) $diag_result['count']; ?> order items)</h4>
+			<p style="font-size:12px;color:#555;">The API returns no <code>status</code> field. Cancellation is indicated by <code>"active": false</code>.</p>
 			<table class="widefat striped" style="max-width:500px;margin-bottom:12px;">
-				<thead><tr><th>Status (exact string from CVENT)</th><th>Count</th><th>Plugin action</th></tr></thead>
+				<thead><tr><th>Field value</th><th>Count</th><th>Plugin action</th></tr></thead>
 				<tbody>
-				<?php foreach ( $diag_result['status_map'] as $status => $qty ) :
-					$lc       = strtolower( trim( $status ) );
-					$excluded = in_array( $lc, $diag_result['excluded_list'], true );
-				?>
-					<tr style="<?php echo $excluded ? 'background:#fff0f0;' : 'background:#f0fff4;'; ?>">
-						<td><code><?php echo esc_html( $status ); ?></code></td>
-						<td><?php echo (int) $qty; ?></td>
-						<td>
-						<?php if ( $excluded ) : ?>
-							<span style="color:#d63638;">&#10007; Skipped (in exclusion list)</span>
-						<?php else : ?>
-							<span style="color:#0a6b00;">&#10003; Counted</span>
-						<?php endif; ?>
-						</td>
+					<tr style="background:#f0fff4;">
+						<td><code>active: true</code></td>
+						<td><?php echo (int) ( $diag_result['active_count'] ?? 0 ); ?></td>
+						<td><span style="color:#0a6b00;">&#10003; Counted</span></td>
 					</tr>
-				<?php endforeach; ?>
+					<tr style="background:#fff0f0;">
+						<td><code>active: false</code></td>
+						<td><?php echo (int) ( $diag_result['inactive_count'] ?? 0 ); ?></td>
+						<td><span style="color:#d63638;">&#10007; Skipped (cancelled/voided)</span></td>
+					</tr>
 				</tbody>
 			</table>
-			<p style="font-size:12px;color:#555;">
-				Current exclusion list: <?php echo esc_html( implode( ', ', $diag_result['excluded_list'] ) ); ?>
-			</p>
 			<?php endif; ?>
 
 			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['skipped_records'] ) ) : ?>
@@ -486,20 +477,35 @@ $s = Hostlinks_CVENT_API::get_settings();
 
 			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['all_items'] ) ) : ?>
 			<details>
-				<summary style="cursor:pointer;">All <?php echo count( $diag_result['all_items'] ); ?> raw order item records (status + key fields)</summary>
+				<summary style="cursor:pointer;">All <?php echo count( $diag_result['all_items'] ); ?> raw order item records (key fields)</summary>
 				<table class="widefat striped" style="margin-top:6px;font-size:11px;">
-					<thead><tr><th>#</th><th>attendeeId</th><th>status</th><th>discountCode</th><th>quantity</th></tr></thead>
+					<thead><tr><th>#</th><th>attendeeId</th><th>active</th><th>discount name / code</th><th>amountPaid</th><th>amountDue</th></tr></thead>
 					<tbody>
 					<?php foreach ( $diag_result['all_items'] as $i => $item ) :
-						$lc  = strtolower( trim( $item['status'] ?? '' ) );
-						$exc = in_array( $lc, $diag_result['excluded_list'], true );
+						$is_active = $item['active'] ?? true;
+						// Pull discount label: prefer code, fall back to name.
+						$disc_label = '—';
+						if ( ! empty( $item['discounts'] ) ) {
+							$parts = array();
+							foreach ( $item['discounts'] as $d ) {
+								$parts[] = ( ! empty( $d['code'] ) ? $d['code'] : ( $d['name'] ?? '' ) );
+							}
+							$disc_label = implode( ', ', array_filter( $parts ) ) ?: '—';
+						}
 					?>
-						<tr style="<?php echo $exc ? 'background:#fff0f0;' : ''; ?>">
+						<tr style="<?php echo ! $is_active ? 'background:#fff0f0;' : ''; ?>">
 							<td><?php echo $i + 1; ?></td>
-							<td><code style="font-size:10px;"><?php echo esc_html( substr( $item['attendeeId'] ?? $item['attendee']['id'] ?? '—', 0, 8 ) . '…' ); ?></code></td>
-							<td><code><?php echo esc_html( $item['status'] ?? '—' ); ?></code></td>
-							<td><code><?php echo esc_html( $item['discountCode'] ?? $item['DiscountCode'] ?? $item['discount_code'] ?? '—' ); ?></code></td>
-							<td><?php echo esc_html( $item['quantity'] ?? $item['qty'] ?? '—' ); ?></td>
+							<td><code style="font-size:10px;"><?php echo esc_html( substr( $item['attendee']['id'] ?? '—', 0, 8 ) . '…' ); ?></code></td>
+							<td>
+								<?php if ( $is_active ) : ?>
+									<span style="color:#0a6b00;">&#10003; true</span>
+								<?php else : ?>
+									<span style="color:#d63638;">&#10007; false</span>
+								<?php endif; ?>
+							</td>
+							<td><code><?php echo esc_html( $disc_label ); ?></code></td>
+							<td><?php echo esc_html( $item['amountPaid'] ?? '—' ); ?></td>
+							<td><?php echo esc_html( $item['amountDue'] ?? '—' ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 					</tbody>

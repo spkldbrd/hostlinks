@@ -335,7 +335,7 @@ class Hostlinks_CVENT_Sync {
 
 		if ( $orders_ok ) {
 			// ── Count from order items ────────────────────────────────────────
-			$cancelled = array( 'cancelled', 'canceled', 'deleted', 'voided' );
+			$cancelled = array( 'cancelled', 'canceled', 'deleted', 'voided', 'waitlisted' );
 			$seen      = array(); // attendeeId → 'free'|'paid'
 			$preview   = array();
 

@@ -69,11 +69,22 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			$hex .= sprintf( '%02X ', ord( $diag_id[ $i ] ) );
 		}
 
-		// Event-scoped endpoints to probe (3 records each).
+		// Force a fresh token so the new scope takes effect immediately.
+		delete_transient( Hostlinks_CVENT_API::TOKEN_KEY );
+		delete_transient( Hostlinks_CVENT_API::TOKEN_KEY . '_meta' );
+		Hostlinks_CVENT_API::get_token(); // Prime the cache + meta.
+		$token_meta = Hostlinks_CVENT_API::get_token_meta();
+
+		// Endpoints to probe (3 records each, 1 API call each).
 		$endpoints_to_test = array(
-			'events/{UUID}/orders/items (primary)'  => 'events/' . $diag_id . '/orders/items',
-			'events/{UUID}/attendees (fallback)'    => 'events/' . $diag_id . '/attendees',
-			'events/{UUID}/orders (structure check)' => 'events/' . $diag_id . '/orders',
+			// Primary path for counts + discounts.
+			'events/{UUID}/orders/items'        => 'events/' . $diag_id . '/orders/items',
+			// Fallback: status-only attendee count.
+			'events/{UUID}/attendees'            => 'events/' . $diag_id . '/attendees',
+			// Orders parent object (scope check).
+			'events/{UUID}/orders'               => 'events/' . $diag_id . '/orders',
+			// Flat attendees with no filter — verifies attendees:read scope at all.
+			'attendees (no filter, scope check)' => 'attendees',
 		);
 
 		$endpoint_results = array();
@@ -96,6 +107,8 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			'step'             => 'order_items_fetch',
 			'clean_id'         => $diag_id,
 			'hex_dump'         => trim( $hex ),
+			'token_meta'       => $token_meta,
+			'requested_scope'  => Hostlinks_CVENT_API::REQUESTED_SCOPE,
 			'primary_url'      => Hostlinks_CVENT_API::BASE_URL . 'events/' . $diag_id . '/orders/items?' .
 			                      http_build_query( array( 'limit' => 5 ), '', '&', PHP_QUERY_RFC3986 ),
 			'endpoint_results' => $endpoint_results,
@@ -199,7 +212,8 @@ $s = Hostlinks_CVENT_API::get_settings();
 	<hr />
 	<h2>Order Items / Attendee Diagnostic</h2>
 	<p>Tests the <strong>event-scoped endpoints</strong> now used in v2.4.17. Leave the UUID blank to auto-pick the first event from the API, or paste a specific CVENT event UUID.</p>
-	<p style="color:#666;font-size:12px;">Previous flat-collection paths all failed: <code>/attendees?filter=eventId…</code> → 400 "Unsupported filter field", <code>/attendees/filter</code> → 400 "Not a valid UUID", <code>/orders/items?filter=eventId…</code> → 404. Now using event-scoped paths.</p>
+	<p style="color:#666;font-size:12px;">Previous flat-collection paths all failed: <code>/attendees?filter=eventId…</code> → 400 "Unsupported filter field", <code>/attendees/filter</code> → 400 "Not a valid UUID", <code>/orders/items?filter=eventId…</code> → 404. Now using event-scoped paths.<br>
+	If you see <strong>HTTP 403</strong> on orders endpoints, the scope <code>event/orders:read</code> is missing — either the token server isn't granting it (check the "Scope granted" row) or it isn't enabled on your CVENT app in the Developer Portal.</p>
 
 	<form method="post">
 		<?php wp_nonce_field( 'hostlinks_cvent_settings' ); ?>
@@ -239,6 +253,33 @@ $s = Hostlinks_CVENT_API::get_settings();
 					<th>Hex dump of UUID</th>
 					<td><code style="word-break:break-all;font-size:11px;"><?php echo esc_html( $diag_result['hex_dump'] ?? '' ); ?></code>
 					<br><small style="color:#888;">A clean UUID starts: <code>63 XX XX XX</code> ('c') — no BOM = no leading <code>EF BB BF</code></small></td>
+				</tr>
+				<tr style="background:#fffbe6;">
+					<th>Scope <em>requested</em> (sent to token endpoint)</th>
+					<td><code><?php echo esc_html( $diag_result['requested_scope'] ?? '' ); ?></code>
+					<br><small style="color:#888;">These scopes must also be enabled on your CVENT app in the Developer Portal.</small></td>
+				</tr>
+				<tr style="background:#fffbe6;">
+					<th>Scope <em>granted</em> (returned by CVENT token server)</th>
+					<td>
+					<?php
+					$meta = $diag_result['token_meta'] ?? null;
+					if ( $meta ) :
+						$granted = esc_html( $meta['scope'] );
+						$req     = $diag_result['requested_scope'] ?? '';
+						// Highlight if granted scope differs from requested.
+						$match   = ( trim( $meta['scope'] ) === trim( $req ) );
+					?>
+						<code><?php echo $granted; ?></code>
+						<?php if ( ! $match ) : ?>
+						<br><span style="color:#d63638;font-weight:600;">&#9888; Mismatch — server did not grant all requested scopes. Check your CVENT app permissions in the Developer Portal.</span>
+						<?php else : ?>
+						<br><span style="color:#0a6b00;">&#10003; Matches requested scope.</span>
+						<?php endif; ?>
+					<?php else : ?>
+						<span style="color:#888;">(Token fetch failed or metadata not available — run Test Connection first.)</span>
+					<?php endif; ?>
+					</td>
 				</tr>
 				<tr>
 					<th>Primary URL (order items)</th>

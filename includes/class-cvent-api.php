@@ -19,7 +19,7 @@ class Hostlinks_CVENT_API {
 
 	const TOKEN_URL    = 'https://api-platform.cvent.com/ea/oauth2/token';
 	const BASE_URL     = 'https://api-platform.cvent.com/ea/';
-	const TOKEN_KEY    = 'hostlinks_cvent_token_v2'; // v2: includes attendees scope
+	const TOKEN_KEY    = 'hostlinks_cvent_token_v3'; // v3: includes orders scope
 	const SETTINGS_KEY = 'hostlinks_cvent_settings';
 	const MAX_RETRIES  = 3;
 
@@ -91,7 +91,7 @@ class Hostlinks_CVENT_API {
 				),
 				'body'    => http_build_query( array(
 					'grant_type' => 'client_credentials',
-					'scope'      => 'event/events:read event/attendees:read',
+					'scope'      => 'event/events:read event/attendees:read event/orders:read',
 				) ),
 				'timeout' => 20,
 			)
@@ -112,8 +112,31 @@ class Hostlinks_CVENT_API {
 		$ttl = isset( $body['expires_in'] ) ? max( (int) $body['expires_in'] - 60, 60 ) : 3540;
 		set_transient( self::TOKEN_KEY, $body['access_token'], $ttl );
 
+		// Cache the metadata (granted scope, expires_in) separately for diagnostic display.
+		set_transient( self::TOKEN_KEY . '_meta', array(
+			'scope'      => $body['scope']      ?? '(not returned by server)',
+			'expires_in' => $body['expires_in'] ?? null,
+			'token_type' => $body['token_type'] ?? null,
+		), $ttl );
+
 		return $body['access_token'];
 	}
+
+	/**
+	 * Return the metadata from the last successful token fetch (scope, expires_in, etc.).
+	 * Used only by the diagnostic panel.
+	 *
+	 * @return array|null  Associative array or null if no cached metadata.
+	 */
+	public static function get_token_meta() {
+		$meta = get_transient( self::TOKEN_KEY . '_meta' );
+		return is_array( $meta ) ? $meta : null;
+	}
+
+	/**
+	 * The OAuth scope string we request — exposed so the diagnostic can display it.
+	 */
+	const REQUESTED_SCOPE = 'event/events:read event/attendees:read event/orders:read';
 
 	// -------------------------------------------------------------------------
 	// HTTP layer

@@ -78,6 +78,8 @@ class Hostlinks_DB {
 			cvent_match_status varchar(20) DEFAULT 'unlinked',
 			cvent_last_synced datetime DEFAULT NULL,
 			cvent_staleness_hash varchar(64) DEFAULT NULL,
+			cvent_prev_paid int(11) DEFAULT NULL,
+			cvent_prev_free int(11) DEFAULT NULL,
 			PRIMARY KEY  (eve_id)
 		) $charset_collate;";
 		dbDelta( $sql );

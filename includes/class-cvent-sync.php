@@ -539,19 +539,21 @@ class Hostlinks_CVENT_Sync {
 			);
 		}
 
-		if ( ! $dry_run ) {
-			$wpdb->update(
-				$table,
-				array(
-					'eve_paid'          => $paid,
-					'eve_free'          => $free,
-					'cvent_last_synced' => current_time( 'mysql' ),
-				),
-				array( 'eve_id' => $eve_id ),
-				array( '%d', '%d', '%s' ),
-				array( '%d' )
-			);
-		}
+	if ( ! $dry_run ) {
+		$wpdb->update(
+			$table,
+			array(
+				'cvent_prev_paid'   => (int) ( $row['eve_paid'] ?? 0 ),
+				'cvent_prev_free'   => (int) ( $row['eve_free'] ?? 0 ),
+				'eve_paid'          => $paid,
+				'eve_free'          => $free,
+				'cvent_last_synced' => current_time( 'mysql' ),
+			),
+			array( 'eve_id' => $eve_id ),
+			array( '%d', '%d', '%d', '%d', '%s' ),
+			array( '%d' )
+		);
+	}
 
 		$msg = $dry_run
 			? sprintf( 'DRY RUN — would write: %d paid, %d free (%d unique attendees, %d items skipped%s).', $paid, $free, $total, $filtered_out, $source_note )

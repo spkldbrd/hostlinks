@@ -105,7 +105,8 @@ $events = $wpdb->get_results(
 		"SELECT edl.eve_id, edl.eve_location, edl.eve_start, edl.eve_end,
 		        edl.eve_paid, edl.eve_free, edl.eve_zoom,
 		        edl.cvent_event_id, edl.cvent_event_title, edl.cvent_match_score,
-		        edl.cvent_match_status, edl.cvent_last_synced
+		        edl.cvent_match_status, edl.cvent_last_synced,
+		        edl.cvent_prev_paid, edl.cvent_prev_free
 		 FROM `{$tbl}` edl
 		 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
 		 WHERE edl.eve_status = 1
@@ -204,8 +205,8 @@ function hl_cvent_status_badge( $status ) {
 				<?php echo (int)$sync_report['errors']; ?> errors
 			</p>
 		</div>
-		<details open style="margin-bottom:16px;">
-			<summary style="cursor:pointer;font-weight:600;padding:4px 0;"><?php echo $is_dry ? 'Dry Run preview details' : 'Sync details'; ?> (click to collapse)</summary>
+	<details style="margin-bottom:16px;">
+		<summary style="cursor:pointer;font-weight:600;padding:4px 0;"><?php echo $is_dry ? 'Dry Run preview details' : 'Sync details'; ?> (click to expand)</summary>
 			<?php foreach ( $sync_report['results'] as $r ) : ?>
 				<div style="border:1px solid #ddd;border-radius:4px;padding:12px;margin:8px 0;background:#fff;">
 					<table style="width:100%;border-collapse:collapse;">
@@ -218,28 +219,28 @@ function hl_cvent_status_badge( $status ) {
 							$has_hl_counts   = isset( $r['hl_paid'] );
 							$has_cvent_counts = isset( $r['paid'] ) && $r['paid'] !== null;
 
-							if ( $has_hl_counts && $has_cvent_counts ) :
-								// Full comparison: HL current → CVENT would-be with delta.
-								$dp       = (int)$r['paid']  - (int)$r['hl_paid'];
-								$df       = (int)$r['free']  - (int)$r['hl_free'];
-								$dp_str   = ( $dp > 0 ? '+' : '' ) . $dp;
-								$df_str   = ( $df > 0 ? '+' : '' ) . $df;
-								$dp_color = $dp !== 0 ? '#d63638' : '#3c3c3c';
-								$df_color = $df !== 0 ? '#d63638' : '#3c3c3c';
-							?>
-								<span style="color:#888;font-size:12px;">HL:</span>
-								<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['hl_paid']; ?>p</span>
-								<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['hl_free']; ?>f</span>
-								<?php if ( $is_dry ) : ?>
-									<span style="color:#888;font-size:12px;margin:0 4px;">→ CVENT:</span>
-									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?>p</span>
-									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?>f</span>
-									<span style="color:<?php echo esc_attr( $dp_color ); ?>;font-size:12px;margin-left:4px;">(<?php echo esc_html( $dp_str ); ?>p <?php echo esc_html( $df_str ); ?>f)</span>
-								<?php else : ?>
-									<span style="color:#888;font-size:12px;margin:0 4px;">→</span>
-									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?>p</span>
-									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?>f</span>
-								<?php endif; ?>
+					if ( $has_hl_counts && $has_cvent_counts ) :
+						// Full comparison: old (HL stored) vs new (CVENT) with delta.
+						$dp          = (int)$r['paid']  - (int)$r['hl_paid'];
+						$df          = (int)$r['free']  - (int)$r['hl_free'];
+						$dp_str      = ( $dp > 0 ? '+' : '' ) . $dp;
+						$df_str      = ( $df > 0 ? '+' : '' ) . $df;
+						$changed     = ( $dp !== 0 || $df !== 0 );
+						$delta_color = $changed ? ( ( $dp < 0 || $df < 0 ) ? '#d63638' : '#e67e00' ) : '#bbb';
+					?>
+						<?php if ( $is_dry ) : ?>
+							<span style="color:#888;font-size:12px;">HL:</span>
+							<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['hl_paid']; ?>p</span>
+							<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['hl_free']; ?>f</span>
+							<span style="color:#888;font-size:12px;margin:0 4px;">→ CVENT:</span>
+							<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?>p</span>
+							<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?>f</span>
+							<span style="color:<?php echo esc_attr( $delta_color ); ?>;font-size:12px;margin-left:4px;">(<?php echo esc_html( $dp_str ); ?>p <?php echo esc_html( $df_str ); ?>f)</span>
+						<?php else : ?>
+							<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?>p</span>
+							<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?>f</span>
+							<span style="color:<?php echo esc_attr( $delta_color ); ?>;font-size:12px;margin-left:4px;">(<?php echo esc_html( $dp_str ); ?>p <?php echo esc_html( $df_str ); ?>f)</span>
+						<?php endif; ?>
 						<?php elseif ( $has_hl_counts ) :
 							// HL counts only — show reason (fetch error or no match yet).
 							$_fetch_err = $r['count_fetch_error'] ?? null;
@@ -274,19 +275,20 @@ function hl_cvent_status_badge( $status ) {
 									$would_match = ( $i === 0 && $top_score >= 90 && ( isset($r['candidates'][1]) ? ($top_score - $r['candidates'][1]['score']) >= 20 : true ) );
 									$bd = $cand['breakdown'] ?? array();
 									// Build a colour-coded breakdown label for each criterion.
-								$pts = array(
-									'SameDay'  => isset( $bd['dates_same_day'] )    ? (int)$bd['dates_same_day']    : null,
-									'Overlap'  => isset( $bd['dates_overlap'] )     ? (int)$bd['dates_overlap']     : null,
-									'City'     => isset( $bd['city'] )              ? (int)$bd['city']              : null,
-									'State'    => isset( $bd['state'] )             ? (int)$bd['state']             : null,
-									'Venue'    => isset( $bd['venue'] )             ? (int)$bd['venue']             : null,
-									'TitleLoc' => isset( $bd['title_location'] )    ? (int)$bd['title_location']    : null,
-									'Title'    => isset( $bd['title'] )             ? (int)$bd['title']             : null,
-									'Type'     => isset( $bd['type_match'] )        ? (int)$bd['type_match']        : null,
-									'Zoom'     => isset( $bd['zoom_match'] )        ? (int)$bd['zoom_match']        : null,
-									'Sub'      => isset( $bd['subaward_match'] )    ? (int)$bd['subaward_match']    : null,
-									'Region'   => isset( $bd['zoom_region_match'] ) ? (int)$bd['zoom_region_match'] : null,
-								);
+							$pts = array(
+								'SameDay'   => isset( $bd['dates_same_day'] )    ? (int)$bd['dates_same_day']    : null,
+								'Overlap'   => isset( $bd['dates_overlap'] )     ? (int)$bd['dates_overlap']     : null,
+								'City'      => isset( $bd['city'] )              ? (int)$bd['city']              : null,
+								'State'     => isset( $bd['state'] )             ? (int)$bd['state']             : null,
+								'Venue'     => isset( $bd['venue'] )             ? (int)$bd['venue']             : null,
+								'TitleLoc'  => isset( $bd['title_location'] )    ? (int)$bd['title_location']    : null,
+								'Title'     => isset( $bd['title'] )             ? (int)$bd['title']             : null,
+								'Type'      => isset( $bd['type_match'] )        ? (int)$bd['type_match']        : null,
+								'Zoom'      => isset( $bd['zoom_match'] )        ? (int)$bd['zoom_match']        : null,
+								'Sub'       => isset( $bd['subaward_match'] )    ? (int)$bd['subaward_match']    : null,
+								'Region'    => isset( $bd['zoom_region_match'] ) ? (int)$bd['zoom_region_match'] : null,
+								'Cancelled' => isset( $bd['cancelled_match'] )   ? (int)$bd['cancelled_match']   : null,
+							);
 								?>
 									<tr style="<?php echo $would_match ? 'background:#e6f4ea;' : ''; ?>">
 										<td><strong><?php echo (int)$cand['score']; ?></strong></td>
@@ -423,21 +425,22 @@ function hl_cvent_status_badge( $status ) {
 
 	<!-- Events table -->
 	<table class="widefat striped" id="cvent-events-table">
-		<thead>
-			<tr>
-				<th>ID</th>
-				<th>Dates</th>
-				<th>Location</th>
-				<th>CVENT Status</th>
-				<th>CVENT Event</th>
-				<th>Score</th>
-				<th>Last Synced</th>
-				<th style="min-width:280px;">Actions</th>
-			</tr>
-		</thead>
-		<tbody>
-		<?php if ( empty( $events ) ) : ?>
-			<tr><td colspan="8">No active events found.</td></tr>
+	<thead>
+		<tr>
+			<th>ID</th>
+			<th>Dates</th>
+			<th>Location</th>
+			<th>CVENT Status</th>
+			<th>CVENT Event</th>
+			<th>Score</th>
+			<th>Last Synced</th>
+			<th style="white-space:nowrap;">Last Δ</th>
+			<th style="min-width:280px;">Actions</th>
+		</tr>
+	</thead>
+	<tbody>
+	<?php if ( empty( $events ) ) : ?>
+		<tr><td colspan="9">No active events found.</td></tr>
 		<?php else : ?>
 			<?php foreach ( $events as $ev ) :
 				$status  = $ev['cvent_match_status'] ?: 'unlinked';
@@ -459,9 +462,30 @@ function hl_cvent_status_badge( $status ) {
 				<td><?php echo hl_cvent_status_badge( $status ); ?></td>
 				<td style="font-size:12px;"><?php echo $cv_title; ?></td>
 				<td><?php echo $score; ?></td>
-				<td style="font-size:11px;"><?php echo $synced; ?></td>
-				<td>
-					<form method="post" style="display:inline;">
+			<td style="font-size:11px;"><?php echo $synced; ?></td>
+			<td style="white-space:nowrap;font-size:12px;font-weight:600;">
+				<?php
+				$prev_paid = $ev['cvent_prev_paid'];
+				$prev_free = $ev['cvent_prev_free'];
+				if ( $prev_paid !== null && $prev_free !== null && $ev['cvent_last_synced'] ) :
+					$dp = (int)$ev['eve_paid'] - (int)$prev_paid;
+					$df = (int)$ev['eve_free'] - (int)$prev_free;
+					$dp_str = ( $dp > 0 ? '+' : '' ) . $dp . 'p';
+					$df_str = ( $df > 0 ? '+' : '' ) . $df . 'f';
+					if ( $dp === 0 && $df === 0 ) :
+						echo '<span style="color:#bbb;">+0p 0f</span>';
+					elseif ( $dp < 0 || $df < 0 ) :
+						echo '<span style="color:#d63638;">' . esc_html( $dp_str . ' ' . $df_str ) . '</span>';
+					else :
+						echo '<span style="color:#e67e00;">' . esc_html( $dp_str . ' ' . $df_str ) . '</span>';
+					endif;
+				else :
+					echo '<span style="color:#bbb;">—</span>';
+				endif;
+				?>
+			</td>
+			<td>
+				<form method="post" style="display:inline;">
 						<?php wp_nonce_field( 'hostlinks_cvent_sync' ); ?>
 						<input type="hidden" name="hostlinks_cvent_eve_id" value="<?php echo $eve_id; ?>">
 						<button type="submit" name="hostlinks_cvent_sync_one" class="button button-small" <?php echo $ready ? '' : 'disabled'; ?>>Sync</button>

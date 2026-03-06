@@ -355,7 +355,11 @@ class Hostlinks_CVENT_Matcher {
 	private static function cv_title_location( $title ) {
 		// Strip BOM and leading whitespace that sometimes appears in CVENT exports.
 		$title = ltrim( $title, "\xEF\xBB\xBF \t" );
-		if ( preg_match( '/^(.+?)\s+-\s+.+$/s', $title, $m ) ) {
+		// Use \s*-\s+ so we handle both "City, ST - Title" and "City, ST- Title"
+		// (some CVENT events omit the space before the dash).
+		// Requiring at least one space AFTER the dash prevents hyphenated city
+		// names like "Winston-Salem" from being split at the wrong position.
+		if ( preg_match( '/^(.+?)\s*-\s+.+$/s', $title, $m ) ) {
 			return trim( $m[1] );
 		}
 		return '';

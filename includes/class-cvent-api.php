@@ -275,6 +275,7 @@ class Hostlinks_CVENT_API {
 			'events',
 			array(
 				'filter' => "end ge '" . $cutoff . "'",
+				'expand' => 'venues',
 			)
 		);
 	}
@@ -430,6 +431,7 @@ class Hostlinks_CVENT_API {
 			'events',
 			array(
 				'filter' => "start ge '" . $start_min . "' and start le '" . $start_max . "'",
+				'expand' => 'venues',
 			)
 		);
 	}

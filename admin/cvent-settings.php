@@ -3,6 +3,20 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// ── Save schedule settings ────────────────────────────────────────────────────
+$schedule_notice = '';
+if ( isset( $_POST['hostlinks_cvent_schedule_save'] ) ) {
+	check_admin_referer( 'hostlinks_cvent_settings' );
+	Hostlinks_CVENT_Scheduler::save_settings(
+		! empty( $_POST['cvent_schedule_enabled'] ),
+		$_POST['cvent_schedule_hour']   ?? 2,
+		$_POST['cvent_schedule_minute'] ?? 0
+	);
+	// Immediately apply the new schedule.
+	Hostlinks_CVENT_Scheduler::maybe_reschedule();
+	$schedule_notice = '<div class="notice notice-success is-dismissible"><p>Schedule settings saved.</p></div>';
+}
+
 // ── Save settings ─────────────────────────────────────────────────────────────
 $notice = '';
 if ( isset( $_POST['hostlinks_cvent_save'] ) ) {
@@ -209,6 +223,82 @@ $s = Hostlinks_CVENT_API::get_settings();
 			<button type="submit" name="hostlinks_cvent_save" class="button button-primary">Save Settings</button>
 			&nbsp;
 			<button type="submit" name="hostlinks_cvent_test" class="button button-secondary">Test Connection</button>
+		</p>
+	</form>
+
+	<hr />
+	<h2>Daily Sync Schedule</h2>
+	<?php echo $schedule_notice; ?>
+	<?php
+	$sched     = Hostlinks_CVENT_Scheduler::get_settings();
+	$last_log  = Hostlinks_CVENT_Scheduler::get_last_log();
+	$next_run  = Hostlinks_CVENT_Scheduler::next_run_display();
+	$tz_label  = wp_timezone_string();
+	?>
+	<p>Automatically run a full CVENT sync every day at a set time. Only events from the last 60 days forward are processed. Dry-run mode is <strong>not</strong> used — results are written to the database.</p>
+
+	<?php if ( $last_log ) : ?>
+	<table class="widefat striped" style="max-width:500px;margin-bottom:12px;">
+		<thead><tr><th colspan="2">Last Auto-Sync Result</th></tr></thead>
+		<tbody>
+			<tr><td><strong>Ran at</strong></td><td><?php echo esc_html( $last_log['time'] ); ?> (site time)</td></tr>
+			<tr><td><strong>Events processed</strong></td><td><?php echo (int) $last_log['total_events']; ?></td></tr>
+			<tr><td><strong>Synced (counts written)</strong></td><td><?php echo (int) $last_log['synced']; ?></td></tr>
+			<tr><td><strong>Auto-matched (no count yet)</strong></td><td><?php echo (int) $last_log['matched']; ?></td></tr>
+			<tr><td><strong>Needs review</strong></td><td><?php echo (int) $last_log['needs_review']; ?></td></tr>
+			<tr><td><strong>No candidates</strong></td><td><?php echo (int) $last_log['no_candidates']; ?></td></tr>
+			<tr><td><strong>Errors</strong></td><td><?php echo (int) $last_log['errors']; ?></td></tr>
+		</tbody>
+	</table>
+	<?php endif; ?>
+
+	<?php if ( $next_run ) : ?>
+	<p><strong>Next scheduled run:</strong> <?php echo esc_html( $next_run ); ?></p>
+	<?php elseif ( $sched['enabled'] ) : ?>
+	<p style="color:#d63638;"><strong>&#9888; Schedule is enabled but no cron event is queued.</strong> Save the settings below to requeue it.</p>
+	<?php endif; ?>
+
+	<form method="post">
+		<?php wp_nonce_field( 'hostlinks_cvent_settings' ); ?>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row">Enable daily sync</th>
+				<td>
+					<label>
+						<input type="checkbox" name="cvent_schedule_enabled" value="1"
+							<?php checked( $sched['enabled'] ); ?> />
+						Run CVENT sync automatically every day
+					</label>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label>Time of day</label></th>
+				<td>
+					<select name="cvent_schedule_hour" style="width:80px;">
+					<?php for ( $h = 0; $h < 24; $h++ ) : ?>
+						<option value="<?php echo $h; ?>" <?php selected( $sched['hour'], $h ); ?>>
+							<?php echo str_pad( $h, 2, '0', STR_PAD_LEFT ); ?>
+						</option>
+					<?php endfor; ?>
+					</select>
+					:
+					<select name="cvent_schedule_minute" style="width:80px;">
+					<?php foreach ( array( 0, 15, 30, 45 ) as $m ) : ?>
+						<option value="<?php echo $m; ?>" <?php selected( $sched['minute'], $m ); ?>>
+							<?php echo str_pad( $m, 2, '0', STR_PAD_LEFT ); ?>
+						</option>
+					<?php endforeach; ?>
+					</select>
+					<p class="description">Site timezone: <strong><?php echo esc_html( $tz_label ); ?></strong>. Recommended: run between midnight and 4 AM to stay within free-tier API limits.</p>
+				</td>
+			</tr>
+		</table>
+		<p class="submit">
+			<button type="submit" name="hostlinks_cvent_schedule_save" class="button button-primary">Save Schedule</button>
+			<?php if ( $sched['enabled'] && $next_run ) : ?>
+			&nbsp;
+			<span style="line-height:30px;color:#555;">Next run: <?php echo esc_html( $next_run ); ?></span>
+			<?php endif; ?>
 		</p>
 	</form>
 

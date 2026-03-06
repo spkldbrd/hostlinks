@@ -147,7 +147,7 @@ if ( $resulttotapplijobscnt > 0 ) {
 		if ( $today > $dt_start ) {
 			$days_label = ( $today > $dt_end ) ? 'The Event is History' : 'Event Started';
 		} else {
-			$days_label = $today->diff( $dt_start )->days . ' days to event';
+			$days_label = ( $today->diff( $dt_start )->days + 1 ) . ' days to event';
 		}
 
 		// ── Event cell ───────────────────────────────────────────────────

@@ -94,4 +94,62 @@ $github_url = 'https://github.com/' . HOSTLINKS_GITHUB_USER . '/' . HOSTLINKS_GI
 	<p style="color:#999;font-size:12px;">
 		GitHub releases are cached for 12 hours. Use "Check for Updates Now" to bypass the cache and get the latest result immediately.
 	</p>
+
+	<?php /* ── Shortcode Reference ─────────────────────────────────────── */ ?>
+	<h2 style="margin-top:2rem;">Shortcode Reference</h2>
+	<p style="color:#555;margin-bottom:1rem;">Add these shortcodes to any WordPress page. All shortcodes require the visitor to be logged in.</p>
+
+	<table class="widefat striped" style="max-width:900px;">
+		<thead>
+			<tr>
+				<th style="width:220px;">Shortcode</th>
+				<th style="width:200px;">Page / Purpose</th>
+				<th>Description</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr>
+				<td><code>[eventlisto]</code></td>
+				<td><strong>Upcoming Events</strong></td>
+				<td>
+					Displays the main calendar card grid of all upcoming events (current month forward).
+					Includes a marketer <strong>Focus</strong> dropdown to filter to a single marketer's events,
+					a <em>Past Events</em> nav link, a <em>Reports</em> nav link (auto-detected once that page is published),
+					and the last-synced date below the Upcoming Events button.
+					<br><small style="color:#888;">URL parameter: <code>?focus=MARKETER_ID</code></small>
+				</td>
+			</tr>
+			<tr>
+				<td><code>[oldeventlisto]</code></td>
+				<td><strong>Past Events</strong></td>
+				<td>
+					Displays past events in the same card grid layout, filtered by year.
+					Includes a year dropdown (2022 → next year), a marketer <strong>Focus</strong> dropdown,
+					and nav links back to Upcoming Events and Reports.
+					<br><small style="color:#888;">URL parameters: <code>?syear=2025</code> &nbsp;|&nbsp; <code>?focus=MARKETER_ID</code></small>
+				</td>
+			</tr>
+			<tr>
+				<td><code>[hostlinks_reports]</code></td>
+				<td><strong>Reports / Marketer Performance</strong></td>
+				<td>
+					Month-over-month marketer performance dashboard powered by Chart.js.
+					Shows 4 summary stat cards (total registrations, paid, event count, avg per event),
+					a multi-line trend chart with toggles for <em>Registrations / Paid Only / Events / Top 5</em>,
+					and a sortable marketer summary table.
+					Date range selector: 6 Months, 1 Year (default), 2 Years.
+					Once published, a <em>Reports</em> button automatically appears in the Upcoming and Past Events nav bars.
+					<br><small style="color:#888;">URL parameter: <code>?months=6|12|24</code></small>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<h3 style="margin-top:1.5rem;">Tips</h3>
+	<ul style="list-style:disc;padding-left:1.5rem;color:#444;line-height:1.8;">
+		<li>Each shortcode page must be set to <strong>private or login-required</strong> — the shortcode itself redirects guests to the home page.</li>
+		<li>The <strong>Focus dropdown</strong> only lists <em>active</em> marketers. Mark a marketer Inactive under <em>Hostlinks → Marketers</em> to remove them from the dropdown while keeping their historical events intact.</li>
+		<li>The <strong>Reports nav button</strong> is auto-detected by searching for a published page containing <code>[hostlinks_reports]</code>. The result is cached for 24 hours — if you move the page, visit any Hostlinks front-end page to refresh it.</li>
+		<li>The <strong>Updated date</strong> shown on the Upcoming Events page reflects the last CVENT sync (manual or automatic). It updates when any sync saves at least one event.</li>
+	</ul>
 </div>

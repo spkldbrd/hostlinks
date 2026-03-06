@@ -415,6 +415,17 @@ class Hostlinks_CVENT_Matcher {
 	 * @param string $title
 	 * @return string
 	 */
+	/**
+	 * Public wrapper so other classes (e.g. cvent-new-events page) can parse
+	 * the city/state prefix out of a CVENT event title.
+	 *
+	 * @param string $title  CVENT event title, e.g. "San Antonio, TX - Grant Writing USA"
+	 * @return string        Parsed prefix, e.g. "San Antonio, TX", or '' if no match.
+	 */
+	public static function title_location_from_cvent( $title ) {
+		return self::cv_title_location( $title );
+	}
+
 	private static function cv_title_location( $title ) {
 		// Strip BOM and leading whitespace that sometimes appears in CVENT exports.
 		$title = ltrim( $title, "\xEF\xBB\xBF \t" );

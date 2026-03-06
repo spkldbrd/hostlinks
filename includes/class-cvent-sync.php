@@ -37,6 +37,78 @@ class Hostlinks_CVENT_Sync {
 	);
 
 	// -------------------------------------------------------------------------
+	// Public: find new CVENT events not yet in Hostlinks
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Find CVENT events that are not yet in Hostlinks and not dismissed by admin.
+	 *
+	 * Fetches all active CVENT events (60-day lookback + future), then excludes:
+	 *   - Events already linked via cvent_event_id in event_details_list.
+	 *   - Events the admin has permanently ignored.
+	 *
+	 * Results are cached in a 1-hour transient. The option
+	 * 'hostlinks_cvent_new_count' is kept in sync for badge/notice display.
+	 *
+	 * @param bool $force  If true, bypass the transient cache and re-fetch.
+	 * @return array|WP_Error  Flat array of CVENT event objects, or WP_Error on failure.
+	 */
+	public static function find_new_events( $force = false ) {
+		$transient_key = 'hostlinks_cvent_new_events';
+
+		if ( ! $force ) {
+			$cached = get_transient( $transient_key );
+			if ( false !== $cached ) {
+				return $cached;
+			}
+		}
+
+		// 1 API call — same request used by the regular sync.
+		$response = Hostlinks_CVENT_API::list_active_events( 60 );
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		// list_active_events returns the full paged wrapper; data is in ['data'].
+		$all_events = isset( $response['data'] ) ? $response['data'] : $response;
+		if ( ! is_array( $all_events ) ) {
+			$all_events = array();
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'event_details_list';
+
+		// One query to get all already-linked CVENT UUIDs.
+		$linked_raw = $wpdb->get_col(
+			"SELECT DISTINCT cvent_event_id FROM `{$table}`
+			 WHERE cvent_event_id IS NOT NULL AND cvent_event_id != ''"
+		);
+		$linked_set = array_flip( array_map( 'trim', $linked_raw ) );
+
+		// Admin-dismissed UUIDs.
+		$ignored     = (array) get_option( 'hostlinks_cvent_ignored_events', array() );
+		$ignored_set = array_flip( $ignored );
+
+		$new_events = array();
+		foreach ( $all_events as $ev ) {
+			$uuid = Hostlinks_CVENT_API::sanitize_uuid( $ev['id'] ?? '' );
+			if ( ! $uuid ) {
+				continue;
+			}
+			if ( isset( $linked_set[ $uuid ] ) || isset( $ignored_set[ $uuid ] ) ) {
+				continue;
+			}
+			$new_events[] = $ev;
+		}
+
+		set_transient( $transient_key, $new_events, HOUR_IN_SECONDS );
+		update_option( 'hostlinks_cvent_new_count', count( $new_events ) );
+		update_option( 'hostlinks_cvent_last_new_fetch', current_time( 'mysql' ) );
+
+		return $new_events;
+	}
+
+	// -------------------------------------------------------------------------
 	// Public: sync one event
 	// -------------------------------------------------------------------------
 

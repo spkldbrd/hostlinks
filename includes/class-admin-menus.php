@@ -6,7 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Hostlinks_Admin_Menus {
 
 	public function __construct() {
-		add_action( 'admin_menu', array( $this, 'register_menus' ) );
+		add_action( 'admin_menu',   array( $this, 'register_menus' ) );
+		add_action( 'admin_notices', array( $this, 'new_events_notice' ) );
 	}
 
 	public function register_menus() {
@@ -30,9 +31,19 @@ class Hostlinks_Admin_Menus {
 		add_submenu_page( 'booking-menu', 'Instructors',   'Instructors',   'manage_options', 'istructor-menu',           array( $this, 'page_instructor' ) );
 		add_submenu_page( 'booking-menu', 'Add Instructor','Add Instructor','manage_options', 'admin.php?page=istructor-menu&add=1' );
 		add_submenu_page( 'booking-menu', 'Import / Export','Import / Export','manage_options','hostlinks-import-export', array( $this, 'page_import_export' ) );
-		add_submenu_page( 'booking-menu', 'CVENT Sync',    'CVENT Sync',    'manage_options','cvent-sync',              array( $this, 'page_cvent_sync' ) );
-		add_submenu_page( 'booking-menu', 'CVENT Settings','CVENT Settings','manage_options','cvent-settings',          array( $this, 'page_cvent_settings' ) );
-		add_submenu_page( 'booking-menu', 'Plugin Info',   'Plugin Info',   'manage_options','hostlinks-plugin-info',   array( $this, 'page_plugin_info' ) );
+		add_submenu_page( 'booking-menu', 'CVENT Sync',      'CVENT Sync',        'manage_options','cvent-sync',              array( $this, 'page_cvent_sync' ) );
+		add_submenu_page( 'booking-menu', 'CVENT Settings',  'CVENT Settings',    'manage_options','cvent-settings',          array( $this, 'page_cvent_settings' ) );
+
+		// New CVENT Events — show a badge count when new events are waiting.
+		$new_count  = (int) get_option( 'hostlinks_cvent_new_count', 0 );
+		$new_label  = 'New CVENT Events';
+		if ( $new_count > 0 ) {
+			$new_label .= ' <span class="awaiting-mod update-plugins" style="margin-left:4px;">'
+				. esc_html( $new_count ) . '</span>';
+		}
+		add_submenu_page( 'booking-menu', 'New CVENT Events', $new_label, 'manage_options','cvent-new-events',        array( $this, 'page_cvent_new_events' ) );
+
+		add_submenu_page( 'booking-menu', 'Plugin Info',     'Plugin Info',       'manage_options','hostlinks-plugin-info',   array( $this, 'page_plugin_info' ) );
 	}
 
 	public function page_events() {
@@ -65,6 +76,46 @@ class Hostlinks_Admin_Menus {
 
 	public function page_plugin_info() {
 		include HOSTLINKS_PLUGIN_DIR . 'admin/plugin-info.php';
+	}
+
+	public function page_cvent_new_events() {
+		include HOSTLINKS_PLUGIN_DIR . 'admin/cvent-new-events.php';
+	}
+
+	/**
+	 * Show an admin notice on all admin pages when new CVENT events are detected.
+	 * The notice links to the New CVENT Events review page.
+	 */
+	public function new_events_notice() {
+		$count = (int) get_option( 'hostlinks_cvent_new_count', 0 );
+		if ( $count <= 0 ) {
+			return;
+		}
+		// Only show on Hostlinks admin pages (and the dashboard) to avoid noise.
+		$screen = get_current_screen();
+		if ( ! $screen ) {
+			return;
+		}
+		// Suppress on the New CVENT Events page itself (already has results there).
+		if ( false !== strpos( $screen->id, 'cvent-new-events' ) ) {
+			return;
+		}
+		$url = admin_url( 'admin.php?page=cvent-new-events' );
+		printf(
+			'<div class="notice notice-warning"><p><strong>Hostlinks:</strong> %s <a href="%s">Review →</a></p></div>',
+			sprintf(
+				esc_html(
+					_n(
+						'%d new CVENT event detected that is not in Hostlinks.',
+						'%d new CVENT events detected that are not in Hostlinks.',
+						$count,
+						'hostlinks'
+					)
+				),
+				$count
+			),
+			esc_url( $url )
+		);
 	}
 }
 

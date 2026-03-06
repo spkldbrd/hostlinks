@@ -284,9 +284,8 @@ class Hostlinks_CVENT_API {
 		$max_pages = 20; // guard rail
 
 		do {
-			// CVENT treats eventId as a GUID/UUID type — no single quotes (unlike string literals).
-			$params = array(
-				'filter' => 'eventId eq ' . $event_id,
+		$params = array(
+			'filter' => "eventId eq '" . $event_id . "'",
 				'limit'  => 200,
 			);
 			if ( $next ) {

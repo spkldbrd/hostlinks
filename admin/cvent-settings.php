@@ -63,20 +63,25 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			$hex .= sprintf( '%02X ', ord( $diag_id[ $i ] ) );
 		}
 
-		// Build the filter string and URL exactly as the API call would.
-		$filter_str = 'eventId eq ' . $diag_id;
+		// Build filter strings for both formats so we can compare.
+		$filter_quoted   = "eventId eq '" . $diag_id . "'";
+		$filter_unquoted = 'eventId eq ' . $diag_id;
+		// Current code uses quoted + RFC3986:
+		$filter_str = $filter_quoted;
 		$test_url   = Hostlinks_CVENT_API::BASE_URL . 'attendees/filter?' .
 		              http_build_query( array( 'filter' => $filter_str, 'limit' => 5 ), '', '&', PHP_QUERY_RFC3986 );
 
-		// Perform the actual attendee fetch.
+		// Perform the actual attendee fetch (uses current code path).
 		$attendees = Hostlinks_CVENT_Sync::fetch_attendees_for_event( $diag_id );
 
 		$diag_result = array_merge( $diag_result ?? array(), array(
-			'step'        => 'attendee_fetch',
-			'clean_id'    => $diag_id,
-			'hex_dump'    => trim( $hex ),
-			'filter_str'  => $filter_str,
-			'test_url'    => $test_url,
+			'step'            => 'attendee_fetch',
+			'clean_id'        => $diag_id,
+			'hex_dump'        => trim( $hex ),
+			'filter_str'      => $filter_str,
+			'filter_quoted'   => $filter_quoted,
+			'filter_unquoted' => $filter_unquoted,
+			'test_url'        => $test_url,
 			'is_error'    => is_wp_error( $attendees ),
 			'error_msg'   => is_wp_error( $attendees ) ? $attendees->get_error_message() : null,
 			'count'       => is_wp_error( $attendees ) ? null : count( $attendees ),
@@ -209,20 +214,26 @@ $s = Hostlinks_CVENT_API::get_settings();
 
 			<table class="widefat striped" style="margin-bottom:12px;">
 				<tr>
-					<th style="width:180px;">Clean UUID used</th>
+					<th style="width:200px;">Clean UUID used</th>
 					<td><code><?php echo esc_html( $diag_result['clean_id'] ?? '' ); ?></code></td>
 				</tr>
 				<tr>
 					<th>Hex dump of UUID</th>
 					<td><code style="word-break:break-all;font-size:11px;"><?php echo esc_html( $diag_result['hex_dump'] ?? '' ); ?></code>
-					<br><small style="color:#888;">A clean UUID starts: <code>XX XX XX XX -</code> (no BOM = no leading EF BB BF)</small></td>
+					<br><small style="color:#888;">A clean UUID starts: <code>63 XX XX XX</code> ('c') — no BOM = no leading <code>EF BB BF</code></small></td>
 				</tr>
 				<tr>
-					<th>Filter string sent</th>
-					<td><code><?php echo esc_html( $diag_result['filter_str'] ?? '' ); ?></code></td>
+					<th>Filter (quoted — v2.4.15)</th>
+					<td><code><?php echo esc_html( $diag_result['filter_quoted'] ?? '' ); ?></code>
+					<br><small style="color:#888;">Encoded: <code>filter=<?php echo esc_html( rawurlencode( $diag_result['filter_quoted'] ?? '' ) ); ?></code></small></td>
 				</tr>
 				<tr>
-					<th>Full URL called</th>
+					<th>Filter (no quotes — v2.4.12–14)</th>
+					<td><code><?php echo esc_html( $diag_result['filter_unquoted'] ?? '' ); ?></code>
+					<br><small style="color:#888;">Encoded: <code>filter=<?php echo esc_html( rawurlencode( $diag_result['filter_unquoted'] ?? '' ) ); ?></code></small></td>
+				</tr>
+				<tr>
+					<th>Full URL sent (quoted)</th>
 					<td><code style="word-break:break-all;font-size:11px;"><?php echo esc_html( $diag_result['test_url'] ?? '' ); ?></code></td>
 				</tr>
 				<tr>

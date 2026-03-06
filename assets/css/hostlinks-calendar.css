@@ -55,8 +55,8 @@
   border-radius: 0.5rem;
   font-weight: 500;
   font-size: 0.875rem;
-  border: 1px solid hsl(215 15% 88%);
-  background: transparent;
+  border: 1px solid hsl(215 15% 80%);
+  background: hsl(215 15% 88%);
   cursor: pointer;
   transition: all 0.2s;
   text-decoration: none;
@@ -65,7 +65,8 @@
 }
 
 .hostlinks-btn:hover {
-  background: hsl(215 20% 95%);
+  background: hsl(215 15% 82%);
+  border-color: hsl(215 15% 72%);
   text-decoration: none;
   color: inherit;
 }
@@ -301,12 +302,14 @@
 }
 
 .dark .hostlinks-btn {
-  border-color: hsl(215 20% 20%);
+  background: hsl(215 20% 22%);
+  border-color: hsl(215 20% 28%);
   color: hsl(210 25% 95%);
 }
 
 .dark .hostlinks-btn:hover {
-  background: hsl(215 20% 18%);
+  background: hsl(215 20% 28%);
+  border-color: hsl(215 20% 34%);
 }
 
 .dark .hostlinks-year-filter {

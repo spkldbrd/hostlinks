@@ -414,6 +414,20 @@
   height: 380px;
 }
 
+.hl-chart-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: .4rem;
+  margin-top: .75rem;
+  padding-top: .5rem;
+  border-top: 1px solid hsl(215 15% 92%);
+}
+
+.dark .hl-chart-controls,
+.darklooks-mode-changer-enabled .hl-chart-controls {
+  border-color: hsl(215 20% 22%);
+}
+
 .hl-summary-table {
   width: 100%;
   border-collapse: collapse;

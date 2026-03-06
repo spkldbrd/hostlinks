@@ -6,7 +6,7 @@ $table11 = $wpdb->prefix . 'event_details_list';
 $table13 = $wpdb->prefix . 'event_marketer';
 
 // ── Range filter ──────────────────────────────────────────────────────────────
-$months_options = array( 6 => '6 Months', 12 => '1 Year', 24 => '2 Years' );
+$months_options = array( 6 => '6 Months', 12 => '1 Year', 24 => '2 Years', 36 => '3 Years', 60 => '5 Years' );
 $months_back    = isset( $_GET['months'] ) && isset( $months_options[ (int) $_GET['months'] ] )
 	? (int) $_GET['months']
 	: 12;
@@ -96,6 +96,11 @@ $total_registrations = array_sum( array_map( 'array_sum', $datasets_total ) );
 $total_paid          = array_sum( array_map( 'array_sum', $datasets_paid ) );
 $avg_per_event       = $total_events > 0 ? round( $total_registrations / $total_events, 1 ) : 0;
 
+// ── Active marketer names (for "Current Marketers" filter) ───────────────────
+$active_marketer_names = $wpdb->get_col(
+	"SELECT event_marketer_name FROM {$table13} WHERE event_marketer_status = 1"
+);
+
 // ── JSON payload for Chart.js ─────────────────────────────────────────────────
 $chart_data = array(
 	'labels'    => $display_labels,
@@ -104,6 +109,7 @@ $chart_data = array(
 	'paid'      => $datasets_paid,
 	'count'     => $datasets_count,
 	'top5'      => $top5_indices,
+	'active'    => array_values( $active_marketer_names ),
 );
 ?>
 <div class="hostlinks-page">
@@ -160,11 +166,14 @@ $chart_data = array(
 				<button class="hl-toggle-btn hl-toggle-btn--active" data-mode="total">Registrations</button>
 				<button class="hl-toggle-btn" data-mode="paid">Paid Only</button>
 				<button class="hl-toggle-btn" data-mode="count">Events</button>
-				<button class="hl-toggle-btn hl-top5-btn" id="hl-top5-btn">Top 5</button>
 			</div>
 		</div>
 		<div class="hl-chart-wrap">
 			<canvas id="hlReportsChart"></canvas>
+		</div>
+		<div class="hl-chart-controls">
+			<button class="hl-toggle-btn" id="hl-top5-btn">Top 5 Performers</button>
+			<button class="hl-toggle-btn" id="hl-current-btn">Current Marketers</button>
 		</div>
 	</div>
 
@@ -232,13 +241,16 @@ document.addEventListener('DOMContentLoaded', function() {
 		'#14b8a6','#a855f7','#fb923c','#4ade80','#60a5fa'
 	];
 
-	var d        = hlReportData;
-	var mode     = 'total';
-	var showTop5 = false;
+	var d               = hlReportData;
+	var mode            = 'total';
+	var showTop5        = false;
+	var showCurrentOnly = false;
 
 	function buildDatasets() {
 		return d.marketers.map(function(name, i) {
-			var hidden = showTop5 && d.top5.indexOf(i) === -1;
+			var hidden = false;
+			if ( showTop5        && d.top5.indexOf(i) === -1    ) hidden = true;
+			if ( showCurrentOnly && d.active.indexOf(name) === -1 ) hidden = true;
 			return {
 				label:            name,
 				data:             d[mode][i],
@@ -268,6 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			plugins: {
 				legend: {
 					position: 'bottom',
+					align:    'start',
 					labels: {
 						boxWidth: 12,
 						padding:  16,
@@ -294,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		},
 	});
 
-	// Mode toggle buttons
+	// Mode toggle buttons (Registrations / Paid Only / Events)
 	document.querySelectorAll('.hl-toggle-btn[data-mode]').forEach(function(btn) {
 		btn.addEventListener('click', function() {
 			document.querySelectorAll('.hl-toggle-btn[data-mode]').forEach(function(b) {
@@ -307,12 +320,23 @@ document.addEventListener('DOMContentLoaded', function() {
 		});
 	});
 
-	// Top 5 toggle
+	// Top 5 Performers toggle
 	var top5Btn = document.getElementById('hl-top5-btn');
 	if (top5Btn) {
 		top5Btn.addEventListener('click', function() {
 			showTop5 = !showTop5;
 			this.classList.toggle('hl-toggle-btn--active', showTop5);
+			chart.data.datasets = buildDatasets();
+			chart.update();
+		});
+	}
+
+	// Current Marketers toggle
+	var currentBtn = document.getElementById('hl-current-btn');
+	if (currentBtn) {
+		currentBtn.addEventListener('click', function() {
+			showCurrentOnly = !showCurrentOnly;
+			this.classList.toggle('hl-toggle-btn--active', showCurrentOnly);
 			chart.data.datasets = buildDatasets();
 			chart.update();
 		});

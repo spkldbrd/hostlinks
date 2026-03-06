@@ -276,23 +276,78 @@ class Hostlinks_CVENT_API {
 	 * @param string $event_id CVENT event UUID.
 	 * @return array|WP_Error  Flat array of attendee records.
 	 */
+	/**
+	 * Retrieve ALL attendees for a CVENT event, handling token-based pagination.
+	 *
+	 * Endpoint: GET /ea/attendees?filter=eventId eq '{id}'&limit=200
+	 * (/attendees/filter does not exist — /attendees is the collection resource)
+	 *
+	 * Required scope: event/attendees:read
+	 *
+	 * @param string $event_id CVENT event UUID.
+	 * @return array|WP_Error  Flat array of attendee records.
+	 */
 	public static function get_attendees( $event_id ) {
 		$event_id  = self::sanitize_uuid( $event_id );
 		$all       = array();
 		$next      = null;
 		$page      = 0;
-		$max_pages = 20; // guard rail
+		$max_pages = 20;
 
 		do {
-		$params = array(
-			'filter' => "eventId eq '" . $event_id . "'",
+			$params = array(
+				'filter' => "eventId eq '" . $event_id . "'",
 				'limit'  => 200,
 			);
 			if ( $next ) {
 				$params['token'] = $next;
 			}
 
-			$result = self::request( 'attendees/filter', $params );
+			// Endpoint is /ea/attendees (collection), NOT /ea/attendees/filter.
+			$result = self::request( 'attendees', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			$data = isset( $result['data'] ) ? $result['data'] : array();
+			$all  = array_merge( $all, $data );
+			$next = isset( $result['paging']['nextToken'] ) ? $result['paging']['nextToken'] : null;
+			$page++;
+		} while ( $next && $page < $max_pages );
+
+		return $all;
+	}
+
+	/**
+	 * Retrieve ALL order items for a CVENT event (paginated).
+	 * Order items carry the discount code used during registration — the correct
+	 * source for PAID/FREE classification (discount codes are NOT on the attendee record).
+	 *
+	 * Endpoint: GET /ea/orders/items?filter=eventId eq '{id}'&limit=200
+	 *
+	 * Each item in the response is expected to contain at least:
+	 *   attendeeId, discountCode, discountName, status
+	 *
+	 * @param string $event_id CVENT event UUID.
+	 * @return array|WP_Error  Flat array of order-item records.
+	 */
+	public static function get_order_items( $event_id ) {
+		$event_id  = self::sanitize_uuid( $event_id );
+		$all       = array();
+		$next      = null;
+		$page      = 0;
+		$max_pages = 20;
+
+		do {
+			$params = array(
+				'filter' => "eventId eq '" . $event_id . "'",
+				'limit'  => 200,
+			);
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+
+			$result = self::request( 'orders/items', $params );
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}

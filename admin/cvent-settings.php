@@ -63,25 +63,47 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			$hex .= sprintf( '%02X ', ord( $diag_id[ $i ] ) );
 		}
 
-		// Build filter strings for both formats so we can compare.
+		// Test all three endpoint / format combinations.
 		$filter_quoted   = "eventId eq '" . $diag_id . "'";
 		$filter_unquoted = 'eventId eq ' . $diag_id;
-		// Current code uses quoted + RFC3986:
+
+		$endpoints_to_test = array(
+			'attendees (quoted)'          => array( 'ep' => 'attendees',        'filter' => $filter_quoted ),
+			'attendees (no quotes)'        => array( 'ep' => 'attendees',        'filter' => $filter_unquoted ),
+			'attendees/filter (quoted)'    => array( 'ep' => 'attendees/filter', 'filter' => $filter_quoted ),
+			'orders/items (quoted)'        => array( 'ep' => 'orders/items',     'filter' => $filter_quoted ),
+		);
+
+		$endpoint_results = array();
+		foreach ( $endpoints_to_test as $label => $cfg ) {
+			$params = array( 'filter' => $cfg['filter'], 'limit' => 3 );
+			$res    = Hostlinks_CVENT_API::request( $cfg['ep'], $params );
+			$endpoint_results[ $label ] = array(
+				'url'     => Hostlinks_CVENT_API::BASE_URL . $cfg['ep'] . '?' . http_build_query( $params, '', '&', PHP_QUERY_RFC3986 ),
+				'ok'      => ! is_wp_error( $res ),
+				'error'   => is_wp_error( $res ) ? $res->get_error_message() : null,
+				'count'   => is_wp_error( $res ) ? null : count( $res['data'] ?? array() ),
+				'sample'  => is_wp_error( $res ) ? null : array_slice( $res['data'] ?? array(), 0, 1 ),
+			);
+		}
+
+		// Current code path (attendees collection, quoted filter).
 		$filter_str = $filter_quoted;
-		$test_url   = Hostlinks_CVENT_API::BASE_URL . 'attendees/filter?' .
+		$test_url   = Hostlinks_CVENT_API::BASE_URL . 'attendees?' .
 		              http_build_query( array( 'filter' => $filter_str, 'limit' => 5 ), '', '&', PHP_QUERY_RFC3986 );
 
 		// Perform the actual attendee fetch (uses current code path).
 		$attendees = Hostlinks_CVENT_Sync::fetch_attendees_for_event( $diag_id );
 
 		$diag_result = array_merge( $diag_result ?? array(), array(
-			'step'            => 'attendee_fetch',
-			'clean_id'        => $diag_id,
-			'hex_dump'        => trim( $hex ),
-			'filter_str'      => $filter_str,
-			'filter_quoted'   => $filter_quoted,
-			'filter_unquoted' => $filter_unquoted,
-			'test_url'        => $test_url,
+			'step'             => 'attendee_fetch',
+			'clean_id'         => $diag_id,
+			'hex_dump'         => trim( $hex ),
+			'filter_str'       => $filter_str,
+			'filter_quoted'    => $filter_quoted,
+			'filter_unquoted'  => $filter_unquoted,
+			'test_url'         => $test_url,
+			'endpoint_results' => $endpoint_results,
 			'is_error'    => is_wp_error( $attendees ),
 			'error_msg'   => is_wp_error( $attendees ) ? $attendees->get_error_message() : null,
 			'count'       => is_wp_error( $attendees ) ? null : count( $attendees ),
@@ -249,6 +271,38 @@ $s = Hostlinks_CVENT_API::get_settings();
 					</td>
 				</tr>
 			</table>
+
+			<?php if ( ! empty( $diag_result['endpoint_results'] ) ) : ?>
+			<h4>Endpoint probe results (3 records each, 1 API call each)</h4>
+			<table class="widefat striped" style="margin-bottom:12px;">
+				<thead><tr><th>Endpoint + format</th><th>Result</th><th>URL sent</th></tr></thead>
+				<tbody>
+				<?php foreach ( $diag_result['endpoint_results'] as $label => $er ) : ?>
+					<tr style="<?php echo $er['ok'] ? 'background:#e6f4ea;' : ''; ?>">
+						<td><code><?php echo esc_html( $label ); ?></code></td>
+						<td>
+							<?php if ( $er['ok'] ) : ?>
+								<strong style="color:#0a6b00;">&#10003; OK</strong> — <?php echo (int) $er['count']; ?> record(s)
+							<?php else : ?>
+								<span style="color:#d63638;">&#9888;</span> <?php echo esc_html( $er['error'] ); ?>
+							<?php endif; ?>
+						</td>
+						<td><code style="font-size:10px;word-break:break-all;"><?php echo esc_html( $er['url'] ); ?></code></td>
+					</tr>
+					<?php if ( $er['ok'] && ! empty( $er['sample'] ) ) : ?>
+					<tr>
+						<td colspan="3" style="padding:4px 12px;">
+							<details><summary style="font-size:11px;cursor:pointer;">Sample record keys</summary>
+							<pre style="font-size:10px;background:#f0f0f1;padding:6px;max-height:150px;overflow:auto;"><?php
+								echo esc_html( json_encode( array_keys( $er['sample'][0] ), JSON_PRETTY_PRINT ) );
+							?></pre></details>
+						</td>
+					</tr>
+					<?php endif; ?>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<?php endif; ?>
 
 			<?php if ( ! $diag_result['is_error'] && ! empty( $diag_result['first_few'] ) ) : ?>
 			<details>

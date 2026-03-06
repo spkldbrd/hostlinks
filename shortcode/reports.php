@@ -224,6 +224,7 @@ $chart_data = array(
 var hlReportData = <?php echo wp_json_encode( $chart_data ); ?>;
 </script>
 <script>
+document.addEventListener('DOMContentLoaded', function() {
 (function() {
 	var COLORS = [
 		'#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
@@ -317,4 +318,5 @@ var hlReportData = <?php echo wp_json_encode( $chart_data ); ?>;
 		});
 	}
 })();
+}); // DOMContentLoaded
 </script>

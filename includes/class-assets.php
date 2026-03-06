@@ -38,7 +38,7 @@ class Hostlinks_Assets {
 				'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
 				array(),
 				'4.4.3',
-				true
+				false  // load in <head> so it's available before the shortcode's inline script
 			);
 		}
 	}

@@ -30,6 +30,8 @@ class Hostlinks_Admin_Menus {
 		add_submenu_page( 'booking-menu', 'Instructors',   'Instructors',   'manage_options', 'istructor-menu',           array( $this, 'page_instructor' ) );
 		add_submenu_page( 'booking-menu', 'Add Instructor','Add Instructor','manage_options', 'admin.php?page=istructor-menu&add=1' );
 		add_submenu_page( 'booking-menu', 'Import / Export','Import / Export','manage_options','hostlinks-import-export', array( $this, 'page_import_export' ) );
+		add_submenu_page( 'booking-menu', 'CVENT Sync',    'CVENT Sync',    'manage_options','cvent-sync',              array( $this, 'page_cvent_sync' ) );
+		add_submenu_page( 'booking-menu', 'CVENT Settings','CVENT Settings','manage_options','cvent-settings',          array( $this, 'page_cvent_settings' ) );
 		add_submenu_page( 'booking-menu', 'Plugin Info',   'Plugin Info',   'manage_options','hostlinks-plugin-info',   array( $this, 'page_plugin_info' ) );
 	}
 
@@ -51,6 +53,14 @@ class Hostlinks_Admin_Menus {
 
 	public function page_import_export() {
 		include HOSTLINKS_PLUGIN_DIR . 'admin/import-export.php';
+	}
+
+	public function page_cvent_sync() {
+		include HOSTLINKS_PLUGIN_DIR . 'admin/cvent-sync.php';
+	}
+
+	public function page_cvent_settings() {
+		include HOSTLINKS_PLUGIN_DIR . 'admin/cvent-settings.php';
 	}
 
 	public function page_plugin_info() {

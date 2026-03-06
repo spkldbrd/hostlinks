@@ -423,8 +423,9 @@ class Hostlinks_CVENT_Sync {
 		$max_pages = 20;
 
 		do {
+			// CVENT treats eventId as a GUID/UUID type — no single quotes (unlike string literals).
 			$params = array(
-				'filter' => "eventId eq '" . $cvent_event_id . "'",
+				'filter' => 'eventId eq ' . $cvent_event_id,
 				'limit'  => 200,
 			);
 			if ( $next ) {

@@ -137,7 +137,9 @@ class Hostlinks_CVENT_API {
 		$s   = self::get_settings();
 		$url = self::BASE_URL . ltrim( $endpoint, '/' );
 		if ( ! empty( $params ) ) {
-			$url = add_query_arg( $params, $url );
+			// Use RFC3986 (%20 for spaces) — add_query_arg uses urlencode (+) which
+			// some OData parsers reject when decoding filter strings.
+			$url .= '?' . http_build_query( $params, '', '&', PHP_QUERY_RFC3986 );
 		}
 
 		$response = wp_remote_get(
@@ -250,7 +252,7 @@ class Hostlinks_CVENT_API {
 
 	/**
 	 * Retrieve ALL attendees for a CVENT event, handling token-based pagination.
-	 * Uses the confirmed endpoint: GET /ea/attendees/filter?filter=eventId eq '{id}'
+	 * Uses the confirmed endpoint: GET /ea/attendees/filter?filter=eventId eq {id}
 	 * Uses page size of 200 to minimise call count (free tier: 1,000 calls/day).
 	 *
 	 * Required scope: event/attendees:read (set on the CVENT app, not in the token request).
@@ -265,8 +267,9 @@ class Hostlinks_CVENT_API {
 		$max_pages = 20; // guard rail
 
 		do {
+			// CVENT treats eventId as a GUID/UUID type — no single quotes (unlike string literals).
 			$params = array(
-				'filter' => "eventId eq '" . $event_id . "'",
+				'filter' => 'eventId eq ' . $event_id,
 				'limit'  => 200,
 			);
 			if ( $next ) {

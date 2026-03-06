@@ -109,10 +109,7 @@ if ( false === $reports_page_url ) {
 <div class="hostlinks-container">
 
 	<div class="hostlinks-actions">
-		<div style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;">
-			<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Upcoming Events</a>
-			<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
-		</div>
+		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Upcoming Events</a>
 		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
 		<?php if ( $reports_page_url ) : ?>
 		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
@@ -134,6 +131,7 @@ if ( false === $reports_page_url ) {
 			window.location.href = url;
 		});
 		</script>
+		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
 	</div>
 
 <?php

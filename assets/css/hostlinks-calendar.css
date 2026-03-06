@@ -45,8 +45,9 @@
 .hostlinks-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: .5rem 1rem;
+  margin-bottom: 0;
 }
 
 .hostlinks-btn {
@@ -245,9 +246,11 @@
 
 /* Last-updated label */
 .hostlinks-updated {
-  margin-left: auto;
+  margin-left: 5px;
   font-size: 0.8rem;
   color: hsl(215 15% 55%);
+  width: 100%;
+  order: 10;
 }
 
 /* Empty state */

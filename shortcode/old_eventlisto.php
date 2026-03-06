@@ -116,9 +116,6 @@ $last_updated = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->forma
 	<div class="hostlinks-actions">
 		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn">Upcoming Events</a>
 		<a href="<?php echo esc_url( $page_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Past Events</a>
-		<?php if ( $reports_page_url ) : ?>
-		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
-		<?php endif; ?>
 
 		<select id="hl-old-chooseyear" class="hostlinks-year-filter" aria-label="Filter by year">
 			<?php
@@ -153,6 +150,10 @@ $last_updated = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->forma
 			document.getElementById('hl-focus-marketer').addEventListener('change', hlOldNav);
 		})();
 		</script>
+
+		<?php if ( $reports_page_url ) : ?>
+		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
+		<?php endif; ?>
 		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
 	</div>
 

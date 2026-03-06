@@ -113,9 +113,6 @@ if ( ! $reports_page_url ) {
 	<div class="hostlinks-actions">
 		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Upcoming Events</a>
 		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
-		<?php if ( $reports_page_url ) : ?>
-		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
-		<?php endif; ?>
 
 		<select id="hl-focus-marketer" class="hostlinks-year-filter" aria-label="Focus by marketer">
 			<option value="0" <?php selected( $focus_id, 0 ); ?>>All Marketers</option>
@@ -133,6 +130,10 @@ if ( ! $reports_page_url ) {
 			window.location.href = url;
 		});
 		</script>
+
+		<?php if ( $reports_page_url ) : ?>
+		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
+		<?php endif; ?>
 		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
 	</div>
 

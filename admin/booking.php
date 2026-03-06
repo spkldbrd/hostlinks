@@ -116,8 +116,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <td><input type="text" value="#" id="eve_roster_url" name="eve_roster_url" required></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_trainer_url">TRAINER URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="#" id="eve_trainer_url" name="eve_trainer_url" required></td>
+        <th><label for="eve_trainer_url">TRAINER URL</label></th>
+        <td><input type="text" value="" id="eve_trainer_url" name="eve_trainer_url"></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_sign_in_url">Sign In URL <span class="description">(required)</span></label></th>
@@ -262,8 +262,8 @@ jQuery(function() {
         <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_roster_url ?? '' ); ?>" id="eve_roster_url" name="eve_roster_url" required></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_trainer_url">TRAINER URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_trainer_url ?? '' ); ?>" id="eve_trainer_url" name="eve_trainer_url" required></td>
+        <th><label for="eve_trainer_url">TRAINER URL</label></th>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_trainer_url ?? '' ); ?>" id="eve_trainer_url" name="eve_trainer_url"></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_sign_in_url">Sign In URL <span class="description">(required)</span></label></th>
@@ -514,7 +514,7 @@ jQuery(function() {
             </td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" required style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" required style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>" name="eve_trainer_url[]" required style="width:140px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>" name="eve_trainer_url[]" style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_sign_in_url'] ?? '' ); ?>" name="eve_sign_in_url[]" required style="width:140px;"></td>
             <td>
               <select name="eve_instructor[]" class="evetype" required style="width:100px;">

@@ -81,6 +81,10 @@ class Hostlinks_CVENT_Sync {
 		) );
 		$row['eve_type_name'] = strtolower( trim( $type_name ?? '' ) );
 
+		// Always capture current HL counts for comparison display in every result.
+		$hl_paid = (int) ( $row['eve_paid'] ?? 0 );
+		$hl_free = (int) ( $row['eve_free'] ?? 0 );
+
 		$stored_id = $row['cvent_event_id'] ?? '';
 		$status    = $row['cvent_match_status'] ?? 'unlinked';
 
@@ -95,7 +99,7 @@ class Hostlinks_CVENT_Sync {
 				$stored_id = '';
 				$status    = 'unlinked';
 			} elseif ( is_wp_error( $check ) ) {
-				return self::result( $eve_id, 'error', $check->get_error_message(), dry_run: $dry_run );
+				return self::result( $eve_id, 'error', $check->get_error_message(), hl_paid: $hl_paid, hl_free: $hl_free, dry_run: $dry_run );
 			} else {
 				// Verify staleness hash hasn't changed drastically.
 				$new_hash = Hostlinks_CVENT_Matcher::staleness_hash( $check );
@@ -119,11 +123,11 @@ class Hostlinks_CVENT_Sync {
 			$match = Hostlinks_CVENT_Matcher::bootstrap_match( $row );
 
 			if ( 'error' === $match['status'] ) {
-				return self::result( $eve_id, 'error', $match['error'], dry_run: $dry_run );
+				return self::result( $eve_id, 'error', $match['error'], hl_paid: $hl_paid, hl_free: $hl_free, dry_run: $dry_run );
 			}
 
 			if ( 'no_candidates' === $match['status'] ) {
-				return self::result( $eve_id, 'no_candidates', 'No CVENT events found in date window.', dry_run: $dry_run );
+				return self::result( $eve_id, 'no_candidates', 'No CVENT events found in date window.', hl_paid: $hl_paid, hl_free: $hl_free, dry_run: $dry_run );
 			}
 
 			$best  = $match['best'];
@@ -153,7 +157,9 @@ class Hostlinks_CVENT_Sync {
 					'needs_review',
 					sprintf( 'Best candidate "%s" scored %d — needs manual review.', $best['title'] ?? '(no title)', $score ),
 					null, null, $best['title'] ?? '', $best['id'], $score,
-					dry_run: $dry_run
+					dry_run: $dry_run,
+					hl_paid: $hl_paid,
+					hl_free: $hl_free
 				);
 				$r['candidates'] = $match['candidates'];
 				return $r;
@@ -178,7 +184,7 @@ class Hostlinks_CVENT_Sync {
 				return $r;
 			}
 
-			return self::result( $eve_id, 'matched', sprintf( 'Auto-matched to "%s" (score %d). Run sync again to update counts.', $best['title'] ?? '', $score ), null, null, $best['title'] ?? '', $stored_id, $score );
+			return self::result( $eve_id, 'matched', sprintf( 'Auto-matched to "%s" (score %d). Run sync again to update counts.', $best['title'] ?? '', $score ), null, null, $best['title'] ?? '', $stored_id, $score, hl_paid: $hl_paid, hl_free: $hl_free );
 		}
 
 		// ── Step 3: fetch attendees and count PAID/FREE ───────────────────────
@@ -318,7 +324,11 @@ class Hostlinks_CVENT_Sync {
 
 		$attendees = self::fetch_attendees_for_event( $cvent_id );
 		if ( is_wp_error( $attendees ) ) {
-			return self::result( $eve_id, 'error', $attendees->get_error_message(), dry_run: $dry_run );
+			return self::result( $eve_id, 'error', $attendees->get_error_message(),
+				hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
+				hl_free: (int) ( $row['eve_free'] ?? 0 ),
+				dry_run: $dry_run
+			);
 		}
 
 		$valid       = self::filter_valid_attendees( $attendees );

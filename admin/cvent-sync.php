@@ -192,37 +192,54 @@ function hl_cvent_status_badge( $status ) {
 							<td style="width:80px;font-weight:600;">Event #<?php echo (int)$r['eve_id']; ?></td>
 							<td style="width:130px;"><?php echo hl_cvent_status_badge( $r['action'] ); ?><?php if ( $is_dry ) echo ' <span style="font-size:10px;color:#888;">(preview)</span>'; ?></td>
 							<td><?php echo esc_html( $r['message'] ); ?></td>
-							<td colspan="2" style="white-space:nowrap;text-align:right;padding-left:12px;">
-								<?php if ( isset( $r['paid'] ) && $r['paid'] !== null ) :
-									// Dry-run: show HL current → CVENT would-be with delta.
-									if ( $is_dry && isset( $r['hl_paid'] ) ) :
-										$dp = (int)$r['paid'] - (int)$r['hl_paid'];
-										$df = (int)$r['free'] - (int)$r['hl_free'];
-										$dp_str = ( $dp > 0 ? '+' : '' ) . $dp;
-										$df_str = ( $df > 0 ? '+' : '' ) . $df;
-										$dp_color = $dp !== 0 ? '#d63638' : '#888';
-										$df_color = $df !== 0 ? '#d63638' : '#888';
-								?>
-									<span style="color:#888;font-size:11px;">HL:</span>
-									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['hl_paid']; ?>p</span>
-									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['hl_free']; ?>f</span>
-									<span style="color:#888;font-size:11px;margin:0 4px;">→ CVENT:</span>
+						<td colspan="2" style="white-space:nowrap;text-align:right;padding-left:12px;">
+							<?php
+							$has_hl_counts   = isset( $r['hl_paid'] );
+							$has_cvent_counts = isset( $r['paid'] ) && $r['paid'] !== null;
+
+							if ( $has_hl_counts && $has_cvent_counts ) :
+								// Full comparison: HL current → CVENT would-be with delta.
+								$dp       = (int)$r['paid']  - (int)$r['hl_paid'];
+								$df       = (int)$r['free']  - (int)$r['hl_free'];
+								$dp_str   = ( $dp > 0 ? '+' : '' ) . $dp;
+								$df_str   = ( $df > 0 ? '+' : '' ) . $df;
+								$dp_color = $dp !== 0 ? '#d63638' : '#3c3c3c';
+								$df_color = $df !== 0 ? '#d63638' : '#3c3c3c';
+							?>
+								<span style="color:#888;font-size:12px;">HL:</span>
+								<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['hl_paid']; ?>p</span>
+								<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['hl_free']; ?>f</span>
+								<?php if ( $is_dry ) : ?>
+									<span style="color:#888;font-size:12px;margin:0 4px;">→ CVENT:</span>
 									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?>p</span>
 									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?>f</span>
-									<span style="color:<?php echo esc_attr( $dp_color ); ?>;font-size:11px;margin-left:4px;">(<?php echo esc_html( $dp_str ); ?>p <?php echo esc_html( $df_str ); ?>f)</span>
-								<?php else : // Live sync: show result only ?>
-									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?> paid</span>
-									<span style="color:#0073aa;font-weight:600;margin-left:6px;"><?php echo (int)$r['free']; ?> free</span>
+									<span style="color:<?php echo esc_attr( $dp_color ); ?>;font-size:12px;margin-left:4px;">(<?php echo esc_html( $dp_str ); ?>p <?php echo esc_html( $df_str ); ?>f)</span>
+								<?php else : ?>
+									<span style="color:#888;font-size:12px;margin:0 4px;">→</span>
+									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?>p</span>
+									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?>f</span>
 								<?php endif; ?>
-								<?php endif; ?>
-							</td>
+							<?php elseif ( $has_hl_counts ) :
+								// HL counts only — no CVENT match yet.
+							?>
+								<span style="color:#888;font-size:12px;">HL:</span>
+								<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['hl_paid']; ?>p</span>
+								<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['hl_free']; ?>f</span>
+								<span style="color:#bbb;font-size:12px;margin-left:4px;">(no CVENT count)</span>
+							<?php elseif ( $has_cvent_counts ) :
+								// Live sync result only (legacy path).
+							?>
+								<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?> paid</span>
+								<span style="color:#0073aa;font-weight:600;margin-left:6px;"><?php echo (int)$r['free']; ?> free</span>
+							<?php endif; ?>
+						</td>
 						</tr>
 					</table>
 
 					<?php if ( $is_dry && ! empty( $r['candidates'] ) ) : ?>
-						<details style="margin-top:8px;">
-							<summary style="cursor:pointer;color:#555;font-size:12px;">Match candidates (<?php echo count( $r['candidates'] ); ?>)</summary>
-							<table class="widefat striped" style="margin-top:6px;font-size:12px;">
+					<details style="margin-top:8px;">
+						<summary style="cursor:pointer;color:#555;font-size:13px;">Match candidates (<?php echo count( $r['candidates'] ); ?>)</summary>
+						<table class="widefat striped" style="margin-top:6px;font-size:13px;">
 								<thead><tr><th>Score</th><th>Would auto-match?</th><th>CVENT Title</th><th>Start</th><th>CVENT ID</th></tr></thead>
 								<tbody>
 								<?php
@@ -248,37 +265,37 @@ function hl_cvent_status_badge( $status ) {
 										<td><?php echo $would_match ? '<strong style="color:#0a6b00;">YES</strong>' : '<span style="color:#888;">No</span>'; ?></td>
 										<td>
 											<?php echo esc_html( $cand['event']['title'] ?? '(no title)' ); ?>
-											<?php if ( ! empty( $bd ) ) : ?>
-												<br><small style="color:#888;">
-												<?php foreach ( $pts as $label => $val ) :
-													if ( $val === null ) continue;
-													$color = $val > 0 ? '#0a6b00' : '#cc1818';
-												?>
-													<span style="color:<?php echo $color; ?>;margin-right:6px;">
-														<?php echo esc_html( $label ); ?>
-														<strong><?php echo $val > 0 ? '+' . $val : '0'; ?></strong>
-													</span>
-												<?php endforeach; ?>
-												<?php if ( isset( $bd['hl_city'], $bd['cv_city'] ) && $bd['hl_city'] !== '' ) : ?>
-													| city: <em><?php echo esc_html( $bd['hl_city'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_city'] ); ?></em>
-												<?php endif; ?>
-												<?php if ( isset( $bd['hl_state'], $bd['cv_state'] ) && $bd['hl_state'] !== '' ) : ?>
-													| state: <em><?php echo esc_html( $bd['hl_state'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_state'] ); ?></em>
-												<?php endif; ?>
-												<?php if ( isset( $bd['hl_loc_base'], $bd['cv_title_loc'] ) && ( $bd['hl_loc_base'] !== '' || $bd['cv_title_loc'] !== '' ) ) : ?>
-													| loc: <em><?php echo esc_html( $bd['hl_loc_base'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_title_loc'] ); ?></em>
-												<?php endif; ?>
-												<?php if ( isset( $bd['title_overlap'] ) && $bd['title_overlap'] > 0 ) : ?>
-													| overlap: <?php echo esc_html( round( $bd['title_overlap'] * 100 ) ); ?>%
-												<?php endif; ?>
-												<?php if ( isset( $bd['cv_type'] ) && $bd['cv_type'] !== '' ) : ?>
-													| type: <em><?php echo esc_html( $bd['hl_type'] ?? '' ); ?></em> vs <em><?php echo esc_html( $bd['cv_type'] ); ?></em>
-												<?php endif; ?>
-												<?php if ( isset( $bd['cv_is_zoom'] ) ) : ?>
-													| zoom: CVENT<?php echo $bd['cv_is_zoom'] ? '&#10003;' : '&#10007;'; ?> HL<?php echo ( $bd['hl_is_zoom'] ?? false ) ? '&#10003;' : '&#10007;'; ?>
-												<?php endif; ?>
-												</small>
+						<?php if ( ! empty( $bd ) ) : ?>
+											<br><span style="color:#888;font-size:13px;line-height:1.6;">
+											<?php foreach ( $pts as $label => $val ) :
+												if ( $val === null ) continue;
+												$color = $val > 0 ? '#0a6b00' : '#cc1818';
+											?>
+												<span style="color:<?php echo $color; ?>;margin-right:6px;">
+													<?php echo esc_html( $label ); ?>
+													<strong><?php echo $val > 0 ? '+' . $val : '0'; ?></strong>
+												</span>
+											<?php endforeach; ?>
+											<?php if ( isset( $bd['hl_city'], $bd['cv_city'] ) && $bd['hl_city'] !== '' ) : ?>
+												| city: <em><?php echo esc_html( $bd['hl_city'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_city'] ); ?></em>
 											<?php endif; ?>
+											<?php if ( isset( $bd['hl_state'], $bd['cv_state'] ) && $bd['hl_state'] !== '' ) : ?>
+												| state: <em><?php echo esc_html( $bd['hl_state'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_state'] ); ?></em>
+											<?php endif; ?>
+											<?php if ( isset( $bd['hl_loc_base'], $bd['cv_title_loc'] ) && ( $bd['hl_loc_base'] !== '' || $bd['cv_title_loc'] !== '' ) ) : ?>
+												| loc: <em><?php echo esc_html( $bd['hl_loc_base'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_title_loc'] ); ?></em>
+											<?php endif; ?>
+											<?php if ( isset( $bd['title_overlap'] ) && $bd['title_overlap'] > 0 ) : ?>
+												| overlap: <?php echo esc_html( round( $bd['title_overlap'] * 100 ) ); ?>%
+											<?php endif; ?>
+											<?php if ( isset( $bd['cv_type'] ) && $bd['cv_type'] !== '' ) : ?>
+												| type: <em><?php echo esc_html( $bd['hl_type'] ?? '' ); ?></em> vs <em><?php echo esc_html( $bd['cv_type'] ); ?></em>
+											<?php endif; ?>
+											<?php if ( isset( $bd['cv_is_zoom'] ) ) : ?>
+												| zoom: CVENT<?php echo $bd['cv_is_zoom'] ? '&#10003;' : '&#10007;'; ?> HL<?php echo ( $bd['hl_is_zoom'] ?? false ) ? '&#10003;' : '&#10007;'; ?>
+											<?php endif; ?>
+											</span>
+										<?php endif; ?>
 										</td>
 										<td><?php echo esc_html( isset( $cand['event']['start'] ) ? gmdate( 'M j, Y', strtotime( $cand['event']['start'] ) ) : '—' ); ?></td>
 										<td><code style="font-size:10px;"><?php echo esc_html( $cand['event']['id'] ?? '' ); ?></code></td>
@@ -291,11 +308,11 @@ function hl_cvent_status_badge( $status ) {
 
 					<?php if ( $is_dry && ! empty( $r['attendees_preview'] ) ) : ?>
 						<details style="margin-top:8px;">
-							<summary style="cursor:pointer;color:#555;font-size:12px;">
-								Attendee preview — first <?php echo count( $r['attendees_preview'] ); ?> of <?php echo (int)( $r['total_fetched'] ?? 0 ); ?> fetched
-								(<?php echo (int)( $r['filtered_out'] ?? 0 ); ?> filtered out as cancelled/test)
-							</summary>
-							<table class="widefat striped" style="margin-top:6px;font-size:12px;">
+						<summary style="cursor:pointer;color:#555;font-size:13px;">
+							Attendee preview — first <?php echo count( $r['attendees_preview'] ); ?> of <?php echo (int)( $r['total_fetched'] ?? 0 ); ?> fetched
+							(<?php echo (int)( $r['filtered_out'] ?? 0 ); ?> filtered out as cancelled/test)
+						</summary>
+						<table class="widefat striped" style="margin-top:6px;font-size:13px;">
 								<thead><tr><th>Attendee ID</th><th>Status</th><th>Discount strings found</th><th>Counted as</th></tr></thead>
 								<tbody>
 								<?php foreach ( $r['attendees_preview'] as $att ) : ?>

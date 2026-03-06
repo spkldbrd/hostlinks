@@ -74,6 +74,13 @@ class Hostlinks_CVENT_Sync {
 			return self::result( $eve_id, 'error', 'Event not found or inactive.', dry_run: $dry_run );
 		}
 
+		// Enrich row with type name for scorer (eve_zoom is already present from SELECT *).
+		$type_name = $wpdb->get_var( $wpdb->prepare(
+			"SELECT event_type_name FROM `{$wpdb->prefix}event_type` WHERE event_type_id = %d",
+			(int) $row['eve_type']
+		) );
+		$row['eve_type_name'] = strtolower( trim( $type_name ?? '' ) );
+
 		$stored_id = $row['cvent_event_id'] ?? '';
 		$status    = $row['cvent_match_status'] ?? 'unlinked';
 

@@ -97,7 +97,7 @@ $cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
 $events = $wpdb->get_results(
 	$wpdb->prepare(
 		"SELECT eve_id, eve_location, eve_start, eve_end, eve_paid, eve_free,
-		        cvent_event_id, cvent_event_title, cvent_match_score,
+		        eve_zoom, cvent_event_id, cvent_event_title, cvent_match_score,
 		        cvent_match_status, cvent_last_synced
 		 FROM `{$tbl}`
 		 WHERE eve_status = 1 AND eve_end >= %s
@@ -223,7 +223,10 @@ function hl_cvent_status_badge( $status ) {
 										'City'     => isset( $bd['city'] )           ? (int)$bd['city']           : null,
 										'State'    => isset( $bd['state'] )          ? (int)$bd['state']          : null,
 										'Venue'    => isset( $bd['venue'] )          ? (int)$bd['venue']          : null,
+										'TitleLoc' => isset( $bd['title_location'] ) ? (int)$bd['title_location'] : null,
 										'Title'    => isset( $bd['title'] )          ? (int)$bd['title']          : null,
+										'Type'     => isset( $bd['type_match'] )     ? (int)$bd['type_match']     : null,
+										'Zoom'     => isset( $bd['zoom_match'] )     ? (int)$bd['zoom_match']     : null,
 									);
 								?>
 									<tr style="<?php echo $would_match ? 'background:#e6f4ea;' : ''; ?>">
@@ -248,8 +251,17 @@ function hl_cvent_status_badge( $status ) {
 												<?php if ( isset( $bd['hl_state'], $bd['cv_state'] ) && $bd['hl_state'] !== '' ) : ?>
 													| state: <em><?php echo esc_html( $bd['hl_state'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_state'] ); ?></em>
 												<?php endif; ?>
+												<?php if ( isset( $bd['hl_loc_base'], $bd['cv_title_loc'] ) && ( $bd['hl_loc_base'] !== '' || $bd['cv_title_loc'] !== '' ) ) : ?>
+													| loc: <em><?php echo esc_html( $bd['hl_loc_base'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_title_loc'] ); ?></em>
+												<?php endif; ?>
 												<?php if ( isset( $bd['title_overlap'] ) && $bd['title_overlap'] > 0 ) : ?>
 													| overlap: <?php echo esc_html( round( $bd['title_overlap'] * 100 ) ); ?>%
+												<?php endif; ?>
+												<?php if ( isset( $bd['cv_type'] ) && $bd['cv_type'] !== '' ) : ?>
+													| type: <em><?php echo esc_html( $bd['hl_type'] ?? '' ); ?></em> vs <em><?php echo esc_html( $bd['cv_type'] ); ?></em>
+												<?php endif; ?>
+												<?php if ( isset( $bd['cv_is_zoom'] ) ) : ?>
+													| zoom: CVENT<?php echo $bd['cv_is_zoom'] ? '&#10003;' : '&#10007;'; ?> HL<?php echo ( $bd['hl_is_zoom'] ?? false ) ? '&#10003;' : '&#10007;'; ?>
 												<?php endif; ?>
 												</small>
 											<?php endif; ?>

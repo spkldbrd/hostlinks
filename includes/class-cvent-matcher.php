@@ -6,16 +6,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Bootstrap matching: find the best CVENT event for a Hostlinks event.
  *
- * Scoring (max 135 points):
+ * Scoring (max 265 points):
  *   +25  same start calendar day (UTC — CVENT stores UTC ISO timestamps)
  *   +25  date ranges overlap (HL start..end overlaps CVENT start..end)
- *   +40  normalized city matches
- *   +20  state/region matches
- *   +15  venue name contains match (normalized)
+ *   +40  normalized city matches (from CVENT venue data)
+ *   +20  state/region matches (from CVENT venue data)
+ *   +15  venue name contains HL city (from CVENT venue data)
  *   +10  title token overlap > 60% of shorter string's tokens
+ *   +65  CVENT title location prefix matches HL location base
+ *         e.g. "Wellston, MO - Grant Writing USA" prefix "Wellston, MO"
+ *         matched against HL eve_location "Wellston, MO" (modifiers stripped)
+ *   +35  event type matches (Writing / Management extracted from CVENT title
+ *         vs eve_type_name from Hostlinks event_type table)
+ *   +30  both are zoom events (CVENT title contains "zoom", HL eve_zoom = 1)
  *
  * Auto-match: top score >= 90 AND at least 20 points ahead of second-best.
  * Otherwise: status = needs_review (admin picks manually).
+ *
+ * Zoom auto-match path: overlap(25) + type(35) + zoom(30) = 90.
+ * City auto-match path: overlap(25) + title_location(65) = 90.
  */
 class Hostlinks_CVENT_Matcher {
 
@@ -29,9 +38,10 @@ class Hostlinks_CVENT_Matcher {
 	/**
 	 * Find the best-matching CVENT event for a Hostlinks event row.
 	 *
-	 * @param array $hl_event  Row from event_details_list (needs eve_start, eve_end, eve_location).
+	 * @param array $hl_event  Row from event_details_list (needs eve_start, eve_end,
+	 *                         eve_location, eve_zoom, eve_type_name).
 	 * @return array {
-	 *   status       : 'auto'|'needs_review'|'no_candidates',
+	 *   status       : 'auto'|'needs_review'|'no_candidates'|'error',
 	 *   best         : CVENT event record or null,
 	 *   best_score   : int,
 	 *   candidates   : array of {event, score, breakdown},
@@ -68,11 +78,11 @@ class Hostlinks_CVENT_Matcher {
 		// Score every candidate.
 		$scored = array();
 		foreach ( $cvent_events as $ce ) {
-			$result   = self::score_candidate( $hl_event, $ce );
+			$res      = self::score_candidate( $hl_event, $ce );
 			$scored[] = array(
 				'event'     => $ce,
-				'score'     => $result['score'],
-				'breakdown' => $result['breakdown'],
+				'score'     => $res['score'],
+				'breakdown' => $res['breakdown'],
 			);
 		}
 
@@ -105,9 +115,9 @@ class Hostlinks_CVENT_Matcher {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Score a single CVENT event against a Hostlinks event (0–135).
+	 * Score a single CVENT event against a Hostlinks event (0–265).
 	 *
-	 * @param array $hl_event    Hostlinks event row.
+	 * @param array $hl_event    Hostlinks event row (may include eve_type_name, eve_zoom).
 	 * @param array $cvent_event CVENT event record.
 	 * @return array { score: int, breakdown: array }
 	 */
@@ -120,6 +130,9 @@ class Hostlinks_CVENT_Matcher {
 			'state'          => 0,
 			'venue'          => 0,
 			'title'          => 0,
+			'title_location' => 0,
+			'type_match'     => 0,
+			'zoom_match'     => 0,
 			'hl_city'        => '',
 			'hl_state'       => '',
 			'cv_city'        => '',
@@ -127,6 +140,12 @@ class Hostlinks_CVENT_Matcher {
 			'hl_start'       => '',
 			'cv_start'       => '',
 			'title_overlap'  => 0.0,
+			'hl_loc_base'    => '',
+			'cv_title_loc'   => '',
+			'cv_type'        => '',
+			'hl_type'        => '',
+			'cv_is_zoom'     => false,
+			'hl_is_zoom'     => false,
 		);
 
 		// ── Date scoring ─────────────────────────────────────────────────────
@@ -158,26 +177,27 @@ class Hostlinks_CVENT_Matcher {
 			}
 		}
 
-		// ── Location scoring ─────────────────────────────────────────────────
+		// ── Location scoring (venue fields) ──────────────────────────────────
 		$hl_city  = '';
 		$hl_state = '';
 		$cv_city  = '';
 		$cv_state = '';
 		$cv_venue = '';
 
-		// Hostlinks location is a free-text string, e.g. "Paso Robles, CA"
+		// Hostlinks location is a free-text string, e.g. "Paso Robles, CA".
+		// Use plain normalize() — no state-name replacement for city strings.
 		if ( ! empty( $hl_event['eve_location'] ) ) {
 			$parts    = explode( ',', $hl_event['eve_location'] );
 			$hl_city  = self::normalize( trim( $parts[0] ?? '' ) );
-			$hl_state = self::normalize( trim( $parts[1] ?? '' ) );
+			$hl_state = self::normalize_state( trim( $parts[1] ?? '' ) );
 		}
 
 		// CVENT venues[] array — prefer first venue.
 		if ( ! empty( $cvent_event['venues'] ) && is_array( $cvent_event['venues'] ) ) {
 			$v        = $cvent_event['venues'][0];
-			$cv_city  = self::normalize( $v['city']       ?? '' );
-			$cv_state = self::normalize( $v['regionCode'] ?? ( $v['region'] ?? '' ) );
-			$cv_venue = self::normalize( $v['name']       ?? '' );
+			$cv_city  = self::normalize( $v['city'] ?? '' );
+			$cv_state = self::normalize_state( $v['regionCode'] ?? ( $v['region'] ?? '' ) );
+			$cv_venue = self::normalize( $v['name'] ?? '' );
 		}
 
 		$breakdown['hl_city']  = $hl_city;
@@ -205,20 +225,71 @@ class Hostlinks_CVENT_Matcher {
 			}
 		}
 
-		// ── Title scoring ─────────────────────────────────────────────────────
+		// ── Title token overlap ───────────────────────────────────────────────
 		// Hostlinks has no native title; use location as best proxy.
-		// CVENT titles often contain the city name, so we measure what fraction
-		// of the shorter string's tokens appear in the longer string.
-		$cv_title = self::normalize( $cvent_event['title'] ?? '' );
-		$hl_title = self::normalize( $hl_event['eve_location'] ?? '' );
+		// Measures what fraction of the shorter string's tokens appear in the longer.
+		$cv_title_norm = self::normalize( $cvent_event['title'] ?? '' );
+		$hl_title_norm = self::normalize( $hl_event['eve_location'] ?? '' );
 
-		if ( $cv_title && $hl_title ) {
-			$overlap                    = self::token_overlap( $cv_title, $hl_title );
+		if ( $cv_title_norm && $hl_title_norm ) {
+			$overlap                    = self::token_overlap( $cv_title_norm, $hl_title_norm );
 			$breakdown['title_overlap'] = round( $overlap, 2 );
 			if ( $overlap >= 0.6 ) {
 				$score += 10;
 				$breakdown['title'] = 10;
 			}
+		}
+
+		// ── Title location prefix match (+65) ────────────────────────────────
+		// CVENT titles follow "{City}, {State} - Grant Writing/Management USA".
+		// The prefix before " - " matches the HL location base (modifiers stripped).
+		// Uses plain normalize() so "Washington, DC" stays "washington dc" —
+		// a more specific string than the state-abbreviated form.
+		$hl_loc_base  = self::normalize( self::hl_location_base( $hl_event['eve_location'] ?? '' ) );
+		$cv_title_loc = self::normalize( self::cv_title_location( $cvent_event['title'] ?? '' ) );
+
+		$breakdown['hl_loc_base']  = $hl_loc_base;
+		$breakdown['cv_title_loc'] = $cv_title_loc;
+
+		if ( $hl_loc_base && $cv_title_loc && $hl_loc_base === $cv_title_loc ) {
+			$score += 65;
+			$breakdown['title_location'] = 65;
+		}
+
+		// ── Type match (+35) ─────────────────────────────────────────────────
+		// Extract type keyword from CVENT title: "writing" or "management".
+		// Subawards events in CVENT are labelled "Management" — HL Subawards
+		// events have management type + "SUB" in location, so they match naturally.
+		$cv_title_lower = strtolower( $cvent_event['title'] ?? '' );
+		$cv_type        = '';
+		if ( false !== strpos( $cv_title_lower, 'writing' ) ) {
+			$cv_type = 'writing';
+		} elseif ( false !== strpos( $cv_title_lower, 'management' ) ) {
+			$cv_type = 'management';
+		}
+
+		$hl_type = strtolower( trim( $hl_event['eve_type_name'] ?? '' ) );
+
+		$breakdown['cv_type'] = $cv_type;
+		$breakdown['hl_type'] = $hl_type;
+
+		if ( $cv_type && $hl_type && $cv_type === $hl_type ) {
+			$score += 35;
+			$breakdown['type_match'] = 35;
+		}
+
+		// ── Zoom match (+30) ─────────────────────────────────────────────────
+		// CVENT zoom events always contain "zoom" in their title.
+		// Hostlinks zoom flag: eve_zoom = 1.
+		$cv_is_zoom = false !== strpos( $cv_title_lower, 'zoom' );
+		$hl_is_zoom = ! empty( $hl_event['eve_zoom'] ) && (int) $hl_event['eve_zoom'] === 1;
+
+		$breakdown['cv_is_zoom'] = $cv_is_zoom;
+		$breakdown['hl_is_zoom'] = $hl_is_zoom;
+
+		if ( $cv_is_zoom && $hl_is_zoom ) {
+			$score += 30;
+			$breakdown['zoom_match'] = 30;
 		}
 
 		return array(
@@ -249,12 +320,54 @@ class Hostlinks_CVENT_Matcher {
 	}
 
 	// -------------------------------------------------------------------------
+	// Location helpers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Strip HL location modifier suffixes before comparison.
+	 * Removes "| SUB", "| CANCELED", "– TO BE RESCHEDULED", etc.
+	 *
+	 * Examples:
+	 *   "Montgomery, AL | SUB"          → "Montgomery, AL"
+	 *   "Oklahoma City, OK|SUB"         → "Oklahoma City, OK"
+	 *   "Cleveland, OH – TO BE RESCH."  → "Cleveland, OH"
+	 *   "Washington, DC"                → "Washington, DC"
+	 *
+	 * @param string $location
+	 * @return string
+	 */
+	private static function hl_location_base( $location ) {
+		$base = preg_replace( '/\s*\|.*$/s',  '', $location ); // strip | and everything after
+		$base = preg_replace( '/\s*–.*$/su',  '', $base );     // strip em-dash suffix
+		return trim( $base );
+	}
+
+	/**
+	 * Extract the "City, State" location prefix from a CVENT event title.
+	 * CVENT titles follow "{City}, {State} - Grant Writing/Management USA".
+	 * Returns everything before the first " - " separator.
+	 * Returns '' if no separator found (e.g. zoom-only titles).
+	 *
+	 * @param string $title
+	 * @return string
+	 */
+	private static function cv_title_location( $title ) {
+		// Strip BOM and leading whitespace that sometimes appears in CVENT exports.
+		$title = ltrim( $title, "\xEF\xBB\xBF \t" );
+		if ( preg_match( '/^(.+?)\s+-\s+.+$/s', $title, $m ) ) {
+			return trim( $m[1] );
+		}
+		return '';
+	}
+
+	// -------------------------------------------------------------------------
 	// Normalisation helpers
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Normalize a location or title string for comparison.
-	 * lowercase → abbreviations → remove punctuation → collapse whitespace.
+	 * Normalize a city, venue, or title string for comparison.
+	 * lowercase → street abbreviations → remove punctuation → collapse whitespace.
+	 * Does NOT replace state full names — use normalize_state() for state fields.
 	 *
 	 * @param string $str
 	 * @return string
@@ -262,19 +375,46 @@ class Hostlinks_CVENT_Matcher {
 	public static function normalize( $str ) {
 		$str = strtolower( trim( $str ) );
 
-		// Street-type abbreviations (expand short → long for consistency).
+		// Street-type abbreviations only.
 		$abbr = array(
-			'/\bst\b/'    => 'street',
-			'/\brd\b/'    => 'road',
-			'/\bave\b/'   => 'avenue',
-			'/\bblvd\b/'  => 'boulevard',
-			'/\bste\b/'   => 'suite',
-			'/\bdr\b/'    => 'drive',
-			'/\bct\b/'    => 'court',
-			'/\bln\b/'    => 'lane',
-			'/\bhwy\b/'   => 'highway',
-			// All 50 US states + DC: full name → postal abbreviation.
-			// CVENT often returns region as the full state name.
+			'/\bst\b/'   => 'street',
+			'/\brd\b/'   => 'road',
+			'/\bave\b/'  => 'avenue',
+			'/\bblvd\b/' => 'boulevard',
+			'/\bste\b/'  => 'suite',
+			'/\bdr\b/'   => 'drive',
+			'/\bct\b/'   => 'court',
+			'/\bln\b/'   => 'lane',
+			'/\bhwy\b/'  => 'highway',
+		);
+		$str = preg_replace( array_keys( $abbr ), array_values( $abbr ), $str );
+
+		// Remove punctuation except spaces and letters/digits.
+		$str = preg_replace( '/[^a-z0-9\s]/', '', $str );
+
+		// Collapse whitespace.
+		$str = preg_replace( '/\s+/', ' ', trim( $str ) );
+
+		return $str;
+	}
+
+	/**
+	 * Normalize a US state or region string to its 2-letter postal abbreviation.
+	 * Calls normalize() first, then applies the full state-name → abbreviation map.
+	 * Use ONLY for state/region fields, never for city names or full strings.
+	 *
+	 * @param string $str  e.g. "District of Columbia", "DC", "Pennsylvania", "PA"
+	 * @return string      e.g. "dc", "dc", "pa", "pa"
+	 */
+	public static function normalize_state( $str ) {
+		$str = self::normalize( $str );
+
+		// All 50 US states + DC: full name → postal abbreviation.
+		// CVENT often returns region as the full state name.
+		// Multi-word states are listed before their single-word components
+		// to prevent partial matches (e.g. "west virginia" before "virginia").
+		$abbr = array(
+			'/\bdistrict of columbia\b/' => 'dc',
 			'/\balabama\b/'              => 'al',
 			'/\balaska\b/'               => 'ak',
 			'/\barizona\b/'              => 'az',
@@ -283,7 +423,6 @@ class Hostlinks_CVENT_Matcher {
 			'/\bcolorado\b/'             => 'co',
 			'/\bconnecticut\b/'          => 'ct',
 			'/\bdelaware\b/'             => 'de',
-			'/\bdistrict of columbia\b/' => 'dc',
 			'/\bflorida\b/'              => 'fl',
 			'/\bgeorgia\b/'              => 'ga',
 			'/\bhawaii\b/'               => 'hi',
@@ -327,15 +466,8 @@ class Hostlinks_CVENT_Matcher {
 			'/\bwisconsin\b/'            => 'wi',
 			'/\bwyoming\b/'              => 'wy',
 		);
-		$str = preg_replace( array_keys( $abbr ), array_values( $abbr ), $str );
 
-		// Remove punctuation except spaces and letters/digits.
-		$str = preg_replace( '/[^a-z0-9\s]/', '', $str );
-
-		// Collapse whitespace.
-		$str = preg_replace( '/\s+/', ' ', trim( $str ) );
-
-		return $str;
+		return trim( preg_replace( array_keys( $abbr ), array_values( $abbr ), $str ) );
 	}
 
 	/**

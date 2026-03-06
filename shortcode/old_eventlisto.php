@@ -96,12 +96,14 @@ $current_month = null;
 $upcoming_url  = home_url( '/' );
 $page_url      = get_permalink();
 
-// Locate the Reports page (cached for a day to avoid repeated DB hits).
+// Locate the Reports page (cached for a day, but only when found).
 $reports_page_url = get_transient( 'hostlinks_reports_page_url' );
-if ( false === $reports_page_url ) {
+if ( ! $reports_page_url ) {
 	$rid = $wpdb->get_var( "SELECT ID FROM {$wpdb->posts} WHERE post_status='publish' AND post_type='page' AND post_content LIKE '%hostlinks_reports%' LIMIT 1" );
 	$reports_page_url = $rid ? get_permalink( (int) $rid ) : '';
-	set_transient( 'hostlinks_reports_page_url', $reports_page_url, DAY_IN_SECONDS );
+	if ( $reports_page_url ) {
+		set_transient( 'hostlinks_reports_page_url', $reports_page_url, DAY_IN_SECONDS );
+	}
 }
 
 $_upd_raw     = get_option( 'last_data_updation', '' );

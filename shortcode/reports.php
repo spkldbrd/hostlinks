@@ -112,13 +112,13 @@ $chart_data = array(
 	<div class="hostlinks-actions">
 		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn">Upcoming Events</a>
 		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
-		<a href="<?php echo esc_url( $reports_url ); ?>" class="hostlinks-btn hostlinks-btn--active">&#x1F4CA; Reports</a>
 
-		<select id="hl-reports-range" class="hostlinks-year-filter" aria-label="Date range">
+		<select id="hl-reports-range" class="hostlinks-year-filter" aria-label="Date range" style="margin-left:auto;">
 			<?php foreach ( $months_options as $val => $label ) : ?>
 			<option value="<?php echo (int) $val; ?>" <?php selected( $months_back, $val ); ?>><?php echo esc_html( $label ); ?></option>
 			<?php endforeach; ?>
 		</select>
+		<a href="<?php echo esc_url( $reports_url ); ?>" class="hostlinks-btn hostlinks-btn--active">&#x1F4CA; Reports</a>
 		<script>
 		document.getElementById('hl-reports-range').addEventListener('change', function() {
 			window.location.href = '<?php echo esc_js( $reports_url ); ?>?months=' + this.value;

@@ -332,21 +332,21 @@
 }
 
 .hl-stat-card {
-  background: hsl(0 0% 100%);
+  background: #0da2e7;
   border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.07);
+  box-shadow: 0 2px 8px rgba(13,162,231,.3);
   padding: 1rem 1.25rem;
   text-align: center;
 }
 .hl-stat-value {
   font-size: 1.75rem;
   font-weight: 700;
-  color: hsl(210 100% 50%);
+  color: #fff;
   line-height: 1.1;
 }
 .hl-stat-label {
   font-size: .78rem;
-  color: hsl(215 15% 50%);
+  color: rgba(255,255,255,.85);
   margin-top: .25rem;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -433,11 +433,12 @@
 
 .dark .hl-stat-card,
 .darklooks-mode-changer-enabled .hl-stat-card {
-  background: hsl(215 20% 16%);
+  background: #0b8ec8;
+  box-shadow: 0 2px 8px rgba(0,0,0,.3);
 }
 .dark .hl-stat-label,
 .darklooks-mode-changer-enabled .hl-stat-label {
-  color: hsl(215 15% 55%);
+  color: rgba(255,255,255,.8);
 }
 
 .dark .hl-reports-card,

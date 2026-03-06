@@ -6,13 +6,16 @@ if ( ! defined( 'ABSPATH' ) ) {
 $s     = Hostlinks_CVENT_API::get_settings();
 $ready = ! empty( $s['client_id'] ) && ! empty( $s['client_secret'] ) && ! empty( $s['account_number'] );
 
-// ── Dry-run toggle (persistent via wp_option) ─────────────────────────────────
+// ── Dry-run toggle + limit-test toggle (persistent via wp_option) ─────────────
 if ( isset( $_POST['hostlinks_cvent_toggle_dryrun'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
-	$new_val = isset( $_POST['cvent_dry_run'] ) ? 1 : 0;
-	update_option( 'hostlinks_cvent_dry_run', $new_val );
+	$new_val   = isset( $_POST['cvent_dry_run'] )    ? 1 : 0;
+	$limit_val = isset( $_POST['cvent_limit_test'] ) ? 1 : 0;
+	update_option( 'hostlinks_cvent_dry_run',    $new_val );
+	update_option( 'hostlinks_cvent_limit_test', $limit_val );
 }
-$dry_run = (bool) get_option( 'hostlinks_cvent_dry_run', 0 );
+$dry_run    = (bool) get_option( 'hostlinks_cvent_dry_run',    0 );
+$limit_test = (bool) get_option( 'hostlinks_cvent_limit_test', 0 );
 
 // ── Action handlers ───────────────────────────────────────────────────────────
 
@@ -22,7 +25,8 @@ $sync_report = null;
 // Sync All
 if ( isset( $_POST['hostlinks_cvent_sync_all'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
-	$sync_report = Hostlinks_CVENT_Sync::sync_all( $dry_run );
+	$sync_limit  = ( $dry_run && $limit_test ) ? 10 : 0;
+	$sync_report = Hostlinks_CVENT_Sync::sync_all( $dry_run, $sync_limit );
 }
 
 // Sync One
@@ -153,7 +157,7 @@ function hl_cvent_status_badge( $status ) {
 	<!-- Dry Run toggle -->
 	<form method="post" style="margin-bottom:0;">
 		<?php wp_nonce_field( 'hostlinks_cvent_sync' ); ?>
-		<div style="display:flex;align-items:center;gap:12px;background:<?php echo $dry_run ? '#fff3cd' : '#f6f7f7'; ?>;border:1px solid <?php echo $dry_run ? '#ffc107' : '#ddd'; ?>;padding:10px 16px;border-radius:4px;margin-bottom:16px;">
+		<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:<?php echo $dry_run ? '#fff3cd' : '#f6f7f7'; ?>;border:1px solid <?php echo $dry_run ? '#ffc107' : '#ddd'; ?>;padding:10px 16px;border-radius:4px;margin-bottom:16px;">
 			<label style="display:flex;align-items:center;gap:8px;font-weight:600;cursor:pointer;margin:0;">
 				<input type="checkbox" name="cvent_dry_run" value="1" <?php checked( $dry_run ); ?>
 					onchange="this.form.submit();">
@@ -161,6 +165,15 @@ function hl_cvent_status_badge( $status ) {
 			</label>
 			<?php if ( $dry_run ) : ?>
 				<span style="background:#ffc107;color:#000;padding:2px 10px;border-radius:3px;font-size:12px;font-weight:700;">ACTIVE — nothing will be written to the database</span>
+				<label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;font-size:13px;border-left:1px solid #e0c060;padding-left:16px;"
+					title="When checked, Sync All will only process the next 10 upcoming events (saving API calls during testing)">
+					<input type="checkbox" name="cvent_limit_test" value="1" <?php checked( $limit_test ); ?>
+						onchange="this.form.submit();">
+					<span>Limit Sync All to next <strong>10</strong> upcoming events</span>
+					<?php if ( $limit_test ) : ?>
+						<span style="background:#e07800;color:#fff;padding:1px 7px;border-radius:3px;font-size:11px;font-weight:700;margin-left:4px;">ON</span>
+					<?php endif; ?>
+				</label>
 			<?php else : ?>
 				<span style="color:#666;font-size:12px;">Enable to preview what Sync would do without saving any changes.</span>
 			<?php endif; ?>
@@ -381,9 +394,15 @@ function hl_cvent_status_badge( $status ) {
 	<form method="post" style="margin-bottom:16px;">
 		<?php wp_nonce_field( 'hostlinks_cvent_sync' ); ?>
 		<button type="submit" name="hostlinks_cvent_sync_all" class="button button-primary" <?php echo $ready ? '' : 'disabled'; ?>>
-			Sync All Events
+			<?php echo ( $dry_run && $limit_test ) ? 'Sync All (next 10 upcoming)' : 'Sync All Events'; ?>
 		</button>
-		<span style="margin-left:12px;color:#666;font-size:12px;">Matches unlinked events and updates paid/free counts on all confirmed events.</span>
+		<span style="margin-left:12px;color:#666;font-size:12px;">
+			<?php if ( $dry_run && $limit_test ) : ?>
+				Dry-run preview — next 10 upcoming events only (saves API calls).
+			<?php else : ?>
+				Matches unlinked events and updates paid/free counts on all confirmed events.
+			<?php endif; ?>
+		</span>
 	</form>
 
 	<!-- Events table -->

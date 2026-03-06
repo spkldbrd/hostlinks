@@ -213,15 +213,35 @@ class Hostlinks_CVENT_Sync {
 	 *   errors       : int,
 	 * }
 	 */
-	public static function sync_all( $dry_run = false ) {
+	/**
+	 * @param bool $dry_run  If true, no DB writes are performed.
+	 * @param int  $limit    When > 0, restrict to the next $limit upcoming events
+	 *                       (eve_start >= today, ordered earliest first). Intended
+	 *                       for dry-run test runs to minimise API call usage.
+	 */
+	public static function sync_all( $dry_run = false, $limit = 0 ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
-		// Only sync events ending within the last 60 days or in the future.
-		$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
-		$rows   = $wpdb->get_results(
-			$wpdb->prepare( "SELECT eve_id FROM `{$table}` WHERE eve_status = 1 AND eve_end >= %s", $cutoff ),
-			ARRAY_A
-		);
+
+		if ( $limit > 0 ) {
+			// Limit mode: only upcoming events (starting today or later), nearest first.
+			$today = gmdate( 'Y-m-d' );
+			$rows  = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT eve_id FROM `{$table}` WHERE eve_status = 1 AND eve_start >= %s ORDER BY eve_start ASC LIMIT %d",
+					$today,
+					$limit
+				),
+				ARRAY_A
+			);
+		} else {
+			// Normal mode: all events ending within the last 60 days or in the future.
+			$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
+			$rows   = $wpdb->get_results(
+				$wpdb->prepare( "SELECT eve_id FROM `{$table}` WHERE eve_status = 1 AND eve_end >= %s", $cutoff ),
+				ARRAY_A
+			);
+		}
 
 		$results = array();
 		$counts  = array( 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );

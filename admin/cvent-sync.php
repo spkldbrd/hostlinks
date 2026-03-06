@@ -219,13 +219,18 @@ function hl_cvent_status_badge( $status ) {
 									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?>p</span>
 									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?>f</span>
 								<?php endif; ?>
-							<?php elseif ( $has_hl_counts ) :
-								// HL counts only — no CVENT match yet.
-							?>
-								<span style="color:#888;font-size:12px;">HL:</span>
-								<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['hl_paid']; ?>p</span>
-								<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['hl_free']; ?>f</span>
+						<?php elseif ( $has_hl_counts ) :
+							// HL counts only — show reason (fetch error or no match yet).
+							$_fetch_err = $r['count_fetch_error'] ?? null;
+						?>
+							<span style="color:#888;font-size:12px;">HL:</span>
+							<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['hl_paid']; ?>p</span>
+							<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['hl_free']; ?>f</span>
+							<?php if ( $_fetch_err ) : ?>
+								<span style="color:#d63638;font-size:12px;margin-left:4px;" title="<?php echo esc_attr( $_fetch_err ); ?>">&#9888; attendee fetch failed — hover for detail</span>
+							<?php else : ?>
 								<span style="color:#bbb;font-size:12px;margin-left:4px;">(no CVENT count)</span>
+							<?php endif; ?>
 							<?php elseif ( $has_cvent_counts ) :
 								// Live sync result only (legacy path).
 							?>

@@ -19,7 +19,7 @@ class Hostlinks_CVENT_API {
 
 	const TOKEN_URL    = 'https://api-platform.cvent.com/ea/oauth2/token';
 	const BASE_URL     = 'https://api-platform.cvent.com/ea/';
-	const TOKEN_KEY    = 'hostlinks_cvent_token';
+	const TOKEN_KEY    = 'hostlinks_cvent_token_v2'; // v2: includes attendees scope
 	const SETTINGS_KEY = 'hostlinks_cvent_settings';
 	const MAX_RETRIES  = 3;
 
@@ -89,7 +89,10 @@ class Hostlinks_CVENT_API {
 					'Authorization' => 'Basic ' . $credentials,
 					'Content-Type'  => 'application/x-www-form-urlencoded',
 				),
-				'body'    => 'grant_type=client_credentials',
+				'body'    => http_build_query( array(
+					'grant_type' => 'client_credentials',
+					'scope'      => 'event/events:read event/attendees:read',
+				) ),
 				'timeout' => 20,
 			)
 		);

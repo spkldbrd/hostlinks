@@ -171,6 +171,8 @@ class Hostlinks_CVENT_Sync {
 			// In dry-run, also preview the attendee counts for the auto-matched event.
 			if ( $dry_run ) {
 				$count_preview = self::do_count_sync( $eve_id, $stored_id, $row, true );
+				// Surface attendee-fetch errors rather than silently showing "no CVENT count".
+				$count_error = ( ( $count_preview['action'] ?? '' ) === 'error' ) ? $count_preview['message'] : null;
 				$r = self::result( $eve_id, 'matched',
 					sprintf( 'DRY RUN — would auto-match to "%s" (score %d).', $best['title'] ?? '', $score ),
 					$count_preview['paid'] ?? null, $count_preview['free'] ?? null,
@@ -179,6 +181,8 @@ class Hostlinks_CVENT_Sync {
 				$r['candidates']        = $match['candidates'];
 				$r['attendees_preview'] = $count_preview['attendees_preview'] ?? null;
 				$r['filtered_out']      = $count_preview['filtered_out'] ?? null;
+				$r['total_fetched']     = $count_preview['total_fetched'] ?? null;
+				$r['count_fetch_error'] = $count_error;
 				$r['hl_paid']           = (int) ( $row['eve_paid'] ?? 0 );
 				$r['hl_free']           = (int) ( $row['eve_free'] ?? 0 );
 				return $r;

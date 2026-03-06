@@ -96,6 +96,14 @@ $last_updated  = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->form
 
 $past_events_url = home_url( '/old-event-list/' );
 $upcoming_url    = home_url( '/' );
+
+// Locate the Reports page (cached for a day to avoid repeated DB hits).
+$reports_page_url = get_transient( 'hostlinks_reports_page_url' );
+if ( false === $reports_page_url ) {
+	$rid = $wpdb->get_var( "SELECT ID FROM {$wpdb->posts} WHERE post_status='publish' AND post_type='page' AND post_content LIKE '%hostlinks_reports%' LIMIT 1" );
+	$reports_page_url = $rid ? get_permalink( (int) $rid ) : '';
+	set_transient( 'hostlinks_reports_page_url', $reports_page_url, DAY_IN_SECONDS );
+}
 ?>
 <div class="hostlinks-page">
 <div class="hostlinks-container">
@@ -106,6 +114,9 @@ $upcoming_url    = home_url( '/' );
 			<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
 		</div>
 		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
+		<?php if ( $reports_page_url ) : ?>
+		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
+		<?php endif; ?>
 
 		<select id="hl-focus-marketer" class="hostlinks-year-filter" aria-label="Focus by marketer">
 			<option value="0" <?php selected( $focus_id, 0 ); ?>>All Marketers</option>

@@ -16,16 +16,31 @@ class Hostlinks_Assets {
 		if ( ! $post instanceof WP_Post ) {
 			return;
 		}
-		if ( ! has_shortcode( $post->post_content, 'eventlisto' ) &&
-		     ! has_shortcode( $post->post_content, 'oldeventlisto' ) ) {
+
+		$has_calendar = has_shortcode( $post->post_content, 'eventlisto' ) ||
+		                has_shortcode( $post->post_content, 'oldeventlisto' );
+		$has_reports  = has_shortcode( $post->post_content, 'hostlinks_reports' );
+
+		if ( ! $has_calendar && ! $has_reports ) {
 			return;
 		}
+
 		wp_enqueue_style(
 			'hostlinks-calendar',
 			HOSTLINKS_PLUGIN_URL . 'assets/css/hostlinks-calendar.css',
 			array(),
 			HOSTLINKS_VERSION
 		);
+
+		if ( $has_reports ) {
+			wp_enqueue_script(
+				'chartjs',
+				'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
+				array(),
+				'4.4.3',
+				true
+			);
+		}
 	}
 
 	public function enqueue_admin( $hook ) {

@@ -95,6 +95,14 @@ $today         = new DateTime();
 $current_month = null;
 $upcoming_url  = home_url( '/' );
 $page_url      = get_permalink();
+
+// Locate the Reports page (cached for a day to avoid repeated DB hits).
+$reports_page_url = get_transient( 'hostlinks_reports_page_url' );
+if ( false === $reports_page_url ) {
+	$rid = $wpdb->get_var( "SELECT ID FROM {$wpdb->posts} WHERE post_status='publish' AND post_type='page' AND post_content LIKE '%hostlinks_reports%' LIMIT 1" );
+	$reports_page_url = $rid ? get_permalink( (int) $rid ) : '';
+	set_transient( 'hostlinks_reports_page_url', $reports_page_url, DAY_IN_SECONDS );
+}
 ?>
 <div class="hostlinks-page">
 <div class="hostlinks-container">
@@ -102,6 +110,9 @@ $page_url      = get_permalink();
 	<div class="hostlinks-actions">
 		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn">Upcoming Events</a>
 		<a href="<?php echo esc_url( $page_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Past Events</a>
+		<?php if ( $reports_page_url ) : ?>
+		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
+		<?php endif; ?>
 
 		<select id="hl-old-chooseyear" class="hostlinks-year-filter" aria-label="Filter by year">
 			<?php

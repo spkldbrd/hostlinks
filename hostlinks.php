@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.2.7
+ * Version:     2.2.8
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -30,7 +30,7 @@ if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
 	}, E_DEPRECATED | E_USER_DEPRECATED );
 }
 
-define( 'HOSTLINKS_VERSION',    '2.2.7' );
+define( 'HOSTLINKS_VERSION',    '2.2.8' );
 define( 'HOSTLINKS_DB_VERSION', '1.1' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

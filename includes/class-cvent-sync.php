@@ -173,6 +173,8 @@ class Hostlinks_CVENT_Sync {
 				$r['candidates']        = $match['candidates'];
 				$r['attendees_preview'] = $count_preview['attendees_preview'] ?? null;
 				$r['filtered_out']      = $count_preview['filtered_out'] ?? null;
+				$r['hl_paid']           = (int) ( $row['eve_paid'] ?? 0 );
+				$r['hl_free']           = (int) ( $row['eve_free'] ?? 0 );
 				return $r;
 			}
 
@@ -379,7 +381,9 @@ class Hostlinks_CVENT_Sync {
 			$row['cvent_event_title'] ?? '',
 			$cvent_id,
 			$row['cvent_match_score'] ?? null,
-			dry_run: $dry_run
+			dry_run: $dry_run,
+			hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
+			hl_free: (int) ( $row['eve_free'] ?? 0 )
 		);
 
 		if ( $dry_run ) {
@@ -513,7 +517,7 @@ class Hostlinks_CVENT_Sync {
 	// Internal helpers
 	// -------------------------------------------------------------------------
 
-	private static function result( $eve_id, $action, $message, $paid = null, $free = null, $cvent_title = null, $cvent_id = null, $score = null, bool $dry_run = false ) {
+	private static function result( $eve_id, $action, $message, $paid = null, $free = null, $cvent_title = null, $cvent_id = null, $score = null, bool $dry_run = false, $hl_paid = null, $hl_free = null ) {
 		return array(
 			'eve_id'            => $eve_id,
 			'dry_run'           => $dry_run,
@@ -521,6 +525,8 @@ class Hostlinks_CVENT_Sync {
 			'message'           => $message,
 			'paid'              => $paid,
 			'free'              => $free,
+			'hl_paid'           => $hl_paid,  // current HL stored paid count (for comparison)
+			'hl_free'           => $hl_free,  // current HL stored free count (for comparison)
 			'cvent_title'       => $cvent_title,
 			'cvent_id'          => $cvent_id,
 			'score'             => $score,

@@ -280,9 +280,10 @@ class Hostlinks_CVENT_Matcher {
 
 		// ── Zoom match (+30) ─────────────────────────────────────────────────
 		// CVENT zoom events always contain "zoom" in their title.
-		// Hostlinks zoom flag: eve_zoom = 1.
+		// Hostlinks zoom flag: eve_zoom stores "yes" when checked (not "1"),
+		// so !empty() is the correct check — no integer cast needed.
 		$cv_is_zoom = false !== strpos( $cv_title_lower, 'zoom' );
-		$hl_is_zoom = ! empty( $hl_event['eve_zoom'] ) && (int) $hl_event['eve_zoom'] === 1;
+		$hl_is_zoom = ! empty( $hl_event['eve_zoom'] );
 
 		$breakdown['cv_is_zoom'] = $cv_is_zoom;
 		$breakdown['hl_is_zoom'] = $hl_is_zoom;

@@ -192,14 +192,28 @@ function hl_cvent_status_badge( $status ) {
 							<td style="width:80px;font-weight:600;">Event #<?php echo (int)$r['eve_id']; ?></td>
 							<td style="width:130px;"><?php echo hl_cvent_status_badge( $r['action'] ); ?><?php if ( $is_dry ) echo ' <span style="font-size:10px;color:#888;">(preview)</span>'; ?></td>
 							<td><?php echo esc_html( $r['message'] ); ?></td>
-							<td style="width:80px;text-align:center;">
-								<?php if ( isset( $r['paid'] ) && $r['paid'] !== null ) : ?>
+							<td colspan="2" style="white-space:nowrap;text-align:right;padding-left:12px;">
+								<?php if ( isset( $r['paid'] ) && $r['paid'] !== null ) :
+									// Dry-run: show HL current → CVENT would-be with delta.
+									if ( $is_dry && isset( $r['hl_paid'] ) ) :
+										$dp = (int)$r['paid'] - (int)$r['hl_paid'];
+										$df = (int)$r['free'] - (int)$r['hl_free'];
+										$dp_str = ( $dp > 0 ? '+' : '' ) . $dp;
+										$df_str = ( $df > 0 ? '+' : '' ) . $df;
+										$dp_color = $dp !== 0 ? '#d63638' : '#888';
+										$df_color = $df !== 0 ? '#d63638' : '#888';
+								?>
+									<span style="color:#888;font-size:11px;">HL:</span>
+									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['hl_paid']; ?>p</span>
+									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['hl_free']; ?>f</span>
+									<span style="color:#888;font-size:11px;margin:0 4px;">→ CVENT:</span>
+									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?>p</span>
+									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?>f</span>
+									<span style="color:<?php echo esc_attr( $dp_color ); ?>;font-size:11px;margin-left:4px;">(<?php echo esc_html( $dp_str ); ?>p <?php echo esc_html( $df_str ); ?>f)</span>
+								<?php else : // Live sync: show result only ?>
 									<span style="color:#0a6b00;font-weight:600;"><?php echo (int)$r['paid']; ?> paid</span>
+									<span style="color:#0073aa;font-weight:600;margin-left:6px;"><?php echo (int)$r['free']; ?> free</span>
 								<?php endif; ?>
-							</td>
-							<td style="width:80px;text-align:center;">
-								<?php if ( isset( $r['free'] ) && $r['free'] !== null ) : ?>
-									<span style="color:#0073aa;font-weight:600;"><?php echo (int)$r['free']; ?> free</span>
 								<?php endif; ?>
 							</td>
 						</tr>

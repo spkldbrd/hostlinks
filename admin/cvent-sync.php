@@ -215,11 +215,45 @@ function hl_cvent_status_badge( $status ) {
 								$top_score = $r['candidates'][0]['score'] ?? 0;
 								foreach ( $r['candidates'] as $i => $cand ) :
 									$would_match = ( $i === 0 && $top_score >= 90 && ( isset($r['candidates'][1]) ? ($top_score - $r['candidates'][1]['score']) >= 20 : true ) );
+									$bd = $cand['breakdown'] ?? array();
+									// Build a colour-coded breakdown label for each criterion.
+									$pts = array(
+										'SameDay'  => isset( $bd['dates_same_day'] ) ? (int)$bd['dates_same_day'] : null,
+										'Overlap'  => isset( $bd['dates_overlap'] )  ? (int)$bd['dates_overlap']  : null,
+										'City'     => isset( $bd['city'] )           ? (int)$bd['city']           : null,
+										'State'    => isset( $bd['state'] )          ? (int)$bd['state']          : null,
+										'Venue'    => isset( $bd['venue'] )          ? (int)$bd['venue']          : null,
+										'Title'    => isset( $bd['title'] )          ? (int)$bd['title']          : null,
+									);
 								?>
 									<tr style="<?php echo $would_match ? 'background:#e6f4ea;' : ''; ?>">
 										<td><strong><?php echo (int)$cand['score']; ?></strong></td>
 										<td><?php echo $would_match ? '<strong style="color:#0a6b00;">YES</strong>' : '<span style="color:#888;">No</span>'; ?></td>
-										<td><?php echo esc_html( $cand['event']['title'] ?? '(no title)' ); ?></td>
+										<td>
+											<?php echo esc_html( $cand['event']['title'] ?? '(no title)' ); ?>
+											<?php if ( ! empty( $bd ) ) : ?>
+												<br><small style="color:#888;">
+												<?php foreach ( $pts as $label => $val ) :
+													if ( $val === null ) continue;
+													$color = $val > 0 ? '#0a6b00' : '#cc1818';
+												?>
+													<span style="color:<?php echo $color; ?>;margin-right:6px;">
+														<?php echo esc_html( $label ); ?>
+														<strong><?php echo $val > 0 ? '+' . $val : '0'; ?></strong>
+													</span>
+												<?php endforeach; ?>
+												<?php if ( isset( $bd['hl_city'], $bd['cv_city'] ) && $bd['hl_city'] !== '' ) : ?>
+													| city: <em><?php echo esc_html( $bd['hl_city'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_city'] ); ?></em>
+												<?php endif; ?>
+												<?php if ( isset( $bd['hl_state'], $bd['cv_state'] ) && $bd['hl_state'] !== '' ) : ?>
+													| state: <em><?php echo esc_html( $bd['hl_state'] ); ?></em> vs <em><?php echo esc_html( $bd['cv_state'] ); ?></em>
+												<?php endif; ?>
+												<?php if ( isset( $bd['title_overlap'] ) && $bd['title_overlap'] > 0 ) : ?>
+													| overlap: <?php echo esc_html( round( $bd['title_overlap'] * 100 ) ); ?>%
+												<?php endif; ?>
+												</small>
+											<?php endif; ?>
+										</td>
 										<td><?php echo esc_html( isset( $cand['event']['start'] ) ? gmdate( 'M j, Y', strtotime( $cand['event']['start'] ) ) : '—' ); ?></td>
 										<td><code style="font-size:10px;"><?php echo esc_html( $cand['event']['id'] ?? '' ); ?></code></td>
 									</tr>

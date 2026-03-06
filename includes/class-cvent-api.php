@@ -141,6 +141,7 @@ class Hostlinks_CVENT_API {
 			// some OData parsers reject when decoding filter strings.
 			$url .= '?' . http_build_query( $params, '', '&', PHP_QUERY_RFC3986 );
 		}
+		$debug_url = $url; // preserve for error messages
 
 		$response = wp_remote_get(
 			$url,
@@ -176,7 +177,7 @@ class Hostlinks_CVENT_API {
 			$detail = isset( $body['message'] ) ? $body['message'] : wp_remote_retrieve_body( $response );
 			return new WP_Error(
 				'cvent_api_error',
-				sprintf( 'CVENT API error (HTTP %d): %s', $code, $detail ),
+				sprintf( 'CVENT API error (HTTP %d): %s | URL: %s', $code, $detail, $debug_url ),
 				$body
 			);
 		}
@@ -216,6 +217,21 @@ class Hostlinks_CVENT_API {
 	}
 
 	// -------------------------------------------------------------------------
+	// Helpers
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Strip BOM, non-breaking space, and whitespace from a CVENT UUID.
+	 * CVENT sometimes prefixes strings with a UTF-8 BOM (\xEF\xBB\xBF).
+	 *
+	 * @param string $id
+	 * @return string Clean UUID string.
+	 */
+	public static function sanitize_uuid( $id ) {
+		return trim( ltrim( (string) $id, "\xEF\xBB\xBF\xC2\xA0" ) );
+	}
+
+	// -------------------------------------------------------------------------
 	// API methods
 	// -------------------------------------------------------------------------
 
@@ -247,7 +263,7 @@ class Hostlinks_CVENT_API {
 	 * @return array|WP_Error
 	 */
 	public static function get_event( $event_id ) {
-		return self::request( 'events/' . $event_id );
+		return self::request( 'events/' . self::sanitize_uuid( $event_id ) );
 	}
 
 	/**
@@ -261,6 +277,7 @@ class Hostlinks_CVENT_API {
 	 * @return array|WP_Error  Flat array of attendee records.
 	 */
 	public static function get_attendees( $event_id ) {
+		$event_id  = self::sanitize_uuid( $event_id );
 		$all       = array();
 		$next      = null;
 		$page      = 0;

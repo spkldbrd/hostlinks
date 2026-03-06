@@ -85,7 +85,7 @@ class Hostlinks_CVENT_Sync {
 		$hl_paid = (int) ( $row['eve_paid'] ?? 0 );
 		$hl_free = (int) ( $row['eve_free'] ?? 0 );
 
-		$stored_id = $row['cvent_event_id'] ?? '';
+		$stored_id = Hostlinks_CVENT_API::sanitize_uuid( $row['cvent_event_id'] ?? '' );
 		$status    = $row['cvent_match_status'] ?? 'unlinked';
 
 		// ── Step 1: verify stored CVENT ID ───────────────────────────────────
@@ -165,8 +165,8 @@ class Hostlinks_CVENT_Sync {
 				return $r;
 			}
 
-			$stored_id = $best['id'];
-			$status    = 'auto';
+		$stored_id = Hostlinks_CVENT_API::sanitize_uuid( $best['id'] );
+		$status    = 'auto';
 
 			// In dry-run, also preview the attendee counts for the auto-matched event.
 			if ( $dry_run ) {
@@ -417,10 +417,11 @@ class Hostlinks_CVENT_Sync {
 	 * @return array|WP_Error
 	 */
 	public static function fetch_attendees_for_event( $cvent_event_id ) {
-		$all       = array();
-		$next      = null;
-		$page      = 0;
-		$max_pages = 20;
+		$cvent_event_id = Hostlinks_CVENT_API::sanitize_uuid( $cvent_event_id );
+		$all            = array();
+		$next           = null;
+		$page           = 0;
+		$max_pages      = 20;
 
 		do {
 			// CVENT treats eventId as a GUID/UUID type — no single quotes (unlike string literals).

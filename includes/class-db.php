@@ -71,6 +71,13 @@ class Hostlinks_DB {
 			eve_instructor int(11) NOT NULL DEFAULT 0,
 			eve_tot_date varchar(100) NOT NULL DEFAULT '',
 			eve_status tinyint(1) NOT NULL DEFAULT 1,
+			cvent_event_id varchar(100) DEFAULT NULL,
+			cvent_event_title varchar(500) DEFAULT NULL,
+			cvent_event_start_utc datetime DEFAULT NULL,
+			cvent_match_score tinyint unsigned DEFAULT NULL,
+			cvent_match_status varchar(20) DEFAULT 'unlinked',
+			cvent_last_synced datetime DEFAULT NULL,
+			cvent_staleness_hash varchar(64) DEFAULT NULL,
 			PRIMARY KEY  (eve_id)
 		) $charset_collate;";
 		dbDelta( $sql );

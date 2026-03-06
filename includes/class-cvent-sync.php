@@ -1,0 +1,454 @@
+<?php
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/**
+ * CVENT sync orchestration.
+ *
+ * Flow for each Hostlinks event:
+ *   1. If cvent_event_id is stored → verify it still exists (GET /ea/events/{id}).
+ *      On 404, clear the stored ID and fall through to bootstrap.
+ *   2. If no ID → bootstrap_match() to find the best CVENT candidate.
+ *      Auto-match (score >= 90, gap >= 20) or flag needs_review.
+ *   3. If status is 'auto' or 'manual' → fetch attendees, filter cancelled/test,
+ *      extract discount strings, count PAID/FREE, update DB.
+ *
+ * Attendee endpoint:
+ *   GET /ea/attendees/filter?filter=eventId eq '{id}'&limit=200
+ *
+ * PAID/FREE rule:
+ *   extract_discount_strings() → if any string contains /free/i → FREE, else PAID.
+ */
+class Hostlinks_CVENT_Sync {
+
+	/**
+	 * Registration statuses treated as valid (case-insensitive comparison).
+	 * Records whose status is NOT in this list are excluded from counts.
+	 * Adjust if CVENT returns different status strings in your account.
+	 */
+	private static $valid_statuses = array(
+		'registered',
+		'confirmed',
+		'attending',
+		'checked in',
+		'checkedin',
+		'active',
+	);
+
+	// -------------------------------------------------------------------------
+	// Public: sync one event
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Sync a single Hostlinks event against CVENT.
+	 *
+	 * @param int $eve_id Row ID in event_details_list.
+	 * @return array {
+	 *   eve_id       : int,
+	 *   action       : 'synced'|'matched'|'needs_review'|'no_candidates'|'skipped'|'error',
+	 *   message      : string,
+	 *   paid         : int|null,
+	 *   free         : int|null,
+	 *   cvent_title  : string|null,
+	 *   cvent_id     : string|null,
+	 *   score        : int|null,
+	 * }
+	 */
+	public static function sync_one( $eve_id ) {
+		global $wpdb;
+		$table = $wpdb->prefix . 'event_details_list';
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM `{$table}` WHERE eve_id = %d AND eve_status = 1", $eve_id ),
+			ARRAY_A
+		);
+
+		if ( ! $row ) {
+			return self::result( $eve_id, 'error', 'Event not found or inactive.' );
+		}
+
+		$stored_id = $row['cvent_event_id'] ?? '';
+		$status    = $row['cvent_match_status'] ?? 'unlinked';
+
+		// ── Step 1: verify stored CVENT ID ───────────────────────────────────
+		if ( $stored_id && in_array( $status, array( 'auto', 'manual' ), true ) ) {
+			$check = Hostlinks_CVENT_API::get_event( $stored_id );
+			if ( is_wp_error( $check ) && strpos( $check->get_error_message(), 'HTTP 404' ) !== false ) {
+				// Stored event gone — clear mapping and re-bootstrap.
+				self::clear_cvent_mapping( $eve_id );
+				$stored_id = '';
+				$status    = 'unlinked';
+			} elseif ( is_wp_error( $check ) ) {
+				return self::result( $eve_id, 'error', $check->get_error_message() );
+			} else {
+				// Verify staleness hash hasn't changed drastically.
+				$new_hash = Hostlinks_CVENT_Matcher::staleness_hash( $check );
+				if ( $new_hash !== ( $row['cvent_staleness_hash'] ?? '' ) ) {
+					// Data changed on CVENT side — flag for review but still sync.
+					$wpdb->update(
+						$table,
+						array( 'cvent_match_status' => 'needs_review', 'cvent_staleness_hash' => $new_hash ),
+						array( 'eve_id' => $eve_id ),
+						array( '%s', '%s' ),
+						array( '%d' )
+					);
+					$status = 'needs_review';
+				}
+			}
+		}
+
+		// ── Step 2: bootstrap if no confirmed ID ─────────────────────────────
+		if ( ! $stored_id || ! in_array( $status, array( 'auto', 'manual' ), true ) ) {
+			$match = Hostlinks_CVENT_Matcher::bootstrap_match( $row );
+
+			if ( 'error' === $match['status'] ) {
+				return self::result( $eve_id, 'error', $match['error'] );
+			}
+
+			if ( 'no_candidates' === $match['status'] ) {
+				return self::result( $eve_id, 'no_candidates', 'No CVENT events found in date window.' );
+			}
+
+			$best  = $match['best'];
+			$score = $match['best_score'];
+			$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $best );
+
+			$wpdb->update(
+				$table,
+				array(
+					'cvent_event_id'        => $best['id'],
+					'cvent_event_title'     => $best['title'] ?? '',
+					'cvent_event_start_utc' => isset( $best['start'] ) ? date( 'Y-m-d H:i:s', strtotime( $best['start'] ) ) : null,
+					'cvent_match_score'     => $score,
+					'cvent_match_status'    => $match['status'],
+					'cvent_staleness_hash'  => $hash,
+				),
+				array( 'eve_id' => $eve_id ),
+				array( '%s', '%s', '%s', '%d', '%s', '%s' ),
+				array( '%d' )
+			);
+
+			if ( 'needs_review' === $match['status'] ) {
+				return self::result(
+					$eve_id,
+					'needs_review',
+					sprintf( 'Best candidate "%s" scored %d — needs manual review.', $best['title'] ?? '(no title)', $score ),
+					null, null, $best['title'] ?? '', $best['id'], $score
+				);
+			}
+
+			$stored_id = $best['id'];
+			$status    = 'auto';
+
+			return array_merge(
+				self::result( $eve_id, 'matched', sprintf( 'Auto-matched to "%s" (score %d). Run sync again to update counts.', $best['title'] ?? '', $score ), null, null, $best['title'] ?? '', $stored_id, $score ),
+				array()
+			);
+		}
+
+		// ── Step 3: fetch attendees and count PAID/FREE ───────────────────────
+		return self::do_count_sync( $eve_id, $stored_id, $row );
+	}
+
+	// -------------------------------------------------------------------------
+	// Public: sync all active events
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Sync all active Hostlinks events.
+	 *
+	 * @return array {
+	 *   results  : array of sync_one() result arrays,
+	 *   synced   : int,
+	 *   matched  : int,
+	 *   needs_review : int,
+	 *   errors   : int,
+	 * }
+	 */
+	public static function sync_all() {
+		global $wpdb;
+		$table = $wpdb->prefix . 'event_details_list';
+		$rows  = $wpdb->get_results( "SELECT eve_id FROM `{$table}` WHERE eve_status = 1", ARRAY_A );
+
+		$results      = array();
+		$counts       = array( 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );
+
+		foreach ( $rows as $r ) {
+			$res       = self::sync_one( (int) $r['eve_id'] );
+			$results[] = $res;
+			$action    = $res['action'] ?? 'error';
+			if ( isset( $counts[ $action ] ) ) {
+				$counts[ $action ]++;
+			} else {
+				$counts['errors']++;
+			}
+		}
+
+		return array_merge( array( 'results' => $results ), $counts );
+	}
+
+	// -------------------------------------------------------------------------
+	// Public: save a manual link
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Save a manually chosen CVENT event ID for a Hostlinks event.
+	 *
+	 * @param int    $eve_id     Hostlinks event ID.
+	 * @param string $cvent_id   CVENT event UUID.
+	 * @return true|WP_Error
+	 */
+	public static function save_manual_link( $eve_id, $cvent_id ) {
+		global $wpdb;
+
+		$cvent_event = Hostlinks_CVENT_API::get_event( $cvent_id );
+		if ( is_wp_error( $cvent_event ) ) {
+			return $cvent_event;
+		}
+
+		$hash = Hostlinks_CVENT_Matcher::staleness_hash( $cvent_event );
+		$table = $wpdb->prefix . 'event_details_list';
+
+		$wpdb->update(
+			$table,
+			array(
+				'cvent_event_id'        => $cvent_id,
+				'cvent_event_title'     => $cvent_event['title'] ?? '',
+				'cvent_event_start_utc' => isset( $cvent_event['start'] ) ? date( 'Y-m-d H:i:s', strtotime( $cvent_event['start'] ) ) : null,
+				'cvent_match_score'     => null,
+				'cvent_match_status'    => 'manual',
+				'cvent_staleness_hash'  => $hash,
+			),
+			array( 'eve_id' => $eve_id ),
+			array( '%s', '%s', '%s', null, '%s', '%s' ),
+			array( '%d' )
+		);
+
+		return true;
+	}
+
+	// -------------------------------------------------------------------------
+	// Public: unlink
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Clear the CVENT mapping for a Hostlinks event.
+	 *
+	 * @param int $eve_id
+	 */
+	public static function clear_cvent_mapping( $eve_id ) {
+		global $wpdb;
+		$table = $wpdb->prefix . 'event_details_list';
+		$wpdb->update(
+			$table,
+			array(
+				'cvent_event_id'        => null,
+				'cvent_event_title'     => null,
+				'cvent_event_start_utc' => null,
+				'cvent_match_score'     => null,
+				'cvent_match_status'    => 'unlinked',
+				'cvent_last_synced'     => null,
+				'cvent_staleness_hash'  => null,
+			),
+			array( 'eve_id' => $eve_id ),
+			array( null, null, null, null, '%s', null, null ),
+			array( '%d' )
+		);
+	}
+
+	// -------------------------------------------------------------------------
+	// Attendee fetching and counting
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Fetch all attendees for a CVENT event, then count PAID/FREE.
+	 */
+	private static function do_count_sync( $eve_id, $cvent_id, $row ) {
+		global $wpdb;
+		$table = $wpdb->prefix . 'event_details_list';
+
+		$attendees = self::fetch_attendees_for_event( $cvent_id );
+		if ( is_wp_error( $attendees ) ) {
+			return self::result( $eve_id, 'error', $attendees->get_error_message() );
+		}
+
+		$valid = self::filter_valid_attendees( $attendees );
+
+		$paid = 0;
+		$free = 0;
+		foreach ( $valid as $att ) {
+			$discount_strings = self::extract_discount_strings( $att );
+			$is_free          = false;
+			foreach ( $discount_strings as $ds ) {
+				if ( preg_match( '/free/i', $ds ) ) {
+					$is_free = true;
+					break;
+				}
+			}
+			if ( $is_free ) {
+				$free++;
+			} else {
+				$paid++;
+			}
+		}
+
+		$wpdb->update(
+			$table,
+			array(
+				'eve_paid'         => $paid,
+				'eve_free'         => $free,
+				'cvent_last_synced' => current_time( 'mysql' ),
+			),
+			array( 'eve_id' => $eve_id ),
+			array( '%d', '%d', '%s' ),
+			array( '%d' )
+		);
+
+		return self::result(
+			$eve_id,
+			'synced',
+			sprintf( 'Synced: %d paid, %d free (%d total valid attendees).', $paid, $free, count( $valid ) ),
+			$paid,
+			$free,
+			$row['cvent_event_title'] ?? '',
+			$cvent_id,
+			$row['cvent_match_score'] ?? null
+		);
+	}
+
+	/**
+	 * Fetch all attendees for a CVENT event (paginated).
+	 * Endpoint: GET /ea/attendees/filter?filter=eventId eq '{id}'&limit=200
+	 *
+	 * @param string $cvent_event_id
+	 * @return array|WP_Error
+	 */
+	public static function fetch_attendees_for_event( $cvent_event_id ) {
+		$all       = array();
+		$next      = null;
+		$page      = 0;
+		$max_pages = 20;
+
+		do {
+			$params = array(
+				'filter' => "eventId eq '" . $cvent_event_id . "'",
+				'limit'  => 200,
+			);
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+
+			$result = Hostlinks_CVENT_API::request( 'attendees/filter', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			$data = isset( $result['data'] ) ? $result['data'] : array();
+			$all  = array_merge( $all, $data );
+			$next = isset( $result['paging']['nextToken'] ) ? $result['paging']['nextToken'] : null;
+			$page++;
+		} while ( $next && $page < $max_pages );
+
+		return $all;
+	}
+
+	/**
+	 * Remove attendees whose registration status indicates they shouldn't be counted.
+	 * Excludes: Cancelled, Declined, Deleted, Test, Waitlisted.
+	 * Includes: Registered, Confirmed, Attending, Checked In, Active.
+	 *
+	 * @param array $attendees
+	 * @return array Filtered attendees.
+	 */
+	public static function filter_valid_attendees( $attendees ) {
+		return array_values( array_filter( $attendees, function( $att ) {
+			// If no status field present, include by default (conservative).
+			if ( ! isset( $att['status'] ) ) {
+				return true;
+			}
+			$s = strtolower( trim( $att['status'] ) );
+			// Explicit exclusions.
+			$excluded = array( 'cancelled', 'canceled', 'declined', 'deleted', 'test', 'waitlisted', 'waitlist' );
+			if ( in_array( $s, $excluded, true ) ) {
+				return false;
+			}
+			// If we have an allowlist match, include it.
+			foreach ( self::$valid_statuses as $valid ) {
+				if ( false !== strpos( $s, $valid ) ) {
+					return true;
+				}
+			}
+			// Unknown status: include (conservative — log-visible in sync output).
+			return true;
+		} ) );
+	}
+
+	/**
+	 * Extract all discount-related strings from an attendee record.
+	 * Checks multiple possible field locations to be tolerant of API shape variation.
+	 *
+	 * Priority order:
+	 *   1. discounts[] → each item's 'name' field
+	 *   2. discount.name  (single-object form)
+	 *   3. pricing.discountCode / pricing.discountName
+	 *   4. orderItems[].discounts[].name
+	 *
+	 * @param array $attendee
+	 * @return string[] Flat array of discount name/code strings.
+	 */
+	public static function extract_discount_strings( $attendee ) {
+		$strings = array();
+
+		// 1. discounts[] array.
+		if ( ! empty( $attendee['discounts'] ) && is_array( $attendee['discounts'] ) ) {
+			foreach ( $attendee['discounts'] as $d ) {
+				if ( ! empty( $d['name'] ) )        $strings[] = $d['name'];
+				if ( ! empty( $d['code'] ) )        $strings[] = $d['code'];
+				if ( ! empty( $d['discountCode'] ) ) $strings[] = $d['discountCode'];
+			}
+		}
+
+		// 2. Single discount object.
+		if ( ! empty( $attendee['discount'] ) && is_array( $attendee['discount'] ) ) {
+			if ( ! empty( $attendee['discount']['name'] ) ) $strings[] = $attendee['discount']['name'];
+			if ( ! empty( $attendee['discount']['code'] ) ) $strings[] = $attendee['discount']['code'];
+		}
+
+		// 3. pricing.discountCode / pricing.discountName.
+		if ( ! empty( $attendee['pricing'] ) && is_array( $attendee['pricing'] ) ) {
+			if ( ! empty( $attendee['pricing']['discountCode'] ) ) $strings[] = $attendee['pricing']['discountCode'];
+			if ( ! empty( $attendee['pricing']['discountName'] ) ) $strings[] = $attendee['pricing']['discountName'];
+		}
+
+		// 4. orderItems[].discounts[].name.
+		if ( ! empty( $attendee['orderItems'] ) && is_array( $attendee['orderItems'] ) ) {
+			foreach ( $attendee['orderItems'] as $item ) {
+				if ( ! empty( $item['discounts'] ) && is_array( $item['discounts'] ) ) {
+					foreach ( $item['discounts'] as $d ) {
+						if ( ! empty( $d['name'] ) ) $strings[] = $d['name'];
+					}
+				}
+			}
+		}
+
+		return array_unique( array_filter( $strings ) );
+	}
+
+	// -------------------------------------------------------------------------
+	// Internal helpers
+	// -------------------------------------------------------------------------
+
+	private static function result( $eve_id, $action, $message, $paid = null, $free = null, $cvent_title = null, $cvent_id = null, $score = null ) {
+		return array(
+			'eve_id'      => $eve_id,
+			'action'      => $action,
+			'message'     => $message,
+			'paid'        => $paid,
+			'free'        => $free,
+			'cvent_title' => $cvent_title,
+			'cvent_id'    => $cvent_id,
+			'score'       => $score,
+		);
+	}
+}

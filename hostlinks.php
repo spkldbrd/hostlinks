@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.3.4
+ * Version:     2.4.0
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,8 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.3.4' );
-define( 'HOSTLINKS_DB_VERSION', '1.1' );
+define( 'HOSTLINKS_VERSION',    '2.4.0' );
+define( 'HOSTLINKS_DB_VERSION', '1.2' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -29,6 +29,8 @@ require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-shortcodes.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-import-export.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-updater.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-api.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-matcher.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-sync.php';
 
 // Activation: create DB tables + detect theme conflict in one hook
 register_activation_hook( __FILE__, array( 'Hostlinks_Activation', 'on_activate' ) );

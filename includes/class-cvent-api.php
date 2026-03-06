@@ -8,7 +8,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * Call budget strategy (free tier: 1,000 calls/day):
  *   - 1 call  : GET /ea/events           (list)
- *   - 1+ calls: GET /ea/events/{id}/attendees  (paginated at 200/page)
+ *   - 1+ calls: GET /ea/attendees/filter?filter=eventId eq '{id}'  (paginated at 200/page)
  *   - No /orders, /transactions, or /fee-items calls needed.
  *
  * PAID/FREE rule:
@@ -212,13 +212,14 @@ class Hostlinks_CVENT_API {
 	}
 
 	/**
-	 * Retrieve ALL registrations for an event, handling token-based pagination.
+	 * Retrieve ALL attendees for a CVENT event, handling token-based pagination.
+	 * Uses the confirmed endpoint: GET /ea/attendees/filter?filter=eventId eq '{id}'
 	 * Uses page size of 200 to minimise call count (free tier: 1,000 calls/day).
 	 *
-	 * CVENT Developer Platform uses /registrations not /attendees.
+	 * Required scope: event/attendees:read (set on the CVENT app, not in the token request).
 	 *
 	 * @param string $event_id CVENT event UUID.
-	 * @return array|WP_Error  Flat array of registration records.
+	 * @return array|WP_Error  Flat array of attendee records.
 	 */
 	public static function get_attendees( $event_id ) {
 		$all       = array();
@@ -227,12 +228,15 @@ class Hostlinks_CVENT_API {
 		$max_pages = 20; // guard rail
 
 		do {
-			$params = array( 'limit' => 200 );
+			$params = array(
+				'filter' => "eventId eq '" . $event_id . "'",
+				'limit'  => 200,
+			);
 			if ( $next ) {
 				$params['token'] = $next;
 			}
 
-			$result = self::request( 'events/' . $event_id . '/registrations', $params );
+			$result = self::request( 'attendees/filter', $params );
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}
@@ -244,6 +248,23 @@ class Hostlinks_CVENT_API {
 		} while ( $next && $page < $max_pages );
 
 		return $all;
+	}
+
+	/**
+	 * Search CVENT events within a start-date window (for bootstrap matching).
+	 * Used by the matcher to find candidates for a given Hostlinks event.
+	 *
+	 * @param string $start_min ISO 8601 UTC datetime (e.g. 2026-03-04T00:00:00Z).
+	 * @param string $start_max ISO 8601 UTC datetime.
+	 * @return array|WP_Error Raw API response (has 'data' key with event records).
+	 */
+	public static function search_events( $start_min, $start_max ) {
+		return self::request(
+			'events',
+			array(
+				'filter' => "start ge '" . $start_min . "' and start le '" . $start_max . "'",
+			)
+		);
 	}
 
 	// -------------------------------------------------------------------------
@@ -312,18 +333,21 @@ class Hostlinks_CVENT_API {
 			return $event;
 		}
 
-		// 3. All attendees (paginated — each page = 1 call).
+		// 3. All attendees via confirmed endpoint (paginated — each page = 1 call).
 		$all       = array();
 		$next      = null;
 		$page      = 0;
 		$max_pages = 20;
 
 		do {
-			$params = array( 'limit' => 200 );
+			$params = array(
+				'filter' => "eventId eq '" . $event_id . "'",
+				'limit'  => 200,
+			);
 			if ( $next ) {
 				$params['token'] = $next;
 			}
-			$result = self::request( 'events/' . $event_id . '/registrations', $params );
+			$result = self::request( 'attendees/filter', $params );
 			$calls++;
 			if ( is_wp_error( $result ) ) {
 				return $result;

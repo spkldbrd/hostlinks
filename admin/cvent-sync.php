@@ -320,10 +320,13 @@ function hl_cvent_status_badge( $status ) {
 										<?php if ( isset( $bd['cv_is_zoom'] ) ) : ?>
 											| zoom: CVENT<?php echo $bd['cv_is_zoom'] ? '&#10003;' : '&#10007;'; ?> HL<?php echo ( $bd['hl_is_zoom'] ?? false ) ? '&#10003;' : '&#10007;'; ?>
 										<?php endif; ?>
-										<?php if ( ( $bd['cv_zoom_region'] ?? '' ) !== '' || ( $bd['hl_zoom_region'] ?? '' ) !== '' ) : ?>
-											| region: <em><?php echo esc_html( $bd['hl_zoom_region'] ?? '' ); ?></em> vs <em><?php echo esc_html( $bd['cv_zoom_region'] ?? '' ); ?></em>
-										<?php endif; ?>
-											</span>
+									<?php if ( ( $bd['cv_zoom_region'] ?? '' ) !== '' || ( $bd['hl_zoom_region'] ?? '' ) !== '' ) : ?>
+										| region: <em><?php echo esc_html( $bd['hl_zoom_region'] ?? '' ); ?></em> vs <em><?php echo esc_html( $bd['cv_zoom_region'] ?? '' ); ?></em>
+									<?php endif; ?>
+									<?php if ( ( $bd['cv_is_cancelled'] ?? false ) || ( $bd['hl_is_cancelled'] ?? false ) ) : ?>
+										| cancelled: CVENT<?php echo ( $bd['cv_is_cancelled'] ?? false ) ? '&#10003;' : '&#10007;'; ?> HL<?php echo ( $bd['hl_is_cancelled'] ?? false ) ? '&#10003;' : '&#10007;'; ?>
+									<?php endif; ?>
+										</span>
 										<?php endif; ?>
 										</td>
 										<td><?php echo esc_html( isset( $cand['event']['start'] ) ? gmdate( 'M j, Y', strtotime( $cand['event']['start'] ) ) : '—' ); ?></td>

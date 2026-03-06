@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Bootstrap matching: find the best CVENT event for a Hostlinks event.
  *
- * Scoring (max 290 points):
+ * Scoring (max 305 points):
  *   +25  same start calendar day (UTC — CVENT stores UTC ISO timestamps)
  *   +25  date ranges overlap (HL start..end overlaps CVENT start..end)
  *   +40  normalized city matches (from CVENT venue data)
@@ -23,13 +23,21 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   +10  zoom region side match: timezone abbreviation in CVENT zoom title
  *         (EST/Eastern → east, PST/Pacific → west, CST/Central → central,
  *          MST/Mountain → mountain) matches the region prefix of HL eve_location
+ *   +15  cancelled match: "cancel" in both CVENT title AND HL eve_location
+ *
+ * Location base stripping (hl_location_base):
+ *   Strips "| modifier" suffixes, em-dash (–) suffixes, and " - STATUS" suffixes
+ *   (e.g. "- CANCELED", "- CANCELLED", "- TO BE RESCH") before city/state
+ *   extraction and title-location comparison. Uses space-hyphen-space so
+ *   hyphenated city names like "Winston-Salem" are not affected.
  *
  * Auto-match: top score >= 90 AND at least 20 points ahead of second-best.
  * Otherwise: status = needs_review (admin picks manually).
  *
- * Zoom auto-match path: overlap(25) + type(35) + zoom(30) = 90.
- * City auto-match path: overlap(25) + title_location(65) = 90.
- * Zoom subaward path:   sameday(25) + overlap(25) + zoom(30) + subaward(15) + region(10) = 105.
+ * Zoom auto-match path:     overlap(25) + type(35) + zoom(30) = 90.
+ * City auto-match path:     overlap(25) + title_location(65) = 90.
+ * Zoom subaward path:       sameday(25) + overlap(25) + zoom(30) + subaward(15) + region(10) = 105.
+ * Cancelled event path:     sameday(25) + overlap(25) + title_loc(65) + type(35) + cancelled(15) = 165.
  */
 class Hostlinks_CVENT_Matcher {
 
@@ -140,6 +148,7 @@ class Hostlinks_CVENT_Matcher {
 			'zoom_match'       => 0,
 			'subaward_match'   => 0,
 			'zoom_region_match'=> 0,
+			'cancelled_match'  => 0,
 			'hl_city'          => '',
 			'hl_state'         => '',
 			'cv_city'          => '',
@@ -152,6 +161,8 @@ class Hostlinks_CVENT_Matcher {
 			'cv_type'          => '',
 			'hl_type'          => '',
 			'cv_is_zoom'       => false,
+			'cv_is_cancelled'  => false,
+			'hl_is_cancelled'  => false,
 			'hl_is_zoom'       => false,
 			'cv_zoom_region'   => '',
 			'hl_zoom_region'   => '',
@@ -194,9 +205,12 @@ class Hostlinks_CVENT_Matcher {
 		$cv_venue = '';
 
 		// Hostlinks location is a free-text string, e.g. "Paso Robles, CA".
-		// Use plain normalize() — no state-name replacement for city strings.
+		// Apply hl_location_base() first so that status suffixes like "- CANCELED"
+		// and pipe-delimited modifiers are stripped before city/state extraction.
+		// Without this, "OK - CANCELED" would fail the normalize_state() lookup.
 		if ( ! empty( $hl_event['eve_location'] ) ) {
-			$parts    = explode( ',', $hl_event['eve_location'] );
+			$loc_base = self::hl_location_base( $hl_event['eve_location'] );
+			$parts    = explode( ',', $loc_base );
 			$hl_city  = self::normalize( trim( $parts[0] ?? '' ) );
 			$hl_state = self::normalize_state( trim( $parts[1] ?? '' ) );
 		}
@@ -351,16 +365,33 @@ class Hostlinks_CVENT_Matcher {
 		$breakdown['cv_zoom_region'] = $cv_zoom_region;
 		$breakdown['hl_zoom_region'] = $hl_zoom_region;
 
-		if ( $cv_zoom_region && $hl_zoom_region && $cv_zoom_region === $hl_zoom_region ) {
-			$score += 10;
-			$breakdown['zoom_region_match'] = 10;
-		}
-
-		return array(
-			'score'     => $score,
-			'breakdown' => $breakdown,
-		);
+	if ( $cv_zoom_region && $hl_zoom_region && $cv_zoom_region === $hl_zoom_region ) {
+		$score += 10;
+		$breakdown['zoom_region_match'] = 10;
 	}
+
+	// ── Cancelled / weather match (+15) ──────────────────────────────────────
+	// CVENT appends or prepends cancellation notes to event titles
+	// (e.g. "Oklahoma City, OK - Grant Writing USA - CANCELED DUE TO WEATHER").
+	// HL often stores the same event as "Oklahoma City, OK - CANCELED".
+	// When both sides contain a cancellation marker and the date/location already
+	// score well, this boost tips marginal candidates over the auto-match threshold.
+	$cv_is_cancelled = (bool) preg_match( '/\bcancel/i', $cvent_event['title'] ?? '' );
+	$hl_is_cancelled = (bool) preg_match( '/\bcancel/i', $hl_event['eve_location'] ?? '' );
+
+	$breakdown['cv_is_cancelled'] = $cv_is_cancelled;
+	$breakdown['hl_is_cancelled'] = $hl_is_cancelled;
+
+	if ( $cv_is_cancelled && $hl_is_cancelled ) {
+		$score += 15;
+		$breakdown['cancelled_match'] = 15;
+	}
+
+	return array(
+		'score'     => $score,
+		'breakdown' => $breakdown,
+	);
+}
 
 	// -------------------------------------------------------------------------
 	// Staleness hash
@@ -402,7 +433,10 @@ class Hostlinks_CVENT_Matcher {
 	 */
 	private static function hl_location_base( $location ) {
 		$base = preg_replace( '/\s*\|.*$/s',  '', $location ); // strip | and everything after
-		$base = preg_replace( '/\s*–.*$/su',  '', $base );     // strip em-dash suffix
+		$base = preg_replace( '/\s*–.*$/su',  '', $base );     // strip em-dash (–) suffix
+		// Strip " - CANCELED", " - CANCELLED", " - TO BE RESCH", etc.
+		// Uses space-hyphen-space so "Winston-Salem, NC" is not affected.
+		$base = preg_replace( '/\s+-\s+.*$/s', '', $base );
 		return trim( $base );
 	}
 
@@ -429,6 +463,11 @@ class Hostlinks_CVENT_Matcher {
 	private static function cv_title_location( $title ) {
 		// Strip BOM and leading whitespace that sometimes appears in CVENT exports.
 		$title = ltrim( $title, "\xEF\xBB\xBF \t" );
+		// Strip leading "CANCELED:" / "CANCELLED:" prefix that CVENT sometimes
+		// prepends to cancelled event titles (e.g. "CANCELED: City, ST - Title").
+		// The more common pattern is a suffix (handled in hl_location_base), but
+		// we handle the prefix here defensively.
+		$title = preg_replace( '/^CANCEL(?:L)?ED\s*:\s*/i', '', $title );
 		// Use \s*-\s+ so we handle both "City, ST - Title" and "City, ST- Title"
 		// (some CVENT events omit the space before the dash).
 		// Requiring at least one space AFTER the dash prevents hyphenated city

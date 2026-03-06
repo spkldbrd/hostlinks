@@ -9,20 +9,58 @@ $table14 = $wpdb->prefix . 'event_instructor';
 
 $start_date = wp_date( 'Y-m-01' );
 
+// ── Focus filter ──────────────────────────────────────────────────────────────
+$focus_id = isset( $_GET['focus'] ) ? (int) $_GET['focus'] : 0;
+
+// Load active marketers for the Focus dropdown.
+$marketers = $wpdb->get_results(
+	"SELECT event_marketer_id, event_marketer_name
+	 FROM {$table13}
+	 WHERE event_marketer_status = 1
+	 ORDER BY event_marketer_name ASC"
+);
+
+// Resolve the focused marketer's display name (for the empty-state message).
+$focus_name = '';
+if ( $focus_id > 0 ) {
+	foreach ( $marketers as $mk ) {
+		if ( (int) $mk->event_marketer_id === $focus_id ) {
+			$focus_name = $mk->event_marketer_name;
+			break;
+		}
+	}
+}
+
 // ── Single JOIN query — replaces 3 per-row lookups (N+1 fix) ─────────────────
-$all_pending_bookings = $wpdb->get_results( $wpdb->prepare(
-	"SELECT e.*,
-	        t.event_type_name,
-	        m.event_marketer_name,
-	        i.event_instructor_name
-	 FROM {$table11} e
-	 LEFT JOIN {$table12} t ON e.eve_type        = t.event_type_id
-	 LEFT JOIN {$table13} m ON e.eve_marketer    = m.event_marketer_id
-	 LEFT JOIN {$table14} i ON e.eve_instructor  = i.event_instructor_id
-	 WHERE e.eve_status = '1' AND e.eve_start >= %s
-	 ORDER BY e.eve_start ASC",
-	$start_date
-), ARRAY_A );
+if ( $focus_id > 0 ) {
+	$all_pending_bookings = $wpdb->get_results( $wpdb->prepare(
+		"SELECT e.*,
+		        t.event_type_name,
+		        m.event_marketer_name,
+		        i.event_instructor_name
+		 FROM {$table11} e
+		 LEFT JOIN {$table12} t ON e.eve_type        = t.event_type_id
+		 LEFT JOIN {$table13} m ON e.eve_marketer    = m.event_marketer_id
+		 LEFT JOIN {$table14} i ON e.eve_instructor  = i.event_instructor_id
+		 WHERE e.eve_status = '1' AND e.eve_start >= %s AND e.eve_marketer = %d
+		 ORDER BY e.eve_start ASC",
+		$start_date, $focus_id
+	), ARRAY_A );
+} else {
+	$all_pending_bookings = $wpdb->get_results( $wpdb->prepare(
+		"SELECT e.*,
+		        t.event_type_name,
+		        m.event_marketer_name,
+		        i.event_instructor_name
+		 FROM {$table11} e
+		 LEFT JOIN {$table12} t ON e.eve_type        = t.event_type_id
+		 LEFT JOIN {$table13} m ON e.eve_marketer    = m.event_marketer_id
+		 LEFT JOIN {$table14} i ON e.eve_instructor  = i.event_instructor_id
+		 WHERE e.eve_status = '1' AND e.eve_start >= %s
+		 ORDER BY e.eve_start ASC",
+		$start_date
+	), ARRAY_A );
+}
 
 // ── Pass 1: pre-calculate monthly totals ─────────────────────────────────────
 $totals = array();
@@ -50,13 +88,12 @@ foreach ( $all_pending_bookings as $ev ) {
 }
 
 // ── Pass 2: render ─────────────────────────────────────────────────────────
-$today        = new DateTime();
+$today         = new DateTime();
 $current_month = null;
-$_upd_raw     = get_option( 'last_data_updation', '' );
-$_upd_dt      = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;
-$last_updated = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->format( 'm/d' );
+$_upd_raw      = get_option( 'last_data_updation', '' );
+$_upd_dt       = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;
+$last_updated  = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->format( 'm/d' );
 
-// Build past-events page URL dynamically; fall back to slug.
 $past_events_url = home_url( '/old-event-list/' );
 $upcoming_url    = home_url( '/' );
 ?>
@@ -65,12 +102,36 @@ $upcoming_url    = home_url( '/' );
 
 	<div class="hostlinks-actions">
 		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Upcoming Events</a>
-		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
+		<a href="<?php echo esc_url( $past_events_url . ( $focus_id ? '?focus=' . $focus_id : '' ) ); ?>" class="hostlinks-btn">Past Events</a>
+
+		<select id="hl-focus-marketer" class="hostlinks-year-filter" aria-label="Focus by marketer">
+			<option value="0" <?php selected( $focus_id, 0 ); ?>>All Marketers</option>
+			<?php foreach ( $marketers as $mk ) : ?>
+			<option value="<?php echo (int) $mk->event_marketer_id; ?>" <?php selected( $focus_id, (int) $mk->event_marketer_id ); ?>>
+				<?php echo esc_html( $mk->event_marketer_name ); ?>
+			</option>
+			<?php endforeach; ?>
+		</select>
+		<script>
+		document.getElementById('hl-focus-marketer').addEventListener('change', function() {
+			var fk  = this.value;
+			var url = '<?php echo esc_js( $upcoming_url ); ?>';
+			if ( fk && fk !== '0' ) { url += '?focus=' + fk; }
+			window.location.href = url;
+		});
+		</script>
+
 		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
 	</div>
 
+<?php
+$empty_msg = $focus_name
+	? 'No upcoming events found for ' . esc_html( $focus_name ) . '.'
+	: 'No upcoming events found.';
+?>
+
 <?php if ( empty( $all_pending_bookings ) ) : ?>
-	<div class="hostlinks-empty">No upcoming events found.</div>
+	<div class="hostlinks-empty"><?php echo $empty_msg; ?></div>
 <?php else : ?>
 
 <?php foreach ( $all_pending_bookings as $alldriver ) :
@@ -82,15 +143,14 @@ $upcoming_url    = home_url( '/' );
 	$marketer_name   = $alldriver['event_marketer_name']         ?? '';
 	$instructor_name = $alldriver['event_instructor_name']       ?? '';
 
-	$dater = explode( '-', $alldriver['eve_start'] );
-	$yr    = $dater[0];
-	$mo    = $dater[1];
+	$dater     = explode( '-', $alldriver['eve_start'] );
+	$yr        = $dater[0];
+	$mo        = $dater[1];
 	$month_key = $yr . $mo;
 
 	// ── Open new month group when month changes ──────────────────────────
 	if ( $current_month !== $month_key ) {
 
-		// Close previous month grid + group.
 		if ( $current_month !== null ) {
 			echo '</div></div>'; // .hostlinks-grid + .hostlinks-month-group
 		}

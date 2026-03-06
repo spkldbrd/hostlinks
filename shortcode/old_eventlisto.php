@@ -13,20 +13,58 @@ $selectedYear = ( isset( $_GET['syear'] ) && $_GET['syear'] !== '' )
 	? (int) $_GET['syear']
 	: $currentYear;
 
+// ── Focus filter ──────────────────────────────────────────────────────────────
+$focus_id = isset( $_GET['focus'] ) ? (int) $_GET['focus'] : 0;
+
+// Load active marketers for the Focus dropdown.
+$marketers = $wpdb->get_results(
+	"SELECT event_marketer_id, event_marketer_name
+	 FROM {$table13}
+	 WHERE event_marketer_status = 1
+	 ORDER BY event_marketer_name ASC"
+);
+
+// Resolve the focused marketer's display name (for the empty-state message).
+$focus_name = '';
+if ( $focus_id > 0 ) {
+	foreach ( $marketers as $mk ) {
+		if ( (int) $mk->event_marketer_id === $focus_id ) {
+			$focus_name = $mk->event_marketer_name;
+			break;
+		}
+	}
+}
+
 // ── Single JOIN query — replaces 3 per-row lookups (N+1 fix) ─────────────────
-$all_pending_bookings = $wpdb->get_results( $wpdb->prepare(
-	"SELECT e.*,
-	        t.event_type_name,
-	        m.event_marketer_name,
-	        i.event_instructor_name
-	 FROM {$table11} e
-	 LEFT JOIN {$table12} t ON e.eve_type        = t.event_type_id
-	 LEFT JOIN {$table13} m ON e.eve_marketer    = m.event_marketer_id
-	 LEFT JOIN {$table14} i ON e.eve_instructor  = i.event_instructor_id
-	 WHERE e.eve_status = '1' AND e.eve_start LIKE %s
-	 ORDER BY e.eve_start ASC",
-	$selectedYear . '%'
-), ARRAY_A );
+if ( $focus_id > 0 ) {
+	$all_pending_bookings = $wpdb->get_results( $wpdb->prepare(
+		"SELECT e.*,
+		        t.event_type_name,
+		        m.event_marketer_name,
+		        i.event_instructor_name
+		 FROM {$table11} e
+		 LEFT JOIN {$table12} t ON e.eve_type        = t.event_type_id
+		 LEFT JOIN {$table13} m ON e.eve_marketer    = m.event_marketer_id
+		 LEFT JOIN {$table14} i ON e.eve_instructor  = i.event_instructor_id
+		 WHERE e.eve_status = '1' AND e.eve_start LIKE %s AND e.eve_marketer = %d
+		 ORDER BY e.eve_start ASC",
+		$selectedYear . '%', $focus_id
+	), ARRAY_A );
+} else {
+	$all_pending_bookings = $wpdb->get_results( $wpdb->prepare(
+		"SELECT e.*,
+		        t.event_type_name,
+		        m.event_marketer_name,
+		        i.event_instructor_name
+		 FROM {$table11} e
+		 LEFT JOIN {$table12} t ON e.eve_type        = t.event_type_id
+		 LEFT JOIN {$table13} m ON e.eve_marketer    = m.event_marketer_id
+		 LEFT JOIN {$table14} i ON e.eve_instructor  = i.event_instructor_id
+		 WHERE e.eve_status = '1' AND e.eve_start LIKE %s
+		 ORDER BY e.eve_start ASC",
+		$selectedYear . '%'
+	), ARRAY_A );
+}
 
 // ── Pass 1: pre-calculate monthly totals ─────────────────────────────────────
 $totals = array();
@@ -62,8 +100,9 @@ $page_url      = get_permalink();
 <div class="hostlinks-container">
 
 	<div class="hostlinks-actions">
-		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn">Upcoming Events</a>
+		<a href="<?php echo esc_url( $upcoming_url . ( $focus_id ? '?focus=' . $focus_id : '' ) ); ?>" class="hostlinks-btn">Upcoming Events</a>
 		<a href="<?php echo esc_url( $page_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Past Events</a>
+
 		<select id="hl-old-chooseyear" class="hostlinks-year-filter" aria-label="Filter by year">
 			<?php
 			$yearStart = 2022;
@@ -74,15 +113,39 @@ $page_url      = get_permalink();
 			}
 			?>
 		</select>
+
+		<select id="hl-focus-marketer" class="hostlinks-year-filter" aria-label="Focus by marketer">
+			<option value="0" <?php selected( $focus_id, 0 ); ?>>All Marketers</option>
+			<?php foreach ( $marketers as $mk ) : ?>
+			<option value="<?php echo (int) $mk->event_marketer_id; ?>" <?php selected( $focus_id, (int) $mk->event_marketer_id ); ?>>
+				<?php echo esc_html( $mk->event_marketer_name ); ?>
+			</option>
+			<?php endforeach; ?>
+		</select>
+
 		<script>
-		document.getElementById('hl-old-chooseyear').addEventListener('change', function() {
-			window.location.href = '<?php echo esc_js( $page_url ); ?>?syear=' + this.value;
-		});
+		(function() {
+			function hlOldNav() {
+				var yr  = document.getElementById('hl-old-chooseyear').value;
+				var fk  = document.getElementById('hl-focus-marketer').value;
+				var url = '<?php echo esc_js( $page_url ); ?>?syear=' + yr;
+				if ( fk && fk !== '0' ) { url += '&focus=' + fk; }
+				window.location.href = url;
+			}
+			document.getElementById('hl-old-chooseyear').addEventListener('change', hlOldNav);
+			document.getElementById('hl-focus-marketer').addEventListener('change', hlOldNav);
+		})();
 		</script>
 	</div>
 
+<?php
+$empty_msg = $focus_name
+	? 'No events found for ' . esc_html( $focus_name ) . ' in ' . $selectedYear . '.'
+	: 'No events found for ' . (int) $selectedYear . '.';
+?>
+
 <?php if ( empty( $all_pending_bookings ) ) : ?>
-	<div class="hostlinks-empty">No events found for <?php echo (int) $selectedYear; ?>.</div>
+	<div class="hostlinks-empty"><?php echo $empty_msg; ?></div>
 <?php else : ?>
 
 <?php foreach ( $all_pending_bookings as $alldriver ) :

@@ -212,11 +212,13 @@ class Hostlinks_CVENT_API {
 	}
 
 	/**
-	 * Retrieve ALL attendees for an event, handling token-based pagination.
+	 * Retrieve ALL registrations for an event, handling token-based pagination.
 	 * Uses page size of 200 to minimise call count (free tier: 1,000 calls/day).
 	 *
+	 * CVENT Developer Platform uses /registrations not /attendees.
+	 *
 	 * @param string $event_id CVENT event UUID.
-	 * @return array|WP_Error  Flat array of attendee records.
+	 * @return array|WP_Error  Flat array of registration records.
 	 */
 	public static function get_attendees( $event_id ) {
 		$all       = array();
@@ -230,7 +232,7 @@ class Hostlinks_CVENT_API {
 				$params['token'] = $next;
 			}
 
-			$result = self::request( 'events/' . $event_id . '/attendees', $params );
+			$result = self::request( 'events/' . $event_id . '/registrations', $params );
 			if ( is_wp_error( $result ) ) {
 				return $result;
 			}
@@ -321,7 +323,7 @@ class Hostlinks_CVENT_API {
 			if ( $next ) {
 				$params['token'] = $next;
 			}
-			$result = self::request( 'events/' . $event_id . '/attendees', $params );
+			$result = self::request( 'events/' . $event_id . '/registrations', $params );
 			$calls++;
 			if ( is_wp_error( $result ) ) {
 				return $result;

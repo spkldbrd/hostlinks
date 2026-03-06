@@ -103,6 +103,10 @@ if ( false === $reports_page_url ) {
 	$reports_page_url = $rid ? get_permalink( (int) $rid ) : '';
 	set_transient( 'hostlinks_reports_page_url', $reports_page_url, DAY_IN_SECONDS );
 }
+
+$_upd_raw     = get_option( 'last_data_updation', '' );
+$_upd_dt      = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;
+$last_updated = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->format( 'm/d' );
 ?>
 <div class="hostlinks-page">
 <div class="hostlinks-container">
@@ -147,6 +151,7 @@ if ( false === $reports_page_url ) {
 			document.getElementById('hl-focus-marketer').addEventListener('change', hlOldNav);
 		})();
 		</script>
+		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
 	</div>
 
 <?php

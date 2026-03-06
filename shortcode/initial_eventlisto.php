@@ -101,7 +101,10 @@ $upcoming_url    = home_url( '/' );
 <div class="hostlinks-container">
 
 	<div class="hostlinks-actions">
-		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Upcoming Events</a>
+		<div style="display:flex;flex-direction:column;align-items:flex-start;gap:3px;">
+			<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn hostlinks-btn--active">Upcoming Events</a>
+			<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
+		</div>
 		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
 
 		<select id="hl-focus-marketer" class="hostlinks-year-filter" aria-label="Focus by marketer">
@@ -120,8 +123,6 @@ $upcoming_url    = home_url( '/' );
 			window.location.href = url;
 		});
 		</script>
-
-		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
 	</div>
 
 <?php

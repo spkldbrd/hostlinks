@@ -12,7 +12,7 @@ class Hostlinks_Assets {
 
 	public function enqueue_frontend() {
 		global $post;
-		// Only load Bootstrap on pages that actually contain a Hostlinks shortcode.
+		// Only load on pages that contain a Hostlinks shortcode.
 		if ( ! $post instanceof WP_Post ) {
 			return;
 		}
@@ -20,10 +20,9 @@ class Hostlinks_Assets {
 		     ! has_shortcode( $post->post_content, 'oldeventlisto' ) ) {
 			return;
 		}
-		// Only Bootstrap is needed for the frontend event table layout (.card, .col-lg-12).
 		wp_enqueue_style(
-			'hostlinks-bootstrap',
-			HOSTLINKS_PLUGIN_URL . 'assets/css/bootstrap.min.css',
+			'hostlinks-calendar',
+			HOSTLINKS_PLUGIN_URL . 'assets/css/hostlinks-calendar.css',
 			array(),
 			HOSTLINKS_VERSION
 		);

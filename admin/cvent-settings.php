@@ -7,10 +7,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 $schedule_notice = '';
 if ( isset( $_POST['hostlinks_cvent_schedule_save'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_settings' );
+	$sched_days = array_map( 'intval', (array) ( $_POST['cvent_schedule_days'] ?? array() ) );
 	Hostlinks_CVENT_Scheduler::save_settings(
 		! empty( $_POST['cvent_schedule_enabled'] ),
-		$_POST['cvent_schedule_hour']   ?? 2,
-		$_POST['cvent_schedule_minute'] ?? 0
+		$_POST['cvent_schedule_hour']       ?? 9,
+		$_POST['cvent_schedule_minute']     ?? 0,
+		$sched_days,
+		$_POST['cvent_schedule_offset_max'] ?? 45
 	);
 	// Immediately apply the new schedule.
 	Hostlinks_CVENT_Scheduler::maybe_reschedule();
@@ -234,7 +237,7 @@ $s = Hostlinks_CVENT_API::get_settings();
 	$next_run  = Hostlinks_CVENT_Scheduler::next_run_display();
 	$tz_label  = wp_timezone_string();
 	?>
-	<p>Automatically run a full CVENT sync every day at a set time. Only events from the last 60 days forward are processed. Dry-run mode is <strong>not</strong> used — results are written to the database.</p>
+	<p>Automatically run a full CVENT sync on selected days at a set time with a random offset to make the schedule appear natural. Only events from the last 60 days forward are processed. Dry-run mode is <strong>not</strong> used — results are written live.</p>
 
 	<?php if ( $last_log ) : ?>
 	<table class="widefat striped" style="max-width:500px;margin-bottom:12px;">
@@ -261,21 +264,38 @@ $s = Hostlinks_CVENT_API::get_settings();
 		<?php wp_nonce_field( 'hostlinks_cvent_settings' ); ?>
 		<table class="form-table" role="presentation">
 			<tr>
-				<th scope="row">Enable daily sync</th>
+				<th scope="row">Enable auto-sync</th>
 				<td>
 					<label>
 						<input type="checkbox" name="cvent_schedule_enabled" value="1"
 							<?php checked( $sched['enabled'] ); ?> />
-						Run CVENT sync automatically every day
+						Run CVENT sync automatically on selected days
 					</label>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label>Time of day</label></th>
+				<th scope="row"><label>Run on days</label></th>
+				<td>
+					<?php
+					$day_labels = array( 0 => 'Sun', 1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat' );
+					$sched_days = isset( $sched['days'] ) ? (array) $sched['days'] : array( 1, 2, 3, 4, 5 );
+					foreach ( $day_labels as $d => $label ) :
+					?>
+					<label style="margin-right:14px;display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
+						<input type="checkbox" name="cvent_schedule_days[]" value="<?php echo $d; ?>"
+							<?php checked( in_array( $d, $sched_days, true ) ); ?> />
+						<?php echo $label; ?>
+					</label>
+					<?php endforeach; ?>
+					<p class="description" style="margin-top:6px;">Default: Mon – Fri (weekdays only).</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label>Base time</label></th>
 				<td>
 					<select name="cvent_schedule_hour" style="width:80px;">
 					<?php for ( $h = 0; $h < 24; $h++ ) : ?>
-						<option value="<?php echo $h; ?>" <?php selected( $sched['hour'], $h ); ?>>
+						<option value="<?php echo $h; ?>" <?php selected( (int) $sched['hour'], $h ); ?>>
 							<?php echo str_pad( $h, 2, '0', STR_PAD_LEFT ); ?>
 						</option>
 					<?php endfor; ?>
@@ -283,12 +303,25 @@ $s = Hostlinks_CVENT_API::get_settings();
 					:
 					<select name="cvent_schedule_minute" style="width:80px;">
 					<?php foreach ( array( 0, 15, 30, 45 ) as $m ) : ?>
-						<option value="<?php echo $m; ?>" <?php selected( $sched['minute'], $m ); ?>>
+						<option value="<?php echo $m; ?>" <?php selected( (int) $sched['minute'], $m ); ?>>
 							<?php echo str_pad( $m, 2, '0', STR_PAD_LEFT ); ?>
 						</option>
 					<?php endforeach; ?>
 					</select>
-					<p class="description">Site timezone: <strong><?php echo esc_html( $tz_label ); ?></strong>. Recommended: run between midnight and 4 AM to stay within free-tier API limits.</p>
+					<p class="description">Site timezone: <strong><?php echo esc_html( $tz_label ); ?></strong>. Default: 9:00 AM.</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label>Random offset</label></th>
+				<td>
+					<select name="cvent_schedule_offset_max" style="width:130px;">
+					<?php foreach ( array( 0, 15, 30, 45, 60 ) as $o ) : ?>
+						<option value="<?php echo $o; ?>" <?php selected( (int) ( $sched['offset_max'] ?? 45 ), $o ); ?>>
+							± <?php echo $o; ?> minutes
+						</option>
+					<?php endforeach; ?>
+					</select>
+					<p class="description">A random offset is added or subtracted from the base time on each run, making the schedule look like a human triggered it. Default: ±45 min.</p>
 				</td>
 			</tr>
 		</table>

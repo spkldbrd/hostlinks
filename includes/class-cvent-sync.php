@@ -192,9 +192,13 @@ class Hostlinks_CVENT_Sync {
 			} elseif ( is_wp_error( $check ) ) {
 				return self::result( $eve_id, 'error', $check->get_error_message(), hl_paid: $hl_paid, hl_free: $hl_free, dry_run: $dry_run );
 			} else {
-				// Extract registration URL while we have the event object.
-				$cvent_reg_url = $check['registrationUrl'] ?? $check['publicRegistrationUrl'] ?? $check['websiteLink'] ?? '';
-				// Verify staleness hash hasn't changed drastically.
+			// Extract registration URL while we have the event object.
+			// Fallback: if none of the top-level fields are populated, query /weblinks.
+			$cvent_reg_url = self::resolve_reg_url(
+				$stored_id,
+				$check['registrationUrl'] ?? $check['publicRegistrationUrl'] ?? $check['websiteLink'] ?? ''
+			);
+			// Verify staleness hash hasn't changed drastically.
 				$new_hash = Hostlinks_CVENT_Matcher::staleness_hash( $check );
 				if ( $new_hash !== ( $row['cvent_staleness_hash'] ?? '' ) ) {
 					if ( ! $dry_run ) {
@@ -223,11 +227,15 @@ class Hostlinks_CVENT_Sync {
 				return self::result( $eve_id, 'no_candidates', 'No CVENT events found in date window.', hl_paid: $hl_paid, hl_free: $hl_free, dry_run: $dry_run );
 			}
 
-		$best  = $match['best'];
-		$score = $match['best_score'];
-		$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $best );
-		// Grab registration URL from the matched event object.
-		$cvent_reg_url = $best['registrationUrl'] ?? $best['publicRegistrationUrl'] ?? $best['websiteLink'] ?? '';
+	$best  = $match['best'];
+	$score = $match['best_score'];
+	$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $best );
+	// Grab registration URL from the matched event object.
+	// Fallback: if none of the top-level fields are populated, query /weblinks.
+	$cvent_reg_url = self::resolve_reg_url(
+		Hostlinks_CVENT_API::sanitize_uuid( $best['id'] ),
+		$best['registrationUrl'] ?? $best['publicRegistrationUrl'] ?? $best['websiteLink'] ?? ''
+	);
 
 			if ( ! $dry_run ) {
 				$bootstrap_data = array(
@@ -709,6 +717,32 @@ class Hostlinks_CVENT_Sync {
 	// -------------------------------------------------------------------------
 	// Internal helpers
 	// -------------------------------------------------------------------------
+
+	/**
+	 * If $url is blank, call GET /ea/events/{id}/weblinks and return the URL of
+	 * the first weblink whose name or type contains "registr" (case-insensitive).
+	 * Returns empty string on any failure or if no registration link is found.
+	 *
+	 * @param string $cvent_id  Sanitized CVENT event UUID.
+	 * @param string $url       URL already extracted from the event object (may be blank).
+	 * @return string
+	 */
+	private static function resolve_reg_url( $cvent_id, $url ) {
+		if ( $url ) {
+			return $url;
+		}
+		$weblinks = Hostlinks_CVENT_API::get_event_weblinks( $cvent_id );
+		if ( is_wp_error( $weblinks ) || empty( $weblinks ) ) {
+			return '';
+		}
+		foreach ( $weblinks as $link ) {
+			$label = strtolower( ( $link['name'] ?? '' ) . ' ' . ( $link['type'] ?? '' ) );
+			if ( false !== strpos( $label, 'registr' ) ) {
+				return $link['url'] ?? '';
+			}
+		}
+		return '';
+	}
 
 	private static function result( $eve_id, $action, $message, $paid = null, $free = null, $cvent_title = null, $cvent_id = null, $score = null, bool $dry_run = false, $hl_paid = null, $hl_free = null ) {
 		return array(

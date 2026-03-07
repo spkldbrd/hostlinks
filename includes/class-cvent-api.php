@@ -312,6 +312,26 @@ class Hostlinks_CVENT_API {
 	}
 
 	/**
+	 * Retrieve the weblinks collection for a CVENT event.
+	 *
+	 * The registration URL is often only available here and not in the main event
+	 * object fields (registrationUrl / publicRegistrationUrl / websiteLink).
+	 *
+	 * Endpoint: GET /ea/events/{eventId}/weblinks
+	 *
+	 * @param string $event_id CVENT event UUID.
+	 * @return array|WP_Error  Flat array of weblink records (each typically has
+	 *                         'name', 'type', and 'url' keys). WP_Error on failure.
+	 */
+	public static function get_event_weblinks( $event_id ) {
+		$result = self::request( 'events/' . self::sanitize_uuid( $event_id ) . '/weblinks' );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return isset( $result['data'] ) ? $result['data'] : array();
+	}
+
+	/**
 	 * Retrieve ALL attendees for a CVENT event, handling token-based pagination.
 	 * Uses the confirmed endpoint: GET /ea/attendees/filter?filter=eventId eq {id}
 	 * Uses page size of 200 to minimise call count (free tier: 1,000 calls/day).

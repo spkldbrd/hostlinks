@@ -131,6 +131,22 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			$reg_url_found = $event_obj['registrationUrl'] ?? $event_obj['publicRegistrationUrl'] ?? $event_obj['websiteLink'] ?? '';
 		}
 
+		// Weblinks probe — fetch /weblinks endpoint as fallback source for Reg URL.
+		$weblinks_raw    = Hostlinks_CVENT_API::get_event_weblinks( $diag_id );
+		$weblinks_data   = is_wp_error( $weblinks_raw ) ? array() : $weblinks_raw;
+		$weblinks_error  = is_wp_error( $weblinks_raw ) ? $weblinks_raw->get_error_message() : null;
+		// Replicate resolve_reg_url() fallback logic for display.
+		$weblinks_reg_url = '';
+		if ( ! $reg_url_found && ! empty( $weblinks_data ) ) {
+			foreach ( $weblinks_data as $wl ) {
+				$label = strtolower( ( $wl['name'] ?? '' ) . ' ' . ( $wl['type'] ?? '' ) );
+				if ( false !== strpos( $label, 'registr' ) ) {
+					$weblinks_reg_url = $wl['url'] ?? '';
+					break;
+				}
+			}
+		}
+
 		// Full order-items fetch using current production code path.
 		$order_items = Hostlinks_CVENT_API::get_order_items( $diag_id );
 
@@ -164,6 +180,9 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			'reg_url_fields'   => $reg_url_fields,
 			'reg_url_found'    => $reg_url_found,
 			'event_obj_error'  => is_wp_error( $event_obj ) ? $event_obj->get_error_message() : null,
+			'weblinks_data'    => $weblinks_data,
+			'weblinks_error'   => $weblinks_error,
+			'weblinks_reg_url' => $weblinks_reg_url,
 			'is_error'         => is_wp_error( $order_items ),
 			'error_msg'        => is_wp_error( $order_items ) ? $order_items->get_error_message() : null,
 			'count'            => is_wp_error( $order_items ) ? null : count( $order_items ),
@@ -519,12 +538,48 @@ $s = Hostlinks_CVENT_API::get_settings();
 				<?php endforeach; ?>
 				</tbody>
 			</table>
-			<?php if ( $diag_result['reg_url_found'] ) : ?>
-				<p><strong style="color:#0a6b00;">&#10003; Reg URL the plugin would use:</strong> <code><?php echo esc_html( $diag_result['reg_url_found'] ); ?></code></p>
-			<?php else : ?>
-				<p><strong style="color:#d63638;">&#9888; Plugin would extract an empty string.</strong> None of the three tried fields (<code>registrationUrl</code>, <code>publicRegistrationUrl</code>, <code>websiteLink</code>) contained a value. If a different key above has the URL, the three-way fallback in <code>sync_one()</code> needs updating.</p>
-			<?php endif; ?>
+		<?php if ( $diag_result['reg_url_found'] ) : ?>
+			<p><strong style="color:#0a6b00;">&#10003; Reg URL the plugin would use (from event object):</strong> <code><?php echo esc_html( $diag_result['reg_url_found'] ); ?></code></p>
+		<?php else : ?>
+			<p><strong style="color:#888;">&#9888; Event object returned empty URL.</strong> None of the three tried fields (<code>registrationUrl</code>, <code>publicRegistrationUrl</code>, <code>websiteLink</code>) contained a value. The plugin will automatically try the <strong>Weblinks endpoint</strong> as a fallback &mdash; see probe below.</p>
 		<?php endif; ?>
+	<?php endif; ?>
+
+	<?php // ── Weblinks probe ──────────────────────────────────────────────────── ?>
+	<h4>Weblinks probe (<code>GET /ea/events/{UUID}/weblinks</code>)</h4>
+	<?php if ( $diag_result['weblinks_error'] ) : ?>
+		<p style="color:#d63638;"><strong>Weblinks fetch failed:</strong> <?php echo esc_html( $diag_result['weblinks_error'] ); ?></p>
+	<?php elseif ( empty( $diag_result['weblinks_data'] ) ) : ?>
+		<p style="color:#888;">No weblinks returned for this event (empty array). This may mean the event has no registration page configured in CVENT yet.</p>
+	<?php else : ?>
+		<p style="font-size:12px;color:#555;">The plugin uses the first weblink whose <code>name</code> or <code>type</code> contains <code>registr</code> (case-insensitive) as the fallback Reg URL when the event object fields are blank.</p>
+		<table class="widefat striped" style="max-width:750px;margin-bottom:8px;">
+			<thead><tr><th style="width:180px;">name</th><th style="width:130px;">type</th><th>url</th><th style="width:80px;">Plugin uses?</th></tr></thead>
+			<tbody>
+			<?php
+			foreach ( $diag_result['weblinks_data'] as $wl ) :
+				$wl_name  = $wl['name'] ?? '';
+				$wl_type  = $wl['type'] ?? '';
+				$wl_url   = $wl['url']  ?? '';
+				$is_reg   = ( false !== stripos( $wl_name . ' ' . $wl_type, 'registr' ) );
+			?>
+				<tr style="<?php echo $is_reg ? 'background:#e6f4ea;' : ''; ?>">
+					<td><?php echo esc_html( $wl_name ); ?></td>
+					<td><code style="font-size:11px;"><?php echo esc_html( $wl_type ); ?></code></td>
+					<td style="word-break:break-all;"><code style="font-size:11px;"><?php echo esc_html( $wl_url ); ?></code></td>
+					<td><?php echo $is_reg ? '<span style="color:#0a6b00;">&#10003; yes</span>' : '<span style="color:#999;">no</span>'; ?></td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+		<?php if ( $diag_result['weblinks_reg_url'] ) : ?>
+			<p><strong style="color:#0a6b00;">&#10003; Fallback Reg URL the plugin would use:</strong> <code><?php echo esc_html( $diag_result['weblinks_reg_url'] ); ?></code></p>
+		<?php elseif ( ! $diag_result['reg_url_found'] ) : ?>
+			<p><strong style="color:#d63638;">&#9888; No registration weblink found.</strong> No weblink entry had a name/type containing <code>registr</code>. The Reg URL field will remain blank after sync until a registration link is published in CVENT.</p>
+		<?php else : ?>
+			<p style="color:#888;">(Weblinks fallback not needed — Reg URL already found in event object above.)</p>
+		<?php endif; ?>
+	<?php endif; ?>
 
 		<?php if ( ! $diag_result['is_error'] ) : ?>
 		<h4>Active/inactive breakdown (all <?php echo (int) $diag_result['count']; ?> order items)</h4>

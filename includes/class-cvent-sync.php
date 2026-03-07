@@ -230,18 +230,25 @@ class Hostlinks_CVENT_Sync {
 		$cvent_reg_url = $best['registrationUrl'] ?? $best['publicRegistrationUrl'] ?? $best['websiteLink'] ?? '';
 
 			if ( ! $dry_run ) {
+				$bootstrap_data = array(
+					'cvent_event_id'        => $best['id'],
+					'cvent_event_title'     => $best['title'] ?? '',
+					'cvent_event_start_utc' => isset( $best['start'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $best['start'] ) ) : null,
+					'cvent_match_score'     => $score,
+					'cvent_match_status'    => $match['status'],
+					'cvent_staleness_hash'  => $hash,
+				);
+				$bootstrap_fmt  = array( '%s', '%s', '%s', '%d', '%s', '%s' );
+				// Also write Reg URL on first match if the field is currently blank.
+				if ( $cvent_reg_url && empty( $row['eve_trainer_url'] ) ) {
+					$bootstrap_data['eve_trainer_url'] = esc_url_raw( $cvent_reg_url );
+					$bootstrap_fmt[]                   = '%s';
+				}
 				$wpdb->update(
 					$table,
-					array(
-						'cvent_event_id'        => $best['id'],
-						'cvent_event_title'     => $best['title'] ?? '',
-						'cvent_event_start_utc' => isset( $best['start'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $best['start'] ) ) : null,
-						'cvent_match_score'     => $score,
-						'cvent_match_status'    => $match['status'],
-						'cvent_staleness_hash'  => $hash,
-					),
+					$bootstrap_data,
 					array( 'eve_id' => $eve_id ),
-					array( '%s', '%s', '%s', '%d', '%s', '%s' ),
+					$bootstrap_fmt,
 					array( '%d' )
 				);
 			}

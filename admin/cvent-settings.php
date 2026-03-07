@@ -117,6 +117,20 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			);
 		}
 
+		// Reg URL field probe — fetch full event object and find all URL-related keys.
+		$event_obj       = Hostlinks_CVENT_API::get_event( $diag_id );
+		$reg_url_fields  = array();
+		$reg_url_found   = '';
+		if ( ! is_wp_error( $event_obj ) && is_array( $event_obj ) ) {
+			foreach ( $event_obj as $k => $v ) {
+				if ( preg_match( '/url|link|registr/i', $k ) ) {
+					$reg_url_fields[ $k ] = is_string( $v ) ? $v : '(' . gettype( $v ) . ')';
+				}
+			}
+			// Replicate the exact extraction logic used in sync_one().
+			$reg_url_found = $event_obj['registrationUrl'] ?? $event_obj['publicRegistrationUrl'] ?? $event_obj['websiteLink'] ?? '';
+		}
+
 		// Full order-items fetch using current production code path.
 		$order_items = Hostlinks_CVENT_API::get_order_items( $diag_id );
 
@@ -147,6 +161,9 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			'primary_url'      => Hostlinks_CVENT_API::BASE_URL . 'events/' . $diag_id . '/orders/items?' .
 			                      http_build_query( array( 'limit' => 5 ), '', '&', PHP_QUERY_RFC3986 ),
 			'endpoint_results' => $endpoint_results,
+			'reg_url_fields'   => $reg_url_fields,
+			'reg_url_found'    => $reg_url_found,
+			'event_obj_error'  => is_wp_error( $event_obj ) ? $event_obj->get_error_message() : null,
 			'is_error'         => is_wp_error( $order_items ),
 			'error_msg'        => is_wp_error( $order_items ) ? $order_items->get_error_message() : null,
 			'count'            => is_wp_error( $order_items ) ? null : count( $order_items ),
@@ -477,8 +494,40 @@ $s = Hostlinks_CVENT_API::get_settings();
 			</table>
 			<?php endif; ?>
 
-			<?php if ( ! $diag_result['is_error'] ) : ?>
-			<h4>Active/inactive breakdown (all <?php echo (int) $diag_result['count']; ?> order items)</h4>
+		<?php // ── Reg URL field probe ──────────────────────────────────────────────── ?>
+		<h4>Reg URL field probe (from <code>GET /ea/events/{UUID}</code>)</h4>
+		<?php if ( ! empty( $diag_result['event_obj_error'] ) ) : ?>
+			<p style="color:#d63638;"><strong>get_event() failed:</strong> <?php echo esc_html( $diag_result['event_obj_error'] ); ?></p>
+		<?php elseif ( empty( $diag_result['reg_url_fields'] ) ) : ?>
+			<p style="color:#888;">No keys containing <code>url</code>, <code>link</code>, or <code>registr</code> were found in the event object.</p>
+		<?php else : ?>
+			<p style="font-size:12px;color:#555;">These are every key in the CVENT event object whose name contains <code>url</code>, <code>link</code>, or <code>registr</code>. The plugin tries <code>registrationUrl</code> → <code>publicRegistrationUrl</code> → <code>websiteLink</code> in that order.</p>
+			<table class="widefat striped" style="max-width:700px;margin-bottom:8px;">
+				<thead><tr><th style="width:220px;">Field name</th><th>Value</th><th>Plugin uses?</th></tr></thead>
+				<tbody>
+				<?php
+				$plugin_tries = array( 'registrationUrl', 'publicRegistrationUrl', 'websiteLink' );
+				foreach ( $diag_result['reg_url_fields'] as $field_key => $field_val ) :
+					$is_tried  = in_array( $field_key, $plugin_tries, true );
+					$has_value = ( $field_val && $field_val !== '(NULL)' && $field_val !== '(array)' );
+				?>
+					<tr style="<?php echo ( $is_tried && $has_value ) ? 'background:#e6f4ea;' : ( $is_tried ? 'background:#fffbe6;' : '' ); ?>">
+						<td><code><?php echo esc_html( $field_key ); ?></code></td>
+						<td style="word-break:break-all;"><?php echo $has_value ? '<code style="font-size:11px;">' . esc_html( $field_val ) . '</code>' : '<span style="color:#999;">empty / null</span>'; ?></td>
+						<td><?php echo $is_tried ? '<span style="color:#0a6b00;">&#10003; yes</span>' : '<span style="color:#999;">no</span>'; ?></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<?php if ( $diag_result['reg_url_found'] ) : ?>
+				<p><strong style="color:#0a6b00;">&#10003; Reg URL the plugin would use:</strong> <code><?php echo esc_html( $diag_result['reg_url_found'] ); ?></code></p>
+			<?php else : ?>
+				<p><strong style="color:#d63638;">&#9888; Plugin would extract an empty string.</strong> None of the three tried fields (<code>registrationUrl</code>, <code>publicRegistrationUrl</code>, <code>websiteLink</code>) contained a value. If a different key above has the URL, the three-way fallback in <code>sync_one()</code> needs updating.</p>
+			<?php endif; ?>
+		<?php endif; ?>
+
+		<?php if ( ! $diag_result['is_error'] ) : ?>
+		<h4>Active/inactive breakdown (all <?php echo (int) $diag_result['count']; ?> order items)</h4>
 			<p style="font-size:12px;color:#555;">The API returns no <code>status</code> field. Cancellation is indicated by <code>"active": false</code>.</p>
 			<table class="widefat striped" style="max-width:500px;margin-bottom:12px;">
 				<thead><tr><th>Field value</th><th>Count</th><th>Plugin action</th></tr></thead>

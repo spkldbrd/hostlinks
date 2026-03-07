@@ -244,7 +244,7 @@ $empty_msg = $focus_name
 				<div class="hostlinks-card-links">
 					<a href="<?php echo esc_url( $alldriver['eve_roster_url'] ); ?>" class="hostlinks-roster-link" target="_blank">Roster</a>
 					<?php if ( ! empty( $alldriver['eve_trainer_url'] ) ) : ?>
-					&nbsp;|&nbsp;<a href="<?php echo esc_url( $alldriver['eve_trainer_url'] ); ?>" class="hostlinks-roster-link" target="_blank">TR</a>
+					&nbsp;|&nbsp;<a href="<?php echo esc_url( $alldriver['eve_trainer_url'] ); ?>" class="hostlinks-roster-link" target="_blank">Reg</a>
 					<?php endif; ?>
 					<?php if ( ! empty( $alldriver['eve_sign_in_url'] ) ) : ?>
 					&nbsp;|&nbsp;<a href="<?php echo esc_url( $alldriver['eve_sign_in_url'] ); ?>" class="hostlinks-roster-link" target="_blank">SI</a>

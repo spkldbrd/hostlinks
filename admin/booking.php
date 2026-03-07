@@ -116,7 +116,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <td><input type="text" value="#" id="eve_roster_url" name="eve_roster_url" required></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_trainer_url">TRAINER URL</label></th>
+        <th><label for="eve_trainer_url">REG URL</label></th>
         <td><input type="text" value="" id="eve_trainer_url" name="eve_trainer_url"></td>
       </tr>
       <tr class="form-field">
@@ -262,7 +262,7 @@ jQuery(function() {
         <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_roster_url ?? '' ); ?>" id="eve_roster_url" name="eve_roster_url" required></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_trainer_url">TRAINER URL</label></th>
+        <th><label for="eve_trainer_url">REG URL</label></th>
         <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_trainer_url ?? '' ); ?>" id="eve_trainer_url" name="eve_trainer_url"></td>
       </tr>
       <tr class="form-field">
@@ -474,7 +474,7 @@ jQuery(function() {
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
             <th>Location</th><th>Paid</th><th>Free</th><th>Date</th>
             <th>Type</th><th>Zoom</th><th>Marketer</th>
-            <th>HOST URL</th><th>ROSTER URL</th><th>TRAINER URL</th><th>Sign In URL</th><th>Instructor</th>
+            <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>Sign In URL</th><th>Instructor</th>
           </tr>
         </thead>
         <tbody id="the-list">

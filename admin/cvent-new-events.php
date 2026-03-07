@@ -257,11 +257,12 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 			$start_val  = $start_dt  ? $start_dt->format( 'Y-m-d' )  : '';
 			$end_val    = $end_dt    ? $end_dt->format( 'Y-m-d' )    : '';
 
-			// Pre-fill logic.
-			$prefilled_loc = Hostlinks_CVENT_Matcher::title_location_from_cvent( $title );
-			$is_zoom       = ( false !== stripos( $title, 'zoom' ) || false !== stripos( $title, 'webinar' ) );
-			$guessed_type  = hostlinks_cvent_guess_type( $title, $type_keyword_map );
-			$form_id       = 'cvent-add-form-' . $idx;
+		// Pre-fill logic.
+		$prefilled_loc = Hostlinks_CVENT_Matcher::title_location_from_cvent( $title );
+		$is_zoom       = ( false !== stripos( $title, 'zoom' ) || false !== stripos( $title, 'webinar' ) );
+		$guessed_type  = hostlinks_cvent_guess_type( $title, $type_keyword_map );
+		$reg_url       = $ev['registrationUrl'] ?? $ev['publicRegistrationUrl'] ?? $ev['websiteLink'] ?? '';
+		$form_id       = 'cvent-add-form-' . $idx;
 		?>
 		<tr>
 			<td><strong><?php echo esc_html( $title ); ?></strong></td>
@@ -416,10 +417,13 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 							</td>
 						</tr>
 						<tr>
-							<th style="padding:6px 10px;font-weight:600;"><label>Trainer URL</label></th>
+							<th style="padding:6px 10px;font-weight:600;"><label>Reg URL</label></th>
 							<td style="padding:6px 10px;">
-								<input type="url" name="eve_trainer_url" value=""
+								<input type="url" name="eve_trainer_url" value="<?php echo esc_attr( $reg_url ); ?>"
 									style="width:360px;" placeholder="https://">
+								<?php if ( $reg_url ) : ?>
+								<span style="color:#2271b1;font-size:11px;margin-left:8px;">✓ pre-filled from CVENT</span>
+								<?php endif; ?>
 							</td>
 						</tr>
 						<tr>

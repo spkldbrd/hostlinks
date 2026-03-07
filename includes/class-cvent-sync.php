@@ -176,6 +176,9 @@ class Hostlinks_CVENT_Sync {
 		$stored_id = Hostlinks_CVENT_API::sanitize_uuid( $row['cvent_event_id'] ?? '' );
 		$status    = $row['cvent_match_status'] ?? 'unlinked';
 
+		// Registration URL from CVENT — populated once the event object is in hand.
+		$cvent_reg_url = '';
+
 		// ── Step 1: verify stored CVENT ID ───────────────────────────────────
 		if ( $stored_id && in_array( $status, array( 'auto', 'manual' ), true ) ) {
 			$check = Hostlinks_CVENT_API::get_event( $stored_id );
@@ -189,6 +192,8 @@ class Hostlinks_CVENT_Sync {
 			} elseif ( is_wp_error( $check ) ) {
 				return self::result( $eve_id, 'error', $check->get_error_message(), hl_paid: $hl_paid, hl_free: $hl_free, dry_run: $dry_run );
 			} else {
+				// Extract registration URL while we have the event object.
+				$cvent_reg_url = $check['registrationUrl'] ?? $check['publicRegistrationUrl'] ?? $check['websiteLink'] ?? '';
 				// Verify staleness hash hasn't changed drastically.
 				$new_hash = Hostlinks_CVENT_Matcher::staleness_hash( $check );
 				if ( $new_hash !== ( $row['cvent_staleness_hash'] ?? '' ) ) {
@@ -218,9 +223,11 @@ class Hostlinks_CVENT_Sync {
 				return self::result( $eve_id, 'no_candidates', 'No CVENT events found in date window.', hl_paid: $hl_paid, hl_free: $hl_free, dry_run: $dry_run );
 			}
 
-			$best  = $match['best'];
-			$score = $match['best_score'];
-			$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $best );
+		$best  = $match['best'];
+		$score = $match['best_score'];
+		$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $best );
+		// Grab registration URL from the matched event object.
+		$cvent_reg_url = $best['registrationUrl'] ?? $best['publicRegistrationUrl'] ?? $best['websiteLink'] ?? '';
 
 			if ( ! $dry_run ) {
 				$wpdb->update(
@@ -258,7 +265,7 @@ class Hostlinks_CVENT_Sync {
 
 			// In dry-run, also preview the attendee counts for the auto-matched event.
 			if ( $dry_run ) {
-				$count_preview = self::do_count_sync( $eve_id, $stored_id, $row, true );
+				$count_preview = self::do_count_sync( $eve_id, $stored_id, $row, true, $cvent_reg_url );
 				// Surface attendee-fetch errors rather than silently showing "no CVENT count".
 				$count_error = ( ( $count_preview['action'] ?? '' ) === 'error' ) ? $count_preview['message'] : null;
 				$r = self::result( $eve_id, 'matched',
@@ -280,7 +287,7 @@ class Hostlinks_CVENT_Sync {
 		}
 
 		// ── Step 3: fetch attendees and count PAID/FREE ───────────────────────
-		return self::do_count_sync( $eve_id, $stored_id, $row, $dry_run );
+		return self::do_count_sync( $eve_id, $stored_id, $row, $dry_run, $cvent_reg_url );
 	}
 
 	// -------------------------------------------------------------------------
@@ -451,7 +458,7 @@ class Hostlinks_CVENT_Sync {
 	 * @param bool   $dry_run  If true, skip DB write and include attendee preview in return value.
 	 * @return array
 	 */
-	private static function do_count_sync( $eve_id, $cvent_id, $row, $dry_run = false ) {
+	private static function do_count_sync( $eve_id, $cvent_id, $row, $dry_run = false, $cvent_reg_url = '' ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
 
@@ -545,17 +552,24 @@ class Hostlinks_CVENT_Sync {
 		}
 
 	if ( ! $dry_run ) {
+		$update_data   = array(
+			'cvent_prev_paid'   => (int) ( $row['eve_paid'] ?? 0 ),
+			'cvent_prev_free'   => (int) ( $row['eve_free'] ?? 0 ),
+			'eve_paid'          => $paid,
+			'eve_free'          => $free,
+			'cvent_last_synced' => current_time( 'mysql' ),
+		);
+		$update_format = array( '%d', '%d', '%d', '%d', '%s' );
+		// Auto-fill Reg URL from CVENT if the field is currently blank.
+		if ( $cvent_reg_url && empty( $row['eve_trainer_url'] ) ) {
+			$update_data['eve_trainer_url'] = esc_url_raw( $cvent_reg_url );
+			$update_format[]               = '%s';
+		}
 		$wpdb->update(
 			$table,
-			array(
-				'cvent_prev_paid'   => (int) ( $row['eve_paid'] ?? 0 ),
-				'cvent_prev_free'   => (int) ( $row['eve_free'] ?? 0 ),
-				'eve_paid'          => $paid,
-				'eve_free'          => $free,
-				'cvent_last_synced' => current_time( 'mysql' ),
-			),
+			$update_data,
 			array( 'eve_id' => $eve_id ),
-			array( '%d', '%d', '%d', '%d', '%s' ),
+			$update_format,
 			array( '%d' )
 		);
 	}

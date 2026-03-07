@@ -531,11 +531,6 @@ class Hostlinks_CVENT_Sync {
 		$filtered_out = $cancelled_count;
 		$source_note  = '';
 
-		// #region agent log — debug-19ead4 fix4 verification
-		$_hl_debug = array( 'sessionId' => '19ead4', 'hypothesisId' => 'fix4', 'location' => 'class-cvent-sync.php:do_count_sync', 'message' => 'filtered_out fix', 'data' => array( 'eve_id' => $eve_id, 'total_order_items' => count( $order_items ), 'cancelled_count' => $cancelled_count, 'unique_attendees' => $total, 'paid' => $paid, 'free' => $free, 'filtered_out_new' => $filtered_out, 'old_would_have_been' => count( $order_items ) - $total ), 'timestamp' => (int) ( microtime( true ) * 1000 ) );
-		file_put_contents( ABSPATH . 'debug-19ead4.log', wp_json_encode( $_hl_debug ) . "\n", FILE_APPEND );
-		// #endregion
-
 		} else {
 			// ── No fallback available ─────────────────────────────────────────
 			// events/{UUID}/attendees returns 404 (not a valid CVENT path).

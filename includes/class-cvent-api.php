@@ -269,15 +269,36 @@ class Hostlinks_CVENT_API {
 	public static function list_active_events( $days_back = 10 ) {
 		$cutoff = gmdate( 'Y-m-d\TH:i:s\Z', strtotime( "-{$days_back} days" ) );
 
-		// CVENT EA filter syntax (OData-style).
-		// Retrieve events whose end date is on or after the cutoff.
-		return self::request(
-			'events',
-			array(
+		// Paginate through ALL pages — the default CVENT page size is small (~25),
+		// so without pagination future events beyond the first page are silently missed.
+		$all       = array();
+		$next      = null;
+		$page      = 0;
+		$max_pages = 20; // safety cap (20 × 200 = 4,000 events max)
+
+		do {
+			$params = array(
 				'filter' => "end ge '" . $cutoff . "'",
 				'expand' => 'venues',
-			)
-		);
+				'limit'  => 200,
+			);
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+
+			$result = self::request( 'events', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			$data = isset( $result['data'] ) ? $result['data'] : array();
+			$all  = array_merge( $all, $data );
+			$next = isset( $result['paging']['nextToken'] ) ? $result['paging']['nextToken'] : null;
+			$page++;
+		} while ( $next && $page < $max_pages );
+
+		// Return in the same wrapper shape callers expect.
+		return array( 'data' => $all );
 	}
 
 	/**
@@ -427,13 +448,33 @@ class Hostlinks_CVENT_API {
 	 * @return array|WP_Error Raw API response (has 'data' key with event records).
 	 */
 	public static function search_events( $start_min, $start_max ) {
-		return self::request(
-			'events',
-			array(
+		$all       = array();
+		$next      = null;
+		$page      = 0;
+		$max_pages = 10;
+
+		do {
+			$params = array(
 				'filter' => "start ge '" . $start_min . "' and start le '" . $start_max . "'",
 				'expand' => 'venues',
-			)
-		);
+				'limit'  => 200,
+			);
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+
+			$result = self::request( 'events', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			$data = isset( $result['data'] ) ? $result['data'] : array();
+			$all  = array_merge( $all, $data );
+			$next = isset( $result['paging']['nextToken'] ) ? $result['paging']['nextToken'] : null;
+			$page++;
+		} while ( $next && $page < $max_pages );
+
+		return array( 'data' => $all );
 	}
 
 	// -------------------------------------------------------------------------

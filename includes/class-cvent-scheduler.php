@@ -38,7 +38,9 @@ class Hostlinks_CVENT_Scheduler {
 
 	public static function init() {
 		add_action( self::HOOK,  array( __CLASS__, 'run' ) );
-		add_action( 'init',      array( __CLASS__, 'maybe_reschedule' ) );
+		// Restrict self-healing to admin page loads — wp_next_scheduled() runs a
+		// DB query, so firing on every frontend request is unnecessary overhead.
+		add_action( 'admin_init', array( __CLASS__, 'maybe_reschedule' ) );
 	}
 
 	// -------------------------------------------------------------------------

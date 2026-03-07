@@ -222,6 +222,7 @@ $empty_msg = $focus_name
 				</div>
 				<a href="<?php echo esc_url( $alldriver['eve_host_url'] ); ?>" class="<?php echo esc_attr( $title_class ); ?>" target="_blank"><?php echo esc_html( $alldriver['eve_location'] ); ?></a>
 				<a href="<?php echo esc_url( $alldriver['eve_roster_url'] ); ?>" class="hostlinks-roster-link" target="_blank">Roster</a>
+			<?php // TR and SI links intentionally omitted on Upcoming Events — only shown on Past Events. ?>
 				<div class="hostlinks-card-date"><?php echo $date_range; ?></div>
 				<div class="<?php echo esc_attr( $instructor_class ); ?>">Instructor: <?php echo esc_html( $instructor_name ); ?></div>
 				<div class="hostlinks-card-countdown"><?php echo esc_html( $days_label ); ?></div>

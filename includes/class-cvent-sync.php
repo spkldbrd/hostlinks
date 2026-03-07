@@ -463,17 +463,19 @@ class Hostlinks_CVENT_Sync {
 		$orders_ok   = ! is_wp_error( $order_items );
 
 		if ( $orders_ok ) {
-			// ── Count from order items ────────────────────────────────────────
-			// The API response has no 'status' field. Cancellation is indicated
-			// by the boolean 'active' field: active=false means cancelled/voided.
-			$seen    = array(); // attendeeId → 'free'|'paid'
-			$preview = array();
+		// ── Count from order items ────────────────────────────────────────
+		// The API response has no 'status' field. Cancellation is indicated
+		// by the boolean 'active' field: active=false means cancelled/voided.
+		$seen            = array(); // attendeeId → 'free'|'paid'
+		$preview         = array();
+		$cancelled_count = 0; // items explicitly marked active=false
 
-			foreach ( $order_items as $item ) {
-				// Skip inactive (cancelled/voided) order items.
-				if ( ! ( $item['active'] ?? true ) ) {
-					continue;
-				}
+		foreach ( $order_items as $item ) {
+			// Skip inactive (cancelled/voided) order items.
+			if ( ! ( $item['active'] ?? true ) ) {
+				$cancelled_count++;
+				continue;
+			}
 
 				$att_id = $item['attendeeId']
 					?? ( $item['attendee']['id'] ?? ( $item['contactId'] ?? null ) );
@@ -520,11 +522,19 @@ class Hostlinks_CVENT_Sync {
 			}
 			}
 
-			$free         = count( array_filter( $seen, function( $v ) { return $v === 'free'; } ) );
-			$paid         = count( $seen ) - $free;
-			$total        = count( $seen );
-			$filtered_out = count( $order_items ) - $total;
-			$source_note  = '';
+		$free         = count( array_filter( $seen, function( $v ) { return $v === 'free'; } ) );
+		$paid         = count( $seen ) - $free;
+		$total        = count( $seen );
+		// $filtered_out reflects only genuinely cancelled items (active=false).
+		// Duplicate order lines for the same attendee (e.g. ticket + add-on)
+		// are silently deduplicated via $seen and are NOT counted as filtered.
+		$filtered_out = $cancelled_count;
+		$source_note  = '';
+
+		// #region agent log — debug-19ead4 fix4 verification
+		$_hl_debug = array( 'sessionId' => '19ead4', 'hypothesisId' => 'fix4', 'location' => 'class-cvent-sync.php:do_count_sync', 'message' => 'filtered_out fix', 'data' => array( 'eve_id' => $eve_id, 'total_order_items' => count( $order_items ), 'cancelled_count' => $cancelled_count, 'unique_attendees' => $total, 'paid' => $paid, 'free' => $free, 'filtered_out_new' => $filtered_out, 'old_would_have_been' => count( $order_items ) - $total ), 'timestamp' => (int) ( microtime( true ) * 1000 ) );
+		file_put_contents( ABSPATH . 'debug-19ead4.log', wp_json_encode( $_hl_debug ) . "\n", FILE_APPEND );
+		// #endregion
 
 		} else {
 			// ── No fallback available ─────────────────────────────────────────

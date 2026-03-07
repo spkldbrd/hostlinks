@@ -214,7 +214,12 @@ $chart_data = array(
 				usort( $summary_rows, function( $a, $b ) { return $b['total'] - $a['total']; } );
 				foreach ( $summary_rows as $sr ) : ?>
 				<tr>
-					<td><strong><?php echo esc_html( $sr['name'] ); ?></strong></td>
+					<td>
+						<strong><?php echo esc_html( $sr['name'] ); ?></strong>
+						<?php if ( ! in_array( $sr['name'], $active_marketer_names, true ) ) : ?>
+						<span style="color:#999;font-size:.8em;font-weight:normal;"> (inactive)</span>
+						<?php endif; ?>
+					</td>
 					<td><?php echo number_format( $sr['total'] ); ?></td>
 					<td><?php echo number_format( $sr['paid'] ); ?></td>
 					<td><?php echo number_format( $sr['free'] ); ?></td>

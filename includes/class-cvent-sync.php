@@ -488,8 +488,15 @@ class Hostlinks_CVENT_Sync {
 		// ── Count from order items ────────────────────────────────────────
 		// The API response has no 'status' field. Cancellation is indicated
 		// by the boolean 'active' field: active=false means cancelled/voided.
+		//
+		// Any-free-wins dedup: an attendee is FREE if ANY of their active
+		// order items carries a discount containing "free". This handles:
+		//   - Multi-line-item attendees (base ticket + add-on).
+		//   - Retroactive PAID→FREE changes where staff later adds a free
+		//     discount code; the next sync re-fetches all items and upgrades.
 		$seen            = array(); // attendeeId → 'free'|'paid'
 		$preview         = array();
+		$preview_added   = array(); // attendeeIds already in preview
 		$cancelled_count = 0; // items explicitly marked active=false
 
 		foreach ( $order_items as $item ) {
@@ -499,41 +506,53 @@ class Hostlinks_CVENT_Sync {
 				continue;
 			}
 
-				$att_id = $item['attendeeId']
-					?? ( $item['attendee']['id'] ?? ( $item['contactId'] ?? null ) );
-				if ( ! $att_id || isset( $seen[ $att_id ] ) ) {
-					continue;
-				}
+			$att_id = $item['attendeeId']
+				?? ( $item['attendee']['id'] ?? ( $item['contactId'] ?? null ) );
+			if ( ! $att_id ) {
+				continue;
+			}
 
-				// Collect discount strings from every possible field location.
-				$discount_strings = array();
-				foreach ( array( 'discountCode', 'DiscountCode', 'discount_code', 'discountName', 'DiscountName' ) as $f ) {
-					if ( ! empty( $item[ $f ] ) ) {
-						$discount_strings[] = (string) $item[ $f ];
-					}
+			// Once an attendee is FREE, no subsequent item can downgrade them.
+			if ( isset( $seen[ $att_id ] ) && $seen[ $att_id ] === 'free' ) {
+				continue;
+			}
+
+			// Collect discount strings from every possible field location.
+			$discount_strings = array();
+			foreach ( array( 'discountCode', 'DiscountCode', 'discount_code', 'discountName', 'DiscountName' ) as $f ) {
+				if ( ! empty( $item[ $f ] ) ) {
+					$discount_strings[] = (string) $item[ $f ];
 				}
-				if ( ! empty( $item['discounts'] ) && is_array( $item['discounts'] ) ) {
-					foreach ( $item['discounts'] as $d ) {
-						foreach ( array( 'code', 'name', 'discountCode' ) as $f ) {
-							if ( ! empty( $d[ $f ] ) ) {
-								$discount_strings[] = (string) $d[ $f ];
-							}
+			}
+			if ( ! empty( $item['discounts'] ) && is_array( $item['discounts'] ) ) {
+				foreach ( $item['discounts'] as $d ) {
+					foreach ( array( 'code', 'name', 'discountCode' ) as $f ) {
+						if ( ! empty( $d[ $f ] ) ) {
+							$discount_strings[] = (string) $d[ $f ];
 						}
 					}
 				}
-				$discount_strings = array_unique( $discount_strings );
+			}
+			$discount_strings = array_unique( $discount_strings );
 
-				$is_free = false;
-				foreach ( $discount_strings as $ds ) {
-					if ( preg_match( '/free/i', $ds ) ) {
-						$is_free = true;
-						break;
-					}
+			$is_free = false;
+			foreach ( $discount_strings as $ds ) {
+				if ( preg_match( '/free/i', $ds ) ) {
+					$is_free = true;
+					break;
 				}
+			}
 
+			// First encounter: set classification. Subsequent encounters: upgrade paid→free only.
+			if ( ! isset( $seen[ $att_id ] ) ) {
 				$seen[ $att_id ] = $is_free ? 'free' : 'paid';
+			} elseif ( $is_free ) {
+				$seen[ $att_id ] = 'free'; // upgrade
+			}
 
-			if ( $dry_run && count( $preview ) < 10 ) {
+			// Dry-run preview: one entry per attendee (first encounter only).
+			if ( $dry_run && count( $preview ) < 10 && ! isset( $preview_added[ $att_id ] ) ) {
+				$preview_added[ $att_id ] = true;
 				$preview[] = array(
 					'id'               => $att_id,
 					'active'           => $item['active'] ?? true,
@@ -542,7 +561,7 @@ class Hostlinks_CVENT_Sync {
 					'source'           => 'order_items',
 				);
 			}
-			}
+		}
 
 		$free         = count( array_filter( $seen, function( $v ) { return $v === 'free'; } ) );
 		$paid         = count( $seen ) - $free;

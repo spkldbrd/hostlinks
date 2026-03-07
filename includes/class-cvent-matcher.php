@@ -109,18 +109,30 @@ class Hostlinks_CVENT_Matcher {
 		$best_score = $best['score'];
 		$gap        = $second ? ( $best_score - $second['score'] ) : 999;
 
-		if ( $best_score >= self::SCORE_AUTO_THRESHOLD && $gap >= self::SCORE_AUTO_GAP ) {
-			$status = 'auto';
-		} else {
-			$status = 'needs_review';
+	// Geographic mismatch guard — in-person events only (Zoom events are exempt
+	// because they have no city/state in CVENT venue data).
+	// If neither city nor state scored any points, there is no geographic
+	// confirmation that these are the same place; push to needs_review instead
+	// of auto-matching on title/date alone.
+	$hl_is_zoom  = ! empty( $hl_event['eve_zoom'] );
+	$geo_blocked = false;
+	if ( ! $hl_is_zoom ) {
+		$best_breakdown = $best['breakdown'] ?? array();
+		if ( ( $best_breakdown['city'] ?? 0 ) === 0 && ( $best_breakdown['state'] ?? 0 ) === 0 ) {
+			$geo_blocked = true;
 		}
+	}
 
-		return array(
-			'status'     => $status,
-			'best'       => $best['event'],
-			'best_score' => $best_score,
-			'candidates' => $scored,
-		);
+	$can_auto = $best_score >= self::SCORE_AUTO_THRESHOLD && $gap >= self::SCORE_AUTO_GAP && ! $geo_blocked;
+	$status   = $can_auto ? 'auto' : 'needs_review';
+
+	return array(
+		'status'      => $status,
+		'best'        => $best['event'],
+		'best_score'  => $best_score,
+		'candidates'  => $scored,
+		'geo_blocked' => $geo_blocked,
+	);
 	}
 
 	// -------------------------------------------------------------------------

@@ -52,6 +52,10 @@ class Hostlinks_CVENT_Scheduler {
 			return;
 		}
 
+		// Record that the cron hook fired — written before sync so even a
+		// hung/errored sync leaves a breadcrumb on the settings page.
+		update_option( 'hostlinks_cvent_last_auto_run', current_time( 'mysql' ), false );
+
 		$result = Hostlinks_CVENT_Sync::sync_all( false ); // live run
 
 		// Update the frontend "last data updated" date shown in the calendar view.
@@ -77,8 +81,10 @@ class Hostlinks_CVENT_Scheduler {
 			$next_ts = self::next_run_timestamp( $settings );
 			if ( $next_ts ) {
 				wp_schedule_single_event( $next_ts, self::HOOK );
-				// Update hash so maybe_reschedule() sees the new timestamp as valid.
 				update_option( self::HASH_KEY, md5( serialize( $settings ) ) );
+				// Record the next scheduled time so the settings page can display
+				// it even if wp_next_scheduled() returns an unexpected value.
+				update_option( 'hostlinks_cvent_next_scheduled_run', gmdate( 'Y-m-d H:i:s', $next_ts ), false );
 			}
 		}
 	}
@@ -122,6 +128,7 @@ class Hostlinks_CVENT_Scheduler {
 			if ( $next_ts ) {
 				wp_schedule_single_event( $next_ts, self::HOOK );
 				update_option( self::HASH_KEY, $settings_hash );
+				update_option( 'hostlinks_cvent_next_scheduled_run', gmdate( 'Y-m-d H:i:s', $next_ts ), false );
 			}
 		}
 	}

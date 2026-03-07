@@ -268,32 +268,84 @@ $s = Hostlinks_CVENT_API::get_settings();
 	<h2>Daily Sync Schedule</h2>
 	<?php echo $schedule_notice; ?>
 	<?php
-	$sched     = Hostlinks_CVENT_Scheduler::get_settings();
-	$last_log  = Hostlinks_CVENT_Scheduler::get_last_log();
-	$next_run  = Hostlinks_CVENT_Scheduler::next_run_display();
-	$tz_label  = wp_timezone_string();
+	$sched          = Hostlinks_CVENT_Scheduler::get_settings();
+	$last_log       = Hostlinks_CVENT_Scheduler::get_last_log();
+	$next_run       = Hostlinks_CVENT_Scheduler::next_run_display();
+	$tz_label       = wp_timezone_string();
+	$last_auto_run  = get_option( 'hostlinks_cvent_last_auto_run', '' );
+	$next_sched_raw = get_option( 'hostlinks_cvent_next_scheduled_run', '' );
+
+	// Format stored UTC next-run time in site timezone for display.
+	$next_sched_display = '';
+	if ( $next_sched_raw ) {
+		try {
+			$dt = new DateTime( $next_sched_raw, new DateTimeZone( 'UTC' ) );
+			$dt->setTimezone( wp_timezone() );
+			$next_sched_display = $dt->format( 'D, M j Y \a\t g:i a T' );
+		} catch ( Exception $e ) {
+			$next_sched_display = $next_sched_raw;
+		}
+	}
 	?>
 	<p>Automatically run a full CVENT sync on selected days at a set time with a random offset to make the schedule appear natural. Only events from the last 60 days forward are processed. Dry-run mode is <strong>not</strong> used — results are written live.</p>
 
-	<?php if ( $last_log ) : ?>
 	<table class="widefat striped" style="max-width:500px;margin-bottom:12px;">
-		<thead><tr><th colspan="2">Last Auto-Sync Result</th></tr></thead>
+		<thead><tr><th colspan="2">Scheduler Status</th></tr></thead>
 		<tbody>
-			<tr><td><strong>Ran at</strong></td><td><?php echo esc_html( $last_log['time'] ); ?> (site time)</td></tr>
-			<tr><td><strong>Events processed</strong></td><td><?php echo (int) $last_log['total_events']; ?></td></tr>
-			<tr><td><strong>Synced (counts written)</strong></td><td><?php echo (int) $last_log['synced']; ?></td></tr>
-			<tr><td><strong>Auto-matched (no count yet)</strong></td><td><?php echo (int) $last_log['matched']; ?></td></tr>
-			<tr><td><strong>Needs review</strong></td><td><?php echo (int) $last_log['needs_review']; ?></td></tr>
-			<tr><td><strong>No candidates</strong></td><td><?php echo (int) $last_log['no_candidates']; ?></td></tr>
-			<tr><td><strong>Errors</strong></td><td><?php echo (int) $last_log['errors']; ?></td></tr>
+			<tr>
+				<td><strong>Last cron fire</strong></td>
+				<td>
+					<?php if ( $last_auto_run ) : ?>
+						<?php echo esc_html( $last_auto_run ); ?> (site time)
+					<?php else : ?>
+						<em style="color:#888;">Never fired</em>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<td><strong>Last sync completed</strong></td>
+				<td>
+					<?php if ( $last_log ) : ?>
+						<?php echo esc_html( $last_log['time'] ); ?> (site time)
+						— <?php echo (int) $last_log['synced']; ?> synced,
+						<?php echo (int) $last_log['errors']; ?> errors,
+						<?php echo (int) $last_log['needs_review']; ?> need review
+					<?php else : ?>
+						<em style="color:#888;">No sync log yet</em>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<td><strong>Next scheduled run</strong></td>
+				<td>
+					<?php if ( $next_run ) : ?>
+						<?php echo esc_html( $next_run ); ?>
+					<?php elseif ( $next_sched_display ) : ?>
+						<?php echo esc_html( $next_sched_display ); ?> <em style="color:#888;">(stored)</em>
+					<?php elseif ( $sched['enabled'] ) : ?>
+						<span style="color:#d63638;">&#9888; No cron event queued — save settings to requeue.</span>
+					<?php else : ?>
+						<em style="color:#888;">Scheduler disabled</em>
+					<?php endif; ?>
+				</td>
+			</tr>
 		</tbody>
 	</table>
-	<?php endif; ?>
 
-	<?php if ( $next_run ) : ?>
-	<p><strong>Next scheduled run:</strong> <?php echo esc_html( $next_run ); ?></p>
-	<?php elseif ( $sched['enabled'] ) : ?>
-	<p style="color:#d63638;"><strong>&#9888; Schedule is enabled but no cron event is queued.</strong> Save the settings below to requeue it.</p>
+	<?php if ( $last_log ) : ?>
+	<details style="margin-bottom:12px;">
+		<summary style="cursor:pointer;font-weight:600;">Last Auto-Sync Result detail</summary>
+		<table class="widefat striped" style="max-width:500px;margin-top:8px;">
+			<tbody>
+				<tr><td><strong>Events processed</strong></td><td><?php echo (int) $last_log['total_events']; ?></td></tr>
+				<tr><td><strong>Synced (counts written)</strong></td><td><?php echo (int) $last_log['synced']; ?></td></tr>
+				<tr><td><strong>Auto-matched (no count yet)</strong></td><td><?php echo (int) $last_log['matched']; ?></td></tr>
+				<tr><td><strong>Needs review</strong></td><td><?php echo (int) $last_log['needs_review']; ?></td></tr>
+				<tr><td><strong>No candidates</strong></td><td><?php echo (int) $last_log['no_candidates']; ?></td></tr>
+				<tr><td><strong>Errors</strong></td><td><?php echo (int) $last_log['errors']; ?></td></tr>
+			</tbody>
+		</table>
+	</details>
 	<?php endif; ?>
 
 	<form method="post">

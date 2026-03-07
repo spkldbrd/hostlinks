@@ -731,15 +731,11 @@ class Hostlinks_CVENT_Sync {
 		if ( $url ) {
 			return $url;
 		}
-		$weblinks = Hostlinks_CVENT_API::get_event_weblinks( $cvent_id );
-		if ( is_wp_error( $weblinks ) || empty( $weblinks ) ) {
-			return '';
-		}
-		foreach ( $weblinks as $link ) {
-			$label = strtolower( ( $link['name'] ?? '' ) . ' ' . ( $link['type'] ?? '' ) );
-			if ( false !== strpos( $label, 'registr' ) ) {
-				return $link['url'] ?? '';
-			}
+		// Construct the standard CVENT registration URL from the event UUID.
+		// Format: https://web.cvent.com/event/{UUID}/register
+		// This avoids an extra API call to /weblinks.
+		if ( $cvent_id ) {
+			return 'https://web.cvent.com/event/' . $cvent_id . '/register';
 		}
 		return '';
 	}

@@ -12,8 +12,8 @@ $months_back    = isset( $_GET['months'] ) && isset( $months_options[ (int) $_GE
 	: 12;
 
 // ── Nav URLs ──────────────────────────────────────────────────────────────────
-$upcoming_url    = home_url( '/' );
-$past_events_url = home_url( '/old-event-list/' );
+$upcoming_url    = Hostlinks_Page_URLs::get_upcoming();
+$past_events_url = Hostlinks_Page_URLs::get_past_events();
 $reports_url     = get_permalink();
 
 // ── Query: aggregate registrations by month × marketer ───────────────────────

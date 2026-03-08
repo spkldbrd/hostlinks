@@ -93,18 +93,9 @@ foreach ( $all_pending_bookings as $ev ) {
 // ── Pass 2: render ─────────────────────────────────────────────────────────
 $today         = new DateTime();
 $current_month = null;
-$upcoming_url  = home_url( '/' );
-$page_url      = get_permalink();
-
-// Locate the Reports page (cached for a day, but only when found).
-$reports_page_url = get_transient( 'hostlinks_reports_page_url' );
-if ( ! $reports_page_url ) {
-	$rid = $wpdb->get_var( "SELECT ID FROM {$wpdb->posts} WHERE post_status='publish' AND post_type='page' AND post_content LIKE '%hostlinks_reports%' LIMIT 1" );
-	$reports_page_url = $rid ? get_permalink( (int) $rid ) : '';
-	if ( $reports_page_url ) {
-		set_transient( 'hostlinks_reports_page_url', $reports_page_url, DAY_IN_SECONDS );
-	}
-}
+$upcoming_url     = Hostlinks_Page_URLs::get_upcoming();
+$page_url         = get_permalink();
+$reports_page_url = Hostlinks_Page_URLs::get_reports();
 
 $_upd_raw     = get_option( 'last_data_updation', '' );
 $_upd_dt      = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;

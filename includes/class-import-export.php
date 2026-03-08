@@ -20,10 +20,13 @@ class Hostlinks_Import_Export {
 		global $wpdb;
 		$data = array(
 			'exported_at'      => current_time('mysql'),
-			'event_details'    => $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}event_details_list  WHERE eve_status = 1 ORDER BY eve_start ASC", ARRAY_A ),
-			'event_types'      => $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}event_type          WHERE event_type_status = 1", ARRAY_A ),
-			'event_marketers'  => $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}event_marketer      WHERE event_marketer_status = 1", ARRAY_A ),
-			'event_instructors'=> $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}event_instructor    WHERE event_instructor_status = 1", ARRAY_A ),
+			// Events: only active (eve_status=1) — soft-deleted events should not migrate.
+			'event_details'    => $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}event_details_list ORDER BY eve_start ASC", ARRAY_A ),
+			// Reference tables: export ALL records including inactive so that historical
+			// events referencing inactive marketers/instructors/types keep valid foreign keys.
+			'event_types'      => $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}event_type ORDER BY event_type_id ASC", ARRAY_A ),
+			'event_marketers'  => $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}event_marketer ORDER BY event_marketer_id ASC", ARRAY_A ),
+			'event_instructors'=> $wpdb->get_results( "SELECT * FROM {$wpdb->prefix}event_instructor ORDER BY event_instructor_id ASC", ARRAY_A ),
 		);
 
 		$filename = 'hostlinks-export-' . date('Y-m-d') . '.json';
@@ -96,84 +99,168 @@ class Hostlinks_Import_Export {
 
 		$imported = 0;
 		$skipped  = 0;
+		$failed   = 0;
+		$errors   = array();
 
-		// Import event types
+		// ── Helper: record a failed insert ────────────────────────────────────
+		$record_error = function( $context ) use ( $wpdb, &$failed, &$errors ) {
+			$failed++;
+			if ( count( $errors ) < 3 && $wpdb->last_error ) {
+				$errors[] = "[{$context}] " . $wpdb->last_error;
+			}
+		};
+
+		// ── Event types ───────────────────────────────────────────────────────
+		// Use INSERT IGNORE with the original primary key so that events
+		// imported later still reference the correct type ID.
 		if ( ! empty( $data['event_types'] ) ) {
 			foreach ( $data['event_types'] as $row ) {
-				$exists = $wpdb->get_var( $wpdb->prepare(
-					"SELECT COUNT(*) FROM {$wpdb->prefix}event_type WHERE event_type_name = %s",
-					$row['event_type_name']
-				) );
-				if ( ! $exists ) {
-					$wpdb->insert( $wpdb->prefix . 'event_type', array(
-						'event_type_name'   => $row['event_type_name'],
-						'event_type_color'  => $row['event_type_color'] ?? '',
-						'event_type_status' => 1,
+				$id     = (int) ( $row['event_type_id'] ?? 0 );
+				$name   = $row['event_type_name'] ?? '';
+				$color  = $row['event_type_color'] ?? '';
+				$status = (int) ( $row['event_type_status'] ?? 1 );
+
+				// Check by ID first; fall back to name for exports from older versions.
+				if ( $id ) {
+					$exists_id = (int) $wpdb->get_var( $wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}event_type WHERE event_type_id = %d", $id
 					) );
-					$imported++;
+					if ( $exists_id ) { $skipped++; continue; }
 				} else {
-					$skipped++;
+					$exists_name = (int) $wpdb->get_var( $wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}event_type WHERE event_type_name = %s", $name
+					) );
+					if ( $exists_name ) { $skipped++; continue; }
+				}
+
+				$sql = $id
+					? $wpdb->prepare(
+						"INSERT IGNORE INTO {$wpdb->prefix}event_type (event_type_id, event_type_name, event_type_color, event_type_status) VALUES (%d, %s, %s, %d)",
+						$id, $name, $color, $status
+					)
+					: $wpdb->prepare(
+						"INSERT IGNORE INTO {$wpdb->prefix}event_type (event_type_name, event_type_color, event_type_status) VALUES (%s, %s, %d)",
+						$name, $color, $status
+					);
+
+				$result = $wpdb->query( $sql );
+				if ( false === $result ) {
+					$record_error( 'event_type:' . $name );
+				} else {
+					$imported++;
 				}
 			}
 		}
 
-		// Import marketers
+		// ── Marketers ─────────────────────────────────────────────────────────
 		if ( ! empty( $data['event_marketers'] ) ) {
 			foreach ( $data['event_marketers'] as $row ) {
-				$exists = $wpdb->get_var( $wpdb->prepare(
-					"SELECT COUNT(*) FROM {$wpdb->prefix}event_marketer WHERE event_marketer_name = %s",
-					$row['event_marketer_name']
-				) );
-				if ( ! $exists ) {
-					$wpdb->insert( $wpdb->prefix . 'event_marketer', array(
-						'event_marketer_name'   => $row['event_marketer_name'],
-						'event_marketer_status' => 1,
+				$id     = (int) ( $row['event_marketer_id'] ?? 0 );
+				$name   = $row['event_marketer_name'] ?? '';
+				$status = (int) ( $row['event_marketer_status'] ?? 1 );
+
+				if ( $id ) {
+					$exists_id = (int) $wpdb->get_var( $wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}event_marketer WHERE event_marketer_id = %d", $id
 					) );
-					$imported++;
+					if ( $exists_id ) { $skipped++; continue; }
 				} else {
-					$skipped++;
+					$exists_name = (int) $wpdb->get_var( $wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}event_marketer WHERE event_marketer_name = %s", $name
+					) );
+					if ( $exists_name ) { $skipped++; continue; }
+				}
+
+				$sql = $id
+					? $wpdb->prepare(
+						"INSERT IGNORE INTO {$wpdb->prefix}event_marketer (event_marketer_id, event_marketer_name, event_marketer_status) VALUES (%d, %s, %d)",
+						$id, $name, $status
+					)
+					: $wpdb->prepare(
+						"INSERT IGNORE INTO {$wpdb->prefix}event_marketer (event_marketer_name, event_marketer_status) VALUES (%s, %d)",
+						$name, $status
+					);
+
+				$result = $wpdb->query( $sql );
+				if ( false === $result ) {
+					$record_error( 'marketer:' . $name );
+				} else {
+					$imported++;
 				}
 			}
 		}
 
-		// Import instructors
+		// ── Instructors ───────────────────────────────────────────────────────
 		if ( ! empty( $data['event_instructors'] ) ) {
 			foreach ( $data['event_instructors'] as $row ) {
-				$exists = $wpdb->get_var( $wpdb->prepare(
-					"SELECT COUNT(*) FROM {$wpdb->prefix}event_instructor WHERE event_instructor_name = %s",
-					$row['event_instructor_name']
-				) );
-				if ( ! $exists ) {
-					$wpdb->insert( $wpdb->prefix . 'event_instructor', array(
-						'event_instructor_name'   => $row['event_instructor_name'],
-						'event_instructor_status' => 1,
+				$id     = (int) ( $row['event_instructor_id'] ?? 0 );
+				$name   = $row['event_instructor_name'] ?? '';
+				$status = (int) ( $row['event_instructor_status'] ?? 1 );
+
+				if ( $id ) {
+					$exists_id = (int) $wpdb->get_var( $wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}event_instructor WHERE event_instructor_id = %d", $id
 					) );
-					$imported++;
+					if ( $exists_id ) { $skipped++; continue; }
 				} else {
-					$skipped++;
+					$exists_name = (int) $wpdb->get_var( $wpdb->prepare(
+						"SELECT COUNT(*) FROM {$wpdb->prefix}event_instructor WHERE event_instructor_name = %s", $name
+					) );
+					if ( $exists_name ) { $skipped++; continue; }
+				}
+
+				$sql = $id
+					? $wpdb->prepare(
+						"INSERT IGNORE INTO {$wpdb->prefix}event_instructor (event_instructor_id, event_instructor_name, event_instructor_status) VALUES (%d, %s, %d)",
+						$id, $name, $status
+					)
+					: $wpdb->prepare(
+						"INSERT IGNORE INTO {$wpdb->prefix}event_instructor (event_instructor_name, event_instructor_status) VALUES (%s, %d)",
+						$name, $status
+					);
+
+				$result = $wpdb->query( $sql );
+				if ( false === $result ) {
+					$record_error( 'instructor:' . $name );
+				} else {
+					$imported++;
 				}
 			}
 		}
 
-		// Import events (deduplicate by eve_start + eve_location)
+		// ── Events ────────────────────────────────────────────────────────────
+		// Deduplicate by eve_start + eve_location (same logic as before).
 		if ( ! empty( $data['event_details'] ) ) {
 			foreach ( $data['event_details'] as $row ) {
-				$exists = $wpdb->get_var( $wpdb->prepare(
+				$exists = (int) $wpdb->get_var( $wpdb->prepare(
 					"SELECT COUNT(*) FROM {$wpdb->prefix}event_details_list WHERE eve_start = %s AND eve_location = %s",
 					$row['eve_start'], $row['eve_location']
 				) );
-				if ( ! $exists ) {
-					unset( $row['eve_id'] );
-					$row['eve_status'] = 1;
-					$wpdb->insert( $wpdb->prefix . 'event_details_list', $row );
-					$imported++;
-				} else {
+				if ( $exists ) {
 					$skipped++;
+					continue;
+				}
+
+				unset( $row['eve_id'] ); // let auto-increment assign a new ID
+				$result = $wpdb->insert( $wpdb->prefix . 'event_details_list', $row );
+				if ( false === $result ) {
+					$record_error( 'event:' . ( $row['eve_location'] ?? '?' ) . ' ' . ( $row['eve_start'] ?? '' ) );
+				} else {
+					$imported++;
 				}
 			}
 		}
 
-		wp_redirect( add_query_arg( array( 'hl_msg' => 'imported', 'hl_imported' => $imported, 'hl_skipped' => $skipped ), $redirect ) );
+		$args = array(
+			'hl_msg'      => 'imported',
+			'hl_imported' => $imported,
+			'hl_skipped'  => $skipped,
+			'hl_failed'   => $failed,
+		);
+		if ( $errors ) {
+			$args['hl_error'] = urlencode( implode( ' | ', $errors ) );
+		}
+		wp_redirect( add_query_arg( $args, $redirect ) );
 		exit;
 	}
 
@@ -188,26 +275,43 @@ class Hostlinks_Import_Export {
 		$headers  = fgetcsv( $handle );
 		$imported = 0;
 		$skipped  = 0;
+		$failed   = 0;
+		$errors   = array();
 
 		while ( ( $line = fgetcsv( $handle ) ) !== false ) {
 			if ( count( $line ) !== count( $headers ) ) { continue; }
-			$row = array_combine( $headers, $line );
-			$exists = $wpdb->get_var( $wpdb->prepare(
+			$row    = array_combine( $headers, $line );
+			$exists = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(*) FROM {$wpdb->prefix}event_details_list WHERE eve_start = %s AND eve_location = %s",
 				$row['eve_start'], $row['eve_location']
 			) );
-			if ( ! $exists ) {
-				unset( $row['eve_id'] );
-				$row['eve_status'] = 1;
-				$wpdb->insert( $wpdb->prefix . 'event_details_list', $row );
-				$imported++;
-			} else {
+			if ( $exists ) {
 				$skipped++;
+				continue;
+			}
+			unset( $row['eve_id'] );
+			$result = $wpdb->insert( $wpdb->prefix . 'event_details_list', $row );
+			if ( false === $result ) {
+				$failed++;
+				if ( count( $errors ) < 3 && $wpdb->last_error ) {
+					$errors[] = '[event:' . ( $row['eve_location'] ?? '?' ) . '] ' . $wpdb->last_error;
+				}
+			} else {
+				$imported++;
 			}
 		}
 		fclose( $handle );
 
-		wp_redirect( add_query_arg( array( 'hl_msg' => 'imported', 'hl_imported' => $imported, 'hl_skipped' => $skipped ), $redirect ) );
+		$args = array(
+			'hl_msg'      => 'imported',
+			'hl_imported' => $imported,
+			'hl_skipped'  => $skipped,
+			'hl_failed'   => $failed,
+		);
+		if ( $errors ) {
+			$args['hl_error'] = urlencode( implode( ' | ', $errors ) );
+		}
+		wp_redirect( add_query_arg( $args, $redirect ) );
 		exit;
 	}
 }

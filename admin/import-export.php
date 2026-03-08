@@ -1,14 +1,52 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) { exit; }
 
+global $wpdb;
+
 // Notification messages
-$hl_msg = isset( $_GET['hl_msg'] ) ? sanitize_key( $_GET['hl_msg'] ) : '';
+$hl_msg      = isset( $_GET['hl_msg'] )      ? sanitize_key( $_GET['hl_msg'] )      : '';
+$hl_imported = isset( $_GET['hl_imported'] ) ? intval( $_GET['hl_imported'] )        : 0;
+$hl_skipped  = isset( $_GET['hl_skipped'] )  ? intval( $_GET['hl_skipped'] )         : 0;
+$hl_failed   = isset( $_GET['hl_failed'] )   ? intval( $_GET['hl_failed'] )          : 0;
+$hl_error    = isset( $_GET['hl_error'] )    ? sanitize_text_field( urldecode( $_GET['hl_error'] ) ) : '';
+
+// Build the import result notice.
+$import_notice = '';
+if ( $hl_msg === 'imported' ) {
+	$level  = ( $hl_failed > 0 ) ? 'notice-warning' : 'notice-success';
+	$import_notice .= "<div class=\"notice {$level}\"><p>";
+	$import_notice .= "Import complete: <strong>{$hl_imported}</strong> inserted, <strong>{$hl_skipped}</strong> skipped (duplicates)";
+	if ( $hl_failed > 0 ) {
+		$import_notice .= ", <strong style=\"color:#d63638;\">{$hl_failed} failed</strong>";
+	}
+	$import_notice .= '.</p>';
+	if ( $hl_error ) {
+		$import_notice .= '<p><strong>First error:</strong> <code>' . esc_html( $hl_error ) . '</code></p>';
+	}
+	$import_notice .= '</div>';
+
+	// Post-import row count summary — show what is now in each table.
+	$counts = array(
+		'Events'      => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}event_details_list" ),
+		'Types'       => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}event_type" ),
+		'Marketers'   => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}event_marketer" ),
+		'Instructors' => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}event_instructor" ),
+	);
+	$import_notice .= '<div class="notice notice-info" style="padding-bottom:10px;"><p><strong>Database row counts after import:</strong></p>';
+	$import_notice .= '<table style="border-collapse:collapse;margin-top:4px;">';
+	foreach ( $counts as $label => $count ) {
+		$color = ( $count === 0 ) ? 'color:#d63638;' : '';
+		$import_notice .= "<tr><td style=\"padding:2px 16px 2px 0;{$color}\"><strong>{$label}</strong></td><td style=\"{$color}\">{$count}</td></tr>";
+	}
+	$import_notice .= '</table>';
+	if ( in_array( 0, $counts, true ) ) {
+		$import_notice .= '<p style="color:#d63638;">&#9888; One or more tables are empty — check the error details above.</p>';
+	}
+	$import_notice .= '</div>';
+}
+
 $messages = array(
-	'imported' => sprintf(
-		'<div class="notice notice-success"><p>Import complete: <strong>%d</strong> records imported, <strong>%d</strong> skipped (duplicates).</p></div>',
-		intval( $_GET['hl_imported'] ?? 0 ),
-		intval( $_GET['hl_skipped'] ?? 0 )
-	),
+	'imported' => $import_notice,
 	'no_file'  => '<div class="notice notice-error"><p>No file was uploaded. Please select a file and try again.</p></div>',
 	'bad_type' => '<div class="notice notice-error"><p>Invalid file type. Please upload a <strong>.json</strong> or <strong>.csv</strong> file.</p></div>',
 	'bad_json' => '<div class="notice notice-error"><p>Could not parse the JSON file. Please check the file format and try again.</p></div>',
@@ -38,7 +76,7 @@ $messages = array(
           <th>Full Export (JSON)</th>
           <td>
             <button type="submit" class="button button-primary">Download JSON</button>
-            <p class="description">Exports all active events, types, marketers, and instructors as a single <code>.json</code> file.</p>
+            <p class="description">Exports all events, types, marketers, and instructors (including inactive) as a single <code>.json</code> file. Preserves all IDs so foreign key relationships survive a re-import on a new site.</p>
           </td>
         </tr>
       </table>

@@ -52,9 +52,10 @@ $mode_labels = array(
 
 $ajax_url = admin_url( 'admin-ajax.php' );
 $nonce    = wp_create_nonce( 'hostlinks_user_access' );
-?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
 <h1>Hostlinks — User Access</h1>
+<?php endif; ?>
 <?php echo $notice; ?>
 
 <p>Control who can view each Hostlinks front-end shortcode. Administrators always have access regardless of the setting.</p>
@@ -154,7 +155,7 @@ $nonce    = wp_create_nonce( 'hostlinks_user_access' );
 		<button type="submit" name="hostlinks_save_user_access" class="button button-primary">Save Settings</button>
 	</p>
 </form>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 
 <script>
 (function() {

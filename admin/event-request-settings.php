@@ -26,9 +26,10 @@ if ( isset( $_POST['hl_save_request_settings'] ) ) {
 $notif_email    = get_option( 'hostlinks_event_request_notification_email', get_option( 'admin_email' ) );
 $subject_prefix = get_option( 'hostlinks_event_request_email_subject_prefix', '[Event Request]' );
 $success_msg    = get_option( 'hostlinks_event_request_success_message', '' );
-?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
 <h1>Hostlinks — Event Request Settings</h1>
+<?php endif; ?>
 <?php echo $notice; ?>
 
 <form method="post">
@@ -74,4 +75,4 @@ $success_msg    = get_option( 'hostlinks_event_request_success_message', '' );
 <p>Place the following shortcode on any page to display the event request intake form:</p>
 <p><code>[hostlinks_event_request_form]</code></p>
 <p>The form saves submissions to a separate <strong>Event Requests</strong> table and does <em>not</em> publish events immediately. Review and manage submissions under <strong>Hostlinks &rarr; Event Requests</strong>.</p>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>

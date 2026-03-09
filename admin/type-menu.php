@@ -17,9 +17,10 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		);
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Type Sucessfully added. <a href="admin.php?page=types-menu">View Type</a></p></div>';
 	}
-	?>
+	<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h2 id="add-new-user">Add New Type</h2>
+<?php endif; ?>
   <?php echo $sucessmsg; ?>
   <form name="createdriver" method="post" action="" class="anewpostcode">
     <?php wp_nonce_field( 'hostlinks_add_type' ); ?>
@@ -46,7 +47,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
       <input type="submit" value="Add New Type" class="button button-primary" id="createdriveruser" name="createdriveruser">
     </p>
   </form>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 	<?php
 
 } elseif ( isset( $_GET['editu'] ) && $_GET['editu'] != '' ) {
@@ -67,9 +68,10 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Type Sucessfully Updated. <a href="admin.php?page=types-menu">View Type</a></p></div>';
 	}
 	$bokdetsx = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table11 WHERE `event_type_id` = %d", $userid ) );
-	?>
+	<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h2 id="add-new-user">Update Type</h2>
+<?php endif; ?>
   <?php echo $sucessmsgnew; ?>
   <form name="createdriver" method="post" action="" class="updpocode">
     <?php wp_nonce_field( 'hostlinks_edit_type' ); ?>
@@ -96,7 +98,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
       <input type="submit" value="Update Type" class="button button-primary" id="updatethepcode" name="updatethepcode">
     </p>
   </form>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 	<?php
 
 } else {
@@ -110,10 +112,11 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	}
 	$all_pending_bookings = $wpdb->get_results( "SELECT * FROM $table11 WHERE `event_type_status`='1'", ARRAY_A );
 	$tot1                 = count( $all_pending_bookings );
-	?>
+	<?php if ( empty( $hl_embedded ) ) : ?>
 <div id="wpbody">
   <div tabindex="0" id="wpbody-content" class="ddddd">
     <div class="wrap">
+<?php endif; ?>
       <h2>Types <a class="add-new-h2" href="admin.php?page=types-menu&add=1">Add New Type</a></h2>
       <ul class="subsubsubx">
         <li class="all"><a class="current">All <span class="count">(<?php echo $tot1; ?>)</span></a> |</li>
@@ -149,9 +152,11 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
           </tbody>
         </table>
       </form>
+<?php if ( empty( $hl_embedded ) ) : ?>
     </div>
   </div>
 </div>
+<?php endif; ?>
 	<?php
 }
 ?>

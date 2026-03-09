@@ -73,9 +73,10 @@ $messages = array(
 	'bad_json' => '<div class="notice notice-error"><p>Could not parse the JSON file. Please check the file format and try again.</p></div>',
 	'bad_csv'  => '<div class="notice notice-error"><p>Could not read the CSV file. Please check the file and try again.</p></div>',
 );
-?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h1>Hostlinks — Import / Export</h1>
+<?php endif; ?>
 
   <?php if ( $hl_msg && isset( $messages[ $hl_msg ] ) ) echo $messages[ $hl_msg ]; ?>
 
@@ -216,7 +217,7 @@ $messages = array(
       </p>
     </form>
   </div>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 
 <script>
 function hlTab(e, id) {

@@ -97,7 +97,7 @@ class Hostlinks_Page_URLs {
 				   AND post_type   = 'page'
 				   AND post_content LIKE %s
 				 LIMIT 1",
-				'%' . $wpdb->esc_like( $shortcode ) . '%'
+				'%' . $wpdb->esc_like( '[' . $shortcode . ']' ) . '%'
 			) );
 			$cached = $rid ? (string) get_permalink( (int) $rid ) : '';
 			// Cache the result for 24 hours.  Empty string is a valid cached
@@ -148,7 +148,7 @@ class Hostlinks_Page_URLs {
 					   AND post_type   = 'page'
 					   AND post_content LIKE %s
 					 LIMIT 1",
-					'%' . $wpdb->esc_like( $cfg['shortcode'] ) . '%'
+					'%' . $wpdb->esc_like( '[' . $cfg['shortcode'] . ']' ) . '%'
 				) );
 				$cached = $rid ? (string) get_permalink( (int) $rid ) : '';
 				set_transient( $transient_key, $cached, DAY_IN_SECONDS );

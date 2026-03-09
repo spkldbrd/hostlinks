@@ -52,6 +52,7 @@ $mode_labels = array(
 
 $ajax_url = admin_url( 'admin-ajax.php' );
 $nonce    = wp_create_nonce( 'hostlinks_user_access' );
+?>
 <?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
 <h1>Hostlinks — User Access</h1>

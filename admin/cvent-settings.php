@@ -196,6 +196,7 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 }
 
 $s = Hostlinks_CVENT_API::get_settings();
+?>
 <?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
 	<h1>CVENT Settings</h1>

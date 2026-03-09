@@ -17,7 +17,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		);
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Type Sucessfully added. <a href="admin.php?page=types-menu">View Type</a></p></div>';
 	}
-	<?php if ( empty( $hl_embedded ) ) : ?>
+	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h2 id="add-new-user">Add New Type</h2>
 <?php endif; ?>
@@ -68,7 +69,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Type Sucessfully Updated. <a href="admin.php?page=types-menu">View Type</a></p></div>';
 	}
 	$bokdetsx = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table11 WHERE `event_type_id` = %d", $userid ) );
-	<?php if ( empty( $hl_embedded ) ) : ?>
+	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h2 id="add-new-user">Update Type</h2>
 <?php endif; ?>
@@ -112,7 +114,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	}
 	$all_pending_bookings = $wpdb->get_results( "SELECT * FROM $table11 WHERE `event_type_status`='1'", ARRAY_A );
 	$tot1                 = count( $all_pending_bookings );
-	<?php if ( empty( $hl_embedded ) ) : ?>
+	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div id="wpbody">
   <div tabindex="0" id="wpbody-content" class="ddddd">
     <div class="wrap">

@@ -26,6 +26,7 @@ if ( isset( $_POST['hl_save_request_settings'] ) ) {
 $notif_email    = get_option( 'hostlinks_event_request_notification_email', get_option( 'admin_email' ) );
 $subject_prefix = get_option( 'hostlinks_event_request_email_subject_prefix', '[Event Request]' );
 $success_msg    = get_option( 'hostlinks_event_request_success_message', '' );
+?>
 <?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
 <h1>Hostlinks — Event Request Settings</h1>

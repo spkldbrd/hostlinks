@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.5.37
+ * Version:     2.5.38
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,8 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.5.37' );
-define( 'HOSTLINKS_DB_VERSION', '1.3' );
+define( 'HOSTLINKS_VERSION',    '2.5.38' );
+define( 'HOSTLINKS_DB_VERSION', '1.4' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -27,6 +27,9 @@ require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-access.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-activation.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-assets.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-admin-menus.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-event-request.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-event-request-storage.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-event-request-shortcode.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-shortcodes.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-import-export.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-updater.php';
@@ -47,6 +50,9 @@ add_action( 'plugins_loaded', array( 'Hostlinks_DB', 'maybe_upgrade' ) );
 
 // Front-end access control (registers AJAX search hook)
 Hostlinks_Access::init();
+
+// Event request intake shortcode + submission handler
+new Hostlinks_Event_Request_Shortcode();
 
 // CVENT daily sync scheduler
 Hostlinks_CVENT_Scheduler::init();

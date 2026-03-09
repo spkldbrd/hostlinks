@@ -17,11 +17,12 @@ class Hostlinks_Assets {
 			return;
 		}
 
-		$has_calendar = has_shortcode( $post->post_content, 'eventlisto' ) ||
-		                has_shortcode( $post->post_content, 'oldeventlisto' );
-		$has_reports  = has_shortcode( $post->post_content, 'hostlinks_reports' );
+		$has_calendar      = has_shortcode( $post->post_content, 'eventlisto' ) ||
+		                     has_shortcode( $post->post_content, 'oldeventlisto' );
+		$has_reports       = has_shortcode( $post->post_content, 'hostlinks_reports' );
+		$has_event_request = has_shortcode( $post->post_content, 'hostlinks_event_request_form' );
 
-		if ( ! $has_calendar && ! $has_reports ) {
+		if ( ! $has_calendar && ! $has_reports && ! $has_event_request ) {
 			return;
 		}
 
@@ -31,6 +32,15 @@ class Hostlinks_Assets {
 			array(),
 			HOSTLINKS_VERSION
 		);
+
+		if ( $has_event_request ) {
+			wp_enqueue_style(
+				'hostlinks-event-request',
+				HOSTLINKS_PLUGIN_URL . 'assets/css/hostlinks-event-request.css',
+				array(),
+				HOSTLINKS_VERSION
+			);
+		}
 
 		if ( $has_reports ) {
 			wp_enqueue_script(

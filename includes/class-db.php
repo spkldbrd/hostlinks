@@ -108,5 +108,40 @@ class Hostlinks_DB {
 			PRIMARY KEY  (event_instructor_id)
 		) $charset_collate;";
 		dbDelta( $sql );
+
+		// Event request intake table — stores pending requests separately from live events.
+		$sql = "CREATE TABLE {$wpdb->prefix}hostlinks_event_requests (
+			id bigint(20) NOT NULL AUTO_INCREMENT,
+			request_status varchar(20) NOT NULL DEFAULT 'new',
+			submitted_at datetime DEFAULT NULL,
+			updated_at datetime DEFAULT NULL,
+			event_title varchar(500) NOT NULL DEFAULT '',
+			hostlinks_title varchar(500) NOT NULL DEFAULT '',
+			description text NOT NULL DEFAULT '',
+			category varchar(255) NOT NULL DEFAULT '',
+			format varchar(50) NOT NULL DEFAULT '',
+			timezone varchar(100) NOT NULL DEFAULT '',
+			marketer varchar(255) NOT NULL DEFAULT '',
+			trainer varchar(255) NOT NULL DEFAULT '',
+			start_date date DEFAULT NULL,
+			end_date date DEFAULT NULL,
+			start_time varchar(20) NOT NULL DEFAULT '',
+			end_time varchar(20) NOT NULL DEFAULT '',
+			host_name varchar(255) NOT NULL DEFAULT '',
+			location_name varchar(255) NOT NULL DEFAULT '',
+			street_address_1 varchar(255) NOT NULL DEFAULT '',
+			street_address_2 varchar(255) NOT NULL DEFAULT '',
+			city varchar(100) NOT NULL DEFAULT '',
+			state varchar(100) NOT NULL DEFAULT '',
+			zip_code varchar(20) NOT NULL DEFAULT '',
+			price decimal(10,2) DEFAULT NULL,
+			max_attendees int(11) DEFAULT NULL,
+			special_message text NOT NULL DEFAULT '',
+			cc_emails text NOT NULL DEFAULT '',
+			hotels text NOT NULL DEFAULT '',
+			host_contacts text NOT NULL DEFAULT '',
+			PRIMARY KEY  (id)
+		) $charset_collate;";
+		dbDelta( $sql );
 	}
 }

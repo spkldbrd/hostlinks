@@ -1,0 +1,264 @@
+/* ── Hostlinks Event Request Form ─────────────────────────────────────────── */
+
+.hl-event-request-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  font-family: inherit;
+}
+
+/* Error summary box */
+.hl-form-errors {
+  background: #fff3f3;
+  border: 1px solid #e07070;
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  color: #b00;
+}
+.hl-form-errors ul {
+  margin: 0.5rem 0 0 1.2rem;
+  padding: 0;
+}
+
+/* Sections */
+.hl-form-section {
+  background: #fff;
+  border: 1px solid hsl(215 15% 88%);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.hl-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 1rem;
+  color: hsl(215 25% 22%);
+  border-bottom: 2px solid #0da2e7;
+  padding-bottom: 0.4rem;
+}
+
+.hl-section-note {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: hsl(215 15% 55%);
+}
+
+/* Field groups */
+.hl-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.hl-field-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: hsl(215 20% 35%);
+}
+
+/* Grid layouts */
+.hl-field-row {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.hl-field-row.hl-col-2 { grid-template-columns: 1fr 1fr; }
+.hl-field-row.hl-col-3 { grid-template-columns: 2fr 1fr 1fr; }
+.hl-col-1 { margin-bottom: 1rem; }
+
+/* Inputs */
+.hl-event-request-wrap input[type="text"],
+.hl-event-request-wrap input[type="email"],
+.hl-event-request-wrap input[type="tel"],
+.hl-event-request-wrap input[type="url"],
+.hl-event-request-wrap input[type="number"],
+.hl-event-request-wrap input[type="date"],
+.hl-event-request-wrap input[type="time"],
+.hl-event-request-wrap select,
+.hl-event-request-wrap textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid hsl(215 15% 78%);
+  border-radius: 5px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  background: #fff;
+  color: hsl(215 25% 22%);
+  transition: border-color 0.15s;
+}
+.hl-event-request-wrap input:focus,
+.hl-event-request-wrap select:focus,
+.hl-event-request-wrap textarea:focus {
+  outline: none;
+  border-color: #0da2e7;
+  box-shadow: 0 0 0 2px hsl(200 90% 60% / 20%);
+}
+.hl-event-request-wrap input.hl-has-error,
+.hl-event-request-wrap select.hl-has-error {
+  border-color: #e07070;
+}
+
+/* Radio group */
+.hl-radio-group {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+  padding: 0.55rem 0;
+}
+.hl-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+.hl-radio-label input[type="radio"] {
+  width: auto;
+}
+
+/* Required / optional markers */
+.hl-req       { color: #c00; }
+.hl-optional  { font-weight: 400; font-size: 0.78rem; color: hsl(215 15% 55%); }
+
+/* Field errors */
+.hl-field-error {
+  color: #c00;
+  font-size: 0.8rem;
+}
+
+/* Repeatable rows */
+.hl-repeatable-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+.hl-cc-row input { flex: 1; }
+
+.hl-hotel-grid,
+.hl-contact-grid {
+  display: grid;
+  gap: 0.75rem;
+  flex: 1;
+}
+.hl-hotel-grid   { grid-template-columns: 2fr 1fr 2fr 2fr; }
+.hl-contact-grid { grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; }
+
+.hl-col-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.hl-check-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+.hl-check-label input[type="checkbox"] { width: auto; }
+
+.hl-remove-row {
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid hsl(215 15% 80%);
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #888;
+  margin-top: 24px;
+}
+.hl-remove-row:hover { border-color: #e07070; color: #c00; }
+
+.hl-add-row {
+  margin-top: 0.4rem;
+  background: none;
+  border: 1px dashed #0da2e7;
+  color: #0da2e7;
+  border-radius: 5px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.hl-add-row:hover { background: hsl(200 90% 97%); }
+
+/* Submit section */
+.hl-form-submit { border-style: none; background: transparent; padding: 0; margin-bottom: 2rem; }
+
+.hl-submit-btn {
+  background: #0da2e7;
+  color: #fff;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.hl-submit-btn:hover { background: #0b8ecf; }
+
+/* Success message */
+.hl-request-success {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 0.75rem;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  color: #166534;
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .hl-field-row.hl-col-2,
+  .hl-field-row.hl-col-3 { grid-template-columns: 1fr; }
+  .hl-hotel-grid   { grid-template-columns: 1fr 1fr; }
+  .hl-contact-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Dark mode ────────────────────────────────────────────────────────────── */
+.dark .hl-form-section,
+.darklooks-mode-changer-enabled .hl-form-section {
+  background: hsl(215 25% 13%);
+  border-color: hsl(215 20% 20%);
+}
+.dark .hl-section-title,
+.darklooks-mode-changer-enabled .hl-section-title {
+  color: hsl(210 25% 85%);
+}
+.dark .hl-field-group label,
+.darklooks-mode-changer-enabled .hl-field-group label {
+  color: hsl(215 15% 65%);
+}
+.dark .hl-event-request-wrap input,
+.dark .hl-event-request-wrap select,
+.dark .hl-event-request-wrap textarea,
+.darklooks-mode-changer-enabled .hl-event-request-wrap input,
+.darklooks-mode-changer-enabled .hl-event-request-wrap select,
+.darklooks-mode-changer-enabled .hl-event-request-wrap textarea {
+  background: hsl(215 20% 18%);
+  border-color: hsl(215 20% 28%);
+  color: hsl(210 25% 85%);
+}
+.dark .hl-event-request-wrap input:focus,
+.dark .hl-event-request-wrap select:focus,
+.dark .hl-event-request-wrap textarea:focus,
+.darklooks-mode-changer-enabled .hl-event-request-wrap input:focus,
+.darklooks-mode-changer-enabled .hl-event-request-wrap select:focus,
+.darklooks-mode-changer-enabled .hl-event-request-wrap textarea:focus {
+  border-color: #0da2e7;
+}
+.dark .hl-request-success,
+.darklooks-mode-changer-enabled .hl-request-success {
+  background: hsl(140 30% 10%);
+  border-color: hsl(140 40% 25%);
+  color: hsl(140 35% 75%);
+}

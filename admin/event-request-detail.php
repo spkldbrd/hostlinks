@@ -1,0 +1,176 @@
+<?php
+/**
+ * Event Request detail view.
+ * Included from admin/event-requests.php when ?id= is set and valid.
+ * Expects $req = Hostlinks_Event_Request_Storage::get_by_id(int).
+ */
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+$rid        = (int) $req['id'];
+$status     = $req['request_status'];
+$status_lbl = Hostlinks_Event_Request::STATUSES[ $status ] ?? ucfirst( $status );
+$list_url   = admin_url( 'admin.php?page=hostlinks-event-requests' );
+$base_url   = admin_url( 'admin.php?page=hostlinks-event-requests' );
+
+$nonce_reviewed = wp_create_nonce( 'hl_request_action_' . $rid );
+$nonce_archived = wp_create_nonce( 'hl_request_action_' . $rid );
+$nonce_new      = wp_create_nonce( 'hl_request_action_' . $rid );
+$reviewed_url   = add_query_arg( array( 'hl_action' => 'reviewed', 'id' => $rid, '_wpnonce' => $nonce_reviewed ), $base_url );
+$archive_url    = add_query_arg( array( 'hl_action' => 'archived', 'id' => $rid, '_wpnonce' => $nonce_archived ), $base_url );
+$reopen_url     = add_query_arg( array( 'hl_action' => 'new',      'id' => $rid, '_wpnonce' => $nonce_new      ), $base_url );
+
+$badge_colors = array(
+	'new'       => '#0da2e7',
+	'reviewed'  => '#f0a500',
+	'converted' => '#4caf50',
+	'archived'  => '#9e9e9e',
+);
+$badge_color = $badge_colors[ $status ] ?? '#9e9e9e';
+
+function hl_detail_row( string $label, string $value, bool $full = false ): void {
+	if ( $value === '' ) return;
+	$width = $full ? '100%' : '50%';
+	echo '<tr>';
+	echo '<th style="width:180px;padding:8px 12px;background:#f9f9f9;border:1px solid #e5e5e5;font-weight:600;vertical-align:top;">' . esc_html( $label ) . '</th>';
+	echo '<td style="padding:8px 12px;border:1px solid #e5e5e5;">' . esc_html( $value ) . '</td>';
+	echo '</tr>';
+}
+?>
+<div class="wrap">
+<h1>
+	<a href="<?php echo esc_url( $list_url ); ?>" style="text-decoration:none;color:#50575e;font-size:14px;margin-right:8px;">← Event Requests</a>
+	Event Request #<?php echo $rid; ?>
+	<span style="background:<?php echo $badge_color; ?>;color:#fff;padding:3px 10px;border-radius:3px;font-size:13px;margin-left:8px;vertical-align:middle;">
+		<?php echo esc_html( $status_lbl ); ?>
+	</span>
+</h1>
+
+<!-- Actions row -->
+<div style="margin:12px 0 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+	<?php if ( $status !== 'reviewed' && $status !== 'converted' ) : ?>
+	<a href="<?php echo esc_url( $reviewed_url ); ?>" class="button button-primary">Mark Reviewed</a>
+	<?php endif; ?>
+	<?php if ( $status !== 'archived' ) : ?>
+	<a href="<?php echo esc_url( $archive_url ); ?>" class="button"
+		onclick="return confirm('Archive this request?');">Archive</a>
+	<?php else : ?>
+	<a href="<?php echo esc_url( $reopen_url ); ?>" class="button">Re-open</a>
+	<?php endif; ?>
+	<button class="button" disabled title="Convert to Event — available in a future phase" style="opacity:.5;cursor:not-allowed;">
+		Convert to Event (coming soon)
+	</button>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:1100px;">
+
+	<!-- LEFT: Event Details -->
+	<div>
+		<h2 style="font-size:15px;margin-bottom:8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Event Details</h2>
+		<table style="width:100%;border-collapse:collapse;">
+			<?php
+			hl_detail_row( 'Title',       $req['event_title'] );
+			hl_detail_row( 'HL Title',    $req['hostlinks_title'] );
+			hl_detail_row( 'Category',    $req['category'] );
+			hl_detail_row( 'Format',      $req['format'] === 'virtual' ? 'Virtual (Zoom)' : 'In-Person' );
+			hl_detail_row( 'Timezone',    $req['timezone'] );
+			hl_detail_row( 'Trainer',     $req['trainer'] );
+			hl_detail_row( 'Marketer',    $req['marketer'] );
+			hl_detail_row( 'Description', $req['description'] );
+			?>
+		</table>
+
+		<h2 style="font-size:15px;margin:20px 0 8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Dates &amp; Times</h2>
+		<table style="width:100%;border-collapse:collapse;">
+			<?php
+			hl_detail_row( 'Start Date', $req['start_date'] );
+			hl_detail_row( 'End Date',   $req['end_date'] );
+			hl_detail_row( 'Start Time', $req['start_time'] );
+			hl_detail_row( 'End Time',   $req['end_time'] );
+			?>
+		</table>
+
+		<h2 style="font-size:15px;margin:20px 0 8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Venue / Host</h2>
+		<table style="width:100%;border-collapse:collapse;">
+			<?php
+			hl_detail_row( 'Host',           $req['host_name'] );
+			hl_detail_row( 'Location Name',  $req['location_name'] );
+			hl_detail_row( 'Street Address', $req['street_address_1'] );
+			hl_detail_row( 'Address 2',      $req['street_address_2'] );
+			hl_detail_row( 'City',           $req['city'] );
+			hl_detail_row( 'State',          $req['state'] );
+			hl_detail_row( 'ZIP Code',       $req['zip_code'] );
+			?>
+		</table>
+
+		<h2 style="font-size:15px;margin:20px 0 8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Registration &amp; Capacity</h2>
+		<table style="width:100%;border-collapse:collapse;">
+			<?php
+			hl_detail_row( 'Price',         $req['price'] !== null ? '$' . number_format( (float) $req['price'], 2 ) : '' );
+			hl_detail_row( 'Max Attendees', $req['max_attendees'] !== null ? (string) $req['max_attendees'] : '' );
+			hl_detail_row( 'Special Message', $req['special_message'] );
+			?>
+		</table>
+	</div>
+
+	<!-- RIGHT: Repeatable groups -->
+	<div>
+		<?php if ( ! empty( $req['cc_emails'] ) ) : ?>
+		<h2 style="font-size:15px;margin-bottom:8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">CC Emails</h2>
+		<ul style="margin:0 0 16px;padding-left:20px;">
+			<?php foreach ( $req['cc_emails'] as $email ) : ?>
+			<li><?php echo esc_html( $email ); ?></li>
+			<?php endforeach; ?>
+		</ul>
+		<?php endif; ?>
+
+		<?php if ( ! empty( $req['hotels'] ) ) : ?>
+		<h2 style="font-size:15px;margin-bottom:8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Hotel Recommendations</h2>
+		<?php foreach ( $req['hotels'] as $hotel ) : ?>
+		<div style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:4px;padding:10px 14px;margin-bottom:8px;">
+			<strong><?php echo esc_html( $hotel['name'] ); ?></strong><br>
+			<?php if ( $hotel['phone'] )   echo 'Phone: ' . esc_html( $hotel['phone'] ) . '<br>'; ?>
+			<?php if ( $hotel['address'] ) echo 'Address: ' . esc_html( $hotel['address'] ) . '<br>'; ?>
+			<?php if ( $hotel['url'] )     echo '<a href="' . esc_url( $hotel['url'] ) . '" target="_blank">' . esc_html( $hotel['url'] ) . '</a>'; ?>
+		</div>
+		<?php endforeach; ?>
+		<?php endif; ?>
+
+		<?php if ( ! empty( $req['host_contacts'] ) ) : ?>
+		<h2 style="font-size:15px;margin-bottom:8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Host Contacts</h2>
+		<?php foreach ( $req['host_contacts'] as $contact ) : ?>
+		<div style="background:#f9f9f9;border:1px solid #e5e5e5;border-radius:4px;padding:10px 14px;margin-bottom:8px;">
+			<strong><?php echo esc_html( $contact['name'] ); ?></strong>
+			<?php if ( $contact['title'] ) echo ' — ' . esc_html( $contact['title'] ); ?>
+			<br>
+			<?php if ( $contact['agency'] ) echo esc_html( $contact['agency'] ) . '<br>'; ?>
+			<?php if ( $contact['email'] )  echo esc_html( $contact['email'] )  . '<br>'; ?>
+			<?php if ( $contact['phone'] ) : ?>
+				<?php echo esc_html( $contact['phone'] ); ?>
+				<?php if ( ! empty( $contact['dnl_phone'] ) ) echo ' <em style="color:#999;">(Do Not List)</em>'; ?>
+				<br>
+			<?php endif; ?>
+			<?php if ( $contact['phone2'] ) : ?>
+				<?php echo esc_html( $contact['phone2'] ); ?>
+				<?php if ( ! empty( $contact['dnl_phone2'] ) ) echo ' <em style="color:#999;">(Do Not List)</em>'; ?>
+				<br>
+			<?php endif; ?>
+			<?php if ( ! empty( $contact['publish'] ) ) echo '<em style="color:#4caf50;">Publish</em>'; ?>
+		</div>
+		<?php endforeach; ?>
+		<?php endif; ?>
+
+		<!-- Submission metadata -->
+		<h2 style="font-size:15px;margin:20px 0 8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Submission Info</h2>
+		<table style="width:100%;border-collapse:collapse;">
+			<?php
+			hl_detail_row( 'Submitted', $req['submitted_at'] );
+			hl_detail_row( 'Updated',   $req['updated_at'] );
+			hl_detail_row( 'Status',    $status_lbl );
+			?>
+		</table>
+	</div>
+
+</div><!-- grid -->
+</div><!-- .wrap -->

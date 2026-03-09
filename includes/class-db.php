@@ -41,6 +41,20 @@ class Hostlinks_DB {
 			}
 		}
 
+		// v1.5 — rename eve_sign_in_url → eve_web_url.
+		// Same three-state guard used for the v1.1 trainer URL rename.
+		if ( version_compare( $installed, '1.5', '<' ) ) {
+			$table   = $wpdb->prefix . 'event_details_list';
+			$has_old = ! empty( $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_sign_in_url' ) ) );
+			$has_new = ! empty( $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_web_url' ) ) );
+
+			if ( $has_old && ! $has_new ) {
+				$wpdb->query( "ALTER TABLE `{$table}` CHANGE `eve_sign_in_url` `eve_web_url` text NOT NULL DEFAULT ''" );
+			} elseif ( $has_old && $has_new ) {
+				$wpdb->query( "ALTER TABLE `{$table}` DROP COLUMN `eve_sign_in_url`" );
+			}
+		}
+
 		// Now run dbDelta — sees the correct schema and makes no conflicting changes.
 		self::create_tables();
 
@@ -67,7 +81,7 @@ class Hostlinks_DB {
 			eve_host_url text NOT NULL,
 			eve_roster_url text NOT NULL,
 			eve_trainer_url text NOT NULL,
-			eve_sign_in_url text NOT NULL,
+			eve_web_url text NOT NULL,
 			eve_instructor int(11) NOT NULL DEFAULT 0,
 			eve_tot_date varchar(100) NOT NULL DEFAULT '',
 			eve_status tinyint(1) NOT NULL DEFAULT 1,

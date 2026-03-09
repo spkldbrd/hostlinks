@@ -25,7 +25,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'] ) );
 		$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'] ) );
 		$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'] ) );
-		$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'] ) );
+		$eve_web_url  = esc_url_raw( trim( $_POST['eve_web_url'] ) );
 		$eve_instructor   = intval( $_POST['eve_instructor'] );
 		update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
 		$wpdb->insert(
@@ -42,7 +42,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 				'eve_host_url'   => $eve_host_url,
 				'eve_roster_url' => $eve_roster_url,
 				'eve_trainer_url'=> $eve_trainer_url,
-				'eve_sign_in_url' => $eve_sign_in_url,
+				'eve_web_url' => $eve_web_url,
 				'eve_instructor'  => $eve_instructor,
 				'eve_tot_date'    => $eve_tot_date,
 				'eve_status'      => 1,
@@ -120,8 +120,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <td><input type="text" value="" id="eve_trainer_url" name="eve_trainer_url"></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_sign_in_url">Sign In URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="#" id="eve_sign_in_url" name="eve_sign_in_url" required></td>
+        <th><label for="eve_web_url">WEB URL</label></th>
+        <td><input type="text" value="" id="eve_web_url" name="eve_web_url"></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_instructor">Instructor <span class="description">(required)</span></label></th>
@@ -171,7 +171,7 @@ jQuery(function() {
 		$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'] ) );
 		$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'] ) );
 		$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'] ) );
-		$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'] ) );
+		$eve_web_url  = esc_url_raw( trim( $_POST['eve_web_url'] ) );
 		$eve_instructor   = intval( $_POST['eve_instructor'] );
 		update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
 		$wpdb->update(
@@ -188,7 +188,7 @@ jQuery(function() {
 				'eve_host_url'   => $eve_host_url,
 				'eve_roster_url' => $eve_roster_url,
 				'eve_trainer_url'=> $eve_trainer_url,
-				'eve_sign_in_url' => $eve_sign_in_url,
+				'eve_web_url' => $eve_web_url,
 				'eve_instructor'  => $eve_instructor,
 				'eve_tot_date'    => $eve_tot_date,
 			),
@@ -266,8 +266,8 @@ jQuery(function() {
         <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_trainer_url ?? '' ); ?>" id="eve_trainer_url" name="eve_trainer_url"></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_sign_in_url">Sign In URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_sign_in_url ?? '' ); ?>" id="eve_sign_in_url" name="eve_sign_in_url" required></td>
+        <th><label for="eve_web_url">WEB URL</label></th>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_web_url ?? '' ); ?>" id="eve_web_url" name="eve_web_url"></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_instructor">Instructor <span class="description">(required)</span></label></th>
@@ -348,7 +348,7 @@ jQuery(function() {
 						$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'][ $key ] ) );
 						$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'][ $key ] ) );
 						$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'][ $key ] ) );
-						$eve_sign_in_url  = esc_url_raw( trim( $_POST['eve_sign_in_url'][ $key ] ) );
+						$eve_web_url  = esc_url_raw( trim( $_POST['eve_web_url'][ $key ] ) );
 						$eve_instructor   = intval( $_POST['eve_instructor'][ $key ] );
 						$wpdb->update(
 							$table11,
@@ -364,7 +364,7 @@ jQuery(function() {
 								'eve_host_url'   => $eve_host_url,
 								'eve_roster_url' => $eve_roster_url,
 								'eve_trainer_url'=> $eve_trainer_url,
-								'eve_sign_in_url' => $eve_sign_in_url,
+								'eve_web_url' => $eve_web_url,
 								'eve_instructor'  => $eve_instructor,
 								'eve_tot_date'    => $eve_tot_date,
 							),
@@ -474,7 +474,7 @@ jQuery(function() {
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
             <th>Location</th><th>Paid</th><th>Free</th><th>Date</th>
             <th>Type</th><th>Zoom</th><th>Marketer</th>
-            <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>Sign In URL</th><th>Instructor</th>
+            <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>Instructor</th>
           </tr>
         </thead>
         <tbody id="the-list">
@@ -515,7 +515,7 @@ jQuery(function() {
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" required style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" required style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>" name="eve_trainer_url[]" style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_sign_in_url'] ?? '' ); ?>" name="eve_sign_in_url[]" required style="width:140px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_web_url'] ?? '' ); ?>" name="eve_web_url[]" style="width:140px;"></td>
             <td>
               <select name="eve_instructor[]" class="evetype" required style="width:100px;">
                 <option value="">Please Choose</option>

@@ -237,8 +237,8 @@ $empty_msg = $focus_name
 					<?php if ( ! empty( $alldriver['eve_trainer_url'] ) ) : ?>
 					&nbsp;|&nbsp;<a href="<?php echo esc_url( $alldriver['eve_trainer_url'] ); ?>" class="hostlinks-roster-link" target="_blank">Reg</a>
 					<?php endif; ?>
-					<?php if ( ! empty( $alldriver['eve_sign_in_url'] ) ) : ?>
-					&nbsp;|&nbsp;<a href="<?php echo esc_url( $alldriver['eve_sign_in_url'] ); ?>" class="hostlinks-roster-link" target="_blank">SI</a>
+					<?php if ( ! empty( $alldriver['eve_web_url'] ) ) : ?>
+					&nbsp;|&nbsp;<a href="<?php echo esc_url( $alldriver['eve_web_url'] ); ?>" class="hostlinks-roster-link" target="_blank">SI</a>
 					<?php endif; ?>
 				</div>
 				<div class="hostlinks-card-date"><?php echo $date_range; ?></div>

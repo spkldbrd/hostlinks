@@ -86,7 +86,7 @@ if ( isset( $_POST['hostlinks_cvent_add_event'] ) ) {
 	$eve_host_url    = esc_url_raw( trim( $_POST['eve_host_url'] ?? '' ) );
 	$eve_roster_url  = esc_url_raw( trim( $_POST['eve_roster_url'] ?? '' ) );
 	$eve_trainer_url = esc_url_raw( trim( $_POST['eve_trainer_url'] ?? '' ) );
-	$eve_sign_in_url = esc_url_raw( trim( $_POST['eve_sign_in_url'] ?? '' ) );
+	$eve_web_url = esc_url_raw( trim( $_POST['eve_web_url'] ?? '' ) );
 	$eve_start       = sanitize_text_field( $_POST['eve_start'] ?? '' );
 	$eve_end         = sanitize_text_field( $_POST['eve_end'] ?? '' );
 	$eve_tot_date    = $eve_start . '-' . $eve_end;
@@ -109,7 +109,7 @@ if ( isset( $_POST['hostlinks_cvent_add_event'] ) ) {
 				'eve_host_url'          => $eve_host_url,
 				'eve_roster_url'        => $eve_roster_url,
 				'eve_trainer_url'       => $eve_trainer_url,
-				'eve_sign_in_url'       => $eve_sign_in_url,
+				'eve_web_url'       => $eve_web_url,
 				'eve_instructor'        => $eve_instructor,
 				'eve_tot_date'          => $eve_tot_date,
 				'eve_status'            => 1,
@@ -427,9 +427,9 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 							</td>
 						</tr>
 						<tr>
-							<th style="padding:6px 10px;font-weight:600;"><label>Sign-in URL</label></th>
+							<th style="padding:6px 10px;font-weight:600;"><label>Web URL</label></th>
 							<td style="padding:6px 10px;">
-								<input type="url" name="eve_sign_in_url" value=""
+								<input type="url" name="eve_web_url" value=""
 									style="width:360px;" placeholder="https://">
 							</td>
 						</tr>

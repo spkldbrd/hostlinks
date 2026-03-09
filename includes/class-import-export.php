@@ -343,6 +343,7 @@ class Hostlinks_Import_Export {
 		// Add future renames here as the schema evolves.
 		$renames = array(
 			'eve_trainner_url' => 'eve_trainer_url',
+			'eve_sign_in_url'  => 'eve_web_url',
 		);
 		foreach ( $renames as $old => $new ) {
 			if ( array_key_exists( $old, $row ) ) {

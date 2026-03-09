@@ -43,6 +43,7 @@ class Hostlinks_Admin_Menus {
 		}
 		add_submenu_page( 'booking-menu', 'New CVENT Events', $new_label, 'manage_options','cvent-new-events',        array( $this, 'page_cvent_new_events' ) );
 
+		add_submenu_page( 'booking-menu', 'User Access',     'User Access',       'manage_options','hostlinks-user-access',   array( $this, 'page_user_access' ) );
 		add_submenu_page( 'booking-menu', 'Plugin Info',     'Plugin Info',       'manage_options','hostlinks-plugin-info',   array( $this, 'page_plugin_info' ) );
 	}
 
@@ -72,6 +73,10 @@ class Hostlinks_Admin_Menus {
 
 	public function page_cvent_settings() {
 		include HOSTLINKS_PLUGIN_DIR . 'admin/cvent-settings.php';
+	}
+
+	public function page_user_access() {
+		include HOSTLINKS_PLUGIN_DIR . 'admin/user-access.php';
 	}
 
 	public function page_plugin_info() {

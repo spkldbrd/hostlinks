@@ -12,9 +12,8 @@ class Hostlinks_Shortcodes {
 	}
 
 	public function render_eventlisto() {
-		if ( ! is_user_logged_in() ) {
-			wp_safe_redirect( home_url() );
-			exit;
+		if ( ! Hostlinks_Access::can_view_shortcode( 'eventlisto' ) ) {
+			return Hostlinks_Access::get_denial_message_html();
 		}
 		global $wpdb, $post;
 		ob_start();
@@ -23,9 +22,8 @@ class Hostlinks_Shortcodes {
 	}
 
 	public function render_old_eventlisto() {
-		if ( ! is_user_logged_in() ) {
-			wp_safe_redirect( home_url() );
-			exit;
+		if ( ! Hostlinks_Access::can_view_shortcode( 'oldeventlisto' ) ) {
+			return Hostlinks_Access::get_denial_message_html();
 		}
 		global $wpdb, $post;
 		ob_start();
@@ -34,9 +32,8 @@ class Hostlinks_Shortcodes {
 	}
 
 	public function render_reports() {
-		if ( ! is_user_logged_in() ) {
-			wp_safe_redirect( home_url() );
-			exit;
+		if ( ! Hostlinks_Access::can_view_shortcode( 'hostlinks_reports' ) ) {
+			return Hostlinks_Access::get_denial_message_html();
 		}
 		global $wpdb, $post;
 		ob_start();

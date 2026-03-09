@@ -497,3 +497,26 @@
 .darklooks-mode-changer-enabled .hl-summary-table tbody tr:hover {
   background: hsl(215 20% 20%);
 }
+
+/* ── Access denied message ─────────────────────────────────────────────────── */
+.hostlinks-access-denied {
+  background: white;
+  border: 1px solid hsl(215 15% 88%);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  text-align: center;
+  color: hsl(215 15% 45%);
+  max-width: 600px;
+  margin: 2rem auto;
+}
+.hostlinks-access-denied p {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.dark .hostlinks-access-denied,
+.darklooks-mode-changer-enabled .hostlinks-access-denied {
+  background: hsl(215 25% 13%);
+  border-color: hsl(215 20% 20%);
+  color: hsl(215 15% 60%);
+}

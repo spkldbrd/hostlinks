@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.5.36
+ * Version:     2.5.37
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.5.36' );
+define( 'HOSTLINKS_VERSION',    '2.5.37' );
 define( 'HOSTLINKS_DB_VERSION', '1.3' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -23,6 +23,7 @@ define( 'HOSTLINKS_GITHUB_REPO', 'hostlinks' );
 
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-db.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-page-urls.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-access.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-activation.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-assets.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-admin-menus.php';
@@ -43,6 +44,9 @@ Hostlinks_Updater::init( __FILE__, HOSTLINKS_GITHUB_USER, HOSTLINKS_GITHUB_REPO 
 
 // Run schema upgrades on every load — safe because dbDelta only alters when needed
 add_action( 'plugins_loaded', array( 'Hostlinks_DB', 'maybe_upgrade' ) );
+
+// Front-end access control (registers AJAX search hook)
+Hostlinks_Access::init();
 
 // CVENT daily sync scheduler
 Hostlinks_CVENT_Scheduler::init();

@@ -9,6 +9,7 @@ class Hostlinks_Import_Export {
 		add_action( 'admin_post_hostlinks_export_json', array( $this, 'handle_export_json' ) );
 		add_action( 'admin_post_hostlinks_export_csv',  array( $this, 'handle_export_csv' ) );
 		add_action( 'admin_post_hostlinks_import',      array( $this, 'handle_import' ) );
+		add_action( 'admin_post_hostlinks_reset_data',  array( $this, 'handle_reset' ) );
 	}
 
 	// ─── Export ────────────────────────────────────────────────────────────────
@@ -354,6 +355,60 @@ class Hostlinks_Import_Export {
 
 		// Strip any key not in the current schema.
 		return array_intersect_key( $row, array_flip( $valid_columns ) );
+	}
+
+	// ─── Reset ─────────────────────────────────────────────────────────────────
+
+	/**
+	 * Handle "Clear Data" POST from the Reset tab on the Import/Export page.
+	 *
+	 * The form sends one or more table keys in $_POST['hl_reset_tables'][].
+	 * Each key maps to a truncatable table name. After truncation the user is
+	 * redirected back with a success notice.
+	 */
+	public function handle_reset() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Unauthorized' );
+		}
+		check_admin_referer( 'hostlinks_reset_data' );
+
+		// Confirmation checkbox is required — extra guard in case JS is disabled.
+		if ( empty( $_POST['hl_reset_confirmed'] ) ) {
+			wp_safe_redirect( add_query_arg( array(
+				'page'   => 'hostlinks-import-export',
+				'hl_msg' => 'reset_not_confirmed',
+			), admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		global $wpdb;
+
+		// Map safe keys → actual table names.
+		$table_map = array(
+			'events'       => $wpdb->prefix . 'event_details_list',
+			'marketers'    => $wpdb->prefix . 'event_marketer',
+			'instructors'  => $wpdb->prefix . 'event_instructor',
+			'types'        => $wpdb->prefix . 'event_type',
+			'requests'     => $wpdb->prefix . 'hostlinks_event_requests',
+		);
+
+		$requested = (array) ( $_POST['hl_reset_tables'] ?? array() );
+		$cleared   = array();
+
+		foreach ( $requested as $key ) {
+			$key = sanitize_key( $key );
+			if ( isset( $table_map[ $key ] ) ) {
+				$wpdb->query( "TRUNCATE TABLE `{$table_map[$key]}`" );
+				$cleared[] = $key;
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( array(
+			'page'          => 'hostlinks-import-export',
+			'hl_msg'        => 'reset_done',
+			'hl_reset_keys' => implode( ',', $cleared ),
+		), admin_url( 'admin.php' ) ) );
+		exit;
 	}
 }
 

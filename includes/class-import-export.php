@@ -231,6 +231,11 @@ class Hostlinks_Import_Export {
 		// ── Events ────────────────────────────────────────────────────────────
 		// Deduplicate by eve_start + eve_location (same logic as before).
 		if ( ! empty( $data['event_details'] ) ) {
+			// Fetch current table columns once so sanitize_event_row() can
+			// strip keys from the export that no longer exist in the schema
+			// (e.g. the legacy misspelled 'eve_trainner_url' column).
+			$valid_columns = $wpdb->get_col( "DESCRIBE {$wpdb->prefix}event_details_list", 0 );
+
 			foreach ( $data['event_details'] as $row ) {
 				$exists = (int) $wpdb->get_var( $wpdb->prepare(
 					"SELECT COUNT(*) FROM {$wpdb->prefix}event_details_list WHERE eve_start = %s AND eve_location = %s",
@@ -241,7 +246,7 @@ class Hostlinks_Import_Export {
 					continue;
 				}
 
-				unset( $row['eve_id'] ); // let auto-increment assign a new ID
+				$row    = $this->sanitize_event_row( $row, $valid_columns );
 				$result = $wpdb->insert( $wpdb->prefix . 'event_details_list', $row );
 				if ( false === $result ) {
 					$record_error( 'event:' . ( $row['eve_location'] ?? '?' ) . ' ' . ( $row['eve_start'] ?? '' ) );
@@ -272,11 +277,12 @@ class Hostlinks_Import_Export {
 			exit;
 		}
 
-		$headers  = fgetcsv( $handle );
-		$imported = 0;
-		$skipped  = 0;
-		$failed   = 0;
-		$errors   = array();
+		$headers       = fgetcsv( $handle );
+		$imported      = 0;
+		$skipped       = 0;
+		$failed        = 0;
+		$errors        = array();
+		$valid_columns = $wpdb->get_col( "DESCRIBE {$wpdb->prefix}event_details_list", 0 );
 
 		while ( ( $line = fgetcsv( $handle ) ) !== false ) {
 			if ( count( $line ) !== count( $headers ) ) { continue; }
@@ -289,7 +295,7 @@ class Hostlinks_Import_Export {
 				$skipped++;
 				continue;
 			}
-			unset( $row['eve_id'] );
+			$row    = $this->sanitize_event_row( $row, $valid_columns );
 			$result = $wpdb->insert( $wpdb->prefix . 'event_details_list', $row );
 			if ( false === $result ) {
 				$failed++;
@@ -313,6 +319,41 @@ class Hostlinks_Import_Export {
 		}
 		wp_redirect( add_query_arg( $args, $redirect ) );
 		exit;
+	}
+	// ─── Row sanitization ──────────────────────────────────────────────────────
+
+	/**
+	 * Normalize an event row from any export version before inserting.
+	 *
+	 * 1. Removes eve_id so auto-increment assigns a new ID on the target site.
+	 * 2. Applies known column renames so exports from pre-migration sites still
+	 *    import correctly (e.g. 'eve_trainner_url' → 'eve_trainer_url').
+	 * 3. Strips any key not present in the current table schema, preventing
+	 *    "Unknown column" errors when the export is from a different schema version.
+	 *
+	 * @param array $row           Raw event row from the export file.
+	 * @param array $valid_columns Column names from DESCRIBE on the target table.
+	 * @return array               Sanitized row safe to pass to $wpdb->insert().
+	 */
+	private function sanitize_event_row( array $row, array $valid_columns ) {
+		unset( $row['eve_id'] );
+
+		// Known column renames: old_name => new_name.
+		// Add future renames here as the schema evolves.
+		$renames = array(
+			'eve_trainner_url' => 'eve_trainer_url',
+		);
+		foreach ( $renames as $old => $new ) {
+			if ( array_key_exists( $old, $row ) ) {
+				if ( ! array_key_exists( $new, $row ) ) {
+					$row[ $new ] = $row[ $old ];
+				}
+				unset( $row[ $old ] );
+			}
+		}
+
+		// Strip any key not in the current schema.
+		return array_intersect_key( $row, array_flip( $valid_columns ) );
 	}
 }
 

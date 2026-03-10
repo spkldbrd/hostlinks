@@ -36,21 +36,30 @@ class Hostlinks_Page_URLs {
 		return self::resolve( 'reports', 'hostlinks_reports', '' );
 	}
 
+	/**
+	 * Returns the Public Event List page URL, or '' if not found.
+	 */
+	public static function get_public_event_list() {
+		return self::resolve( 'public_event_list', 'public_event_list', '' );
+	}
+
 	// ── Settings helpers ───────────────────────────────────────────────────────
 
 	public static function get_overrides() {
 		return wp_parse_args( get_option( self::OPTION_KEY, array() ), array(
-			'upcoming'    => '',
-			'past_events' => '',
-			'reports'     => '',
+			'upcoming'          => '',
+			'past_events'       => '',
+			'reports'           => '',
+			'public_event_list' => '',
 		) );
 	}
 
-	public static function save_overrides( $upcoming, $past_events, $reports ) {
+	public static function save_overrides( $upcoming, $past_events, $reports, $public_event_list = '' ) {
 		update_option( self::OPTION_KEY, array(
-			'upcoming'    => esc_url_raw( trim( $upcoming ) ),
-			'past_events' => esc_url_raw( trim( $past_events ) ),
-			'reports'     => esc_url_raw( trim( $reports ) ),
+			'upcoming'          => esc_url_raw( trim( $upcoming ) ),
+			'past_events'       => esc_url_raw( trim( $past_events ) ),
+			'reports'           => esc_url_raw( trim( $reports ) ),
+			'public_event_list' => esc_url_raw( trim( $public_event_list ) ),
 		) );
 		self::clear_cache();
 	}
@@ -61,6 +70,7 @@ class Hostlinks_Page_URLs {
 		delete_transient( 'hostlinks_page_url_upcoming' );
 		delete_transient( 'hostlinks_page_url_past_events' );
 		delete_transient( 'hostlinks_page_url_reports' );
+		delete_transient( 'hostlinks_page_url_public_event_list' );
 		// Remove the legacy transient used by Reports in earlier versions.
 		delete_transient( 'hostlinks_reports_page_url' );
 	}
@@ -124,9 +134,10 @@ class Hostlinks_Page_URLs {
 	public static function detection_status() {
 		$overrides = self::get_overrides();
 		$map       = array(
-			'upcoming'    => array( 'shortcode' => 'eventlisto',        'default_path' => '/' ),
-			'past_events' => array( 'shortcode' => 'oldeventlisto',     'default_path' => '/old-event-list/' ),
-			'reports'     => array( 'shortcode' => 'hostlinks_reports', 'default_path' => '' ),
+			'upcoming'          => array( 'shortcode' => 'eventlisto',        'default_path' => '/' ),
+			'past_events'       => array( 'shortcode' => 'oldeventlisto',     'default_path' => '/old-event-list/' ),
+			'reports'           => array( 'shortcode' => 'hostlinks_reports', 'default_path' => '' ),
+			'public_event_list' => array( 'shortcode' => 'public_event_list', 'default_path' => '' ),
 		);
 
 		$status = array();

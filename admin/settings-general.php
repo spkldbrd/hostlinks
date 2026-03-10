@@ -2,7 +2,7 @@
 /**
  * Settings → General tab.
  *
- * Contains: Page URL overrides for the three frontend navigation buttons.
+ * Contains: Page URL overrides for the four frontend shortcode pages.
  * Included from admin/settings.php with $hl_embedded = true.
  */
 if ( ! defined( 'ABSPATH' ) ) {
@@ -17,9 +17,10 @@ $page_url_notice = '';
 if ( isset( $_POST['hostlinks_save_page_urls'] ) ) {
 	check_admin_referer( 'hostlinks_page_urls' );
 	Hostlinks_Page_URLs::save_overrides(
-		$_POST['hl_url_upcoming']    ?? '',
-		$_POST['hl_url_past_events'] ?? '',
-		$_POST['hl_url_reports']     ?? ''
+		$_POST['hl_url_upcoming']          ?? '',
+		$_POST['hl_url_past_events']       ?? '',
+		$_POST['hl_url_reports']           ?? '',
+		$_POST['hl_url_public_event_list'] ?? ''
 	);
 	$page_url_notice = '<div class="notice notice-success is-dismissible"><p>Page URLs saved. URL cache cleared.</p></div>';
 }
@@ -40,15 +41,16 @@ $source_labels = array(
 	'none'     => '<span style="color:#d63638;font-weight:600;">&#9679; Not found</span>',
 );
 $page_labels = array(
-	'upcoming'    => 'Upcoming Events <code>[eventlisto]</code>',
-	'past_events' => 'Past Events <code>[oldeventlisto]</code>',
-	'reports'     => 'Reports <code>[hostlinks_reports]</code>',
+	'upcoming'          => 'Upcoming Events <code>[eventlisto]</code>',
+	'past_events'       => 'Past Events <code>[oldeventlisto]</code>',
+	'reports'           => 'Reports <code>[hostlinks_reports]</code>',
+	'public_event_list' => 'Public Event List <code>[public_event_list]</code>',
 );
 ?>
 <?php echo $page_url_notice; ?>
 
 <h2 style="margin-top:0;">Page Link Settings</h2>
-<p>The three navigation buttons (Upcoming Events, Past Events, Reports) on the frontend calendar resolve their URLs in this order:</p>
+<p>The frontend shortcode pages resolve their URLs in this order:</p>
 <ol style="padding-left:1.5rem;color:#444;line-height:1.8;margin-bottom:1rem;">
 	<li><strong>Manual override</strong> — URL entered in the fields below.</li>
 	<li><strong>Auto-detect</strong> — searches all published pages for the shortcode tag (cached 24 h).</li>
@@ -109,6 +111,15 @@ $page_labels = array(
 					value="<?php echo esc_attr( $overrides['reports'] ); ?>"
 					class="regular-text" placeholder="Leave blank to auto-detect" />
 				<p class="description">Page containing <code>[hostlinks_reports]</code>. Leave blank to hide the Reports button until the page is published.</p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="hl_url_public_event_list">Public Event List URL override</label></th>
+			<td>
+				<input type="url" id="hl_url_public_event_list" name="hl_url_public_event_list"
+					value="<?php echo esc_attr( $overrides['public_event_list'] ?? '' ); ?>"
+					class="regular-text" placeholder="Leave blank to auto-detect" />
+				<p class="description">Page containing <code>[public_event_list]</code>.</p>
 			</td>
 		</tr>
 	</table>

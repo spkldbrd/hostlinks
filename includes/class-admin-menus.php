@@ -6,7 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Hostlinks_Admin_Menus {
 
 	public function __construct() {
-		add_action( 'admin_menu',   array( $this, 'register_menus' ) );
+		add_action( 'admin_menu',    array( $this, 'register_menus' ) );
+		add_action( 'admin_menu',    array( $this, 'reorder_menus' ), 9999 );
 		add_action( 'admin_notices', array( $this, 'new_events_notice' ) );
 	}
 
@@ -101,6 +102,39 @@ class Hostlinks_Admin_Menus {
 
 	public function page_cvent_new_events() {
 		include HOSTLINKS_PLUGIN_DIR . 'admin/cvent-new-events.php';
+	}
+
+	/**
+	 * Force Settings and Plugin Info to always be the last two items in the
+	 * Hostlinks submenu, regardless of registration order quirks.
+	 * Runs at priority 9999 so it fires after all other plugins and our own
+	 * register_menus() have finished.
+	 */
+	public function reorder_menus() {
+		global $submenu;
+		if ( empty( $submenu['booking-menu'] ) ) {
+			return;
+		}
+
+		$pinned_slugs = array( 'hostlinks-settings', 'hostlinks-plugin-info' );
+		$pinned       = array();
+
+		foreach ( $submenu['booking-menu'] as $key => $item ) {
+			if ( in_array( $item[2], $pinned_slugs, true ) ) {
+				$pinned[ $item[2] ] = $item;
+				unset( $submenu['booking-menu'][ $key ] );
+			}
+		}
+
+		// Re-index remaining items
+		$submenu['booking-menu'] = array_values( $submenu['booking-menu'] );
+
+		// Append in desired order: Settings → Plugin Info
+		foreach ( $pinned_slugs as $slug ) {
+			if ( isset( $pinned[ $slug ] ) ) {
+				$submenu['booking-menu'][] = $pinned[ $slug ];
+			}
+		}
 	}
 
 	/**

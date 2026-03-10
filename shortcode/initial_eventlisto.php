@@ -200,7 +200,7 @@ $empty_msg = $focus_name
 
 	// ── CSS modifier classes ──────────────────────────────────────────────
 	$is_zoom       = ! empty( $alldriver['eve_zoom'] ) && strtolower( trim( $alldriver['eve_zoom'] ) ) === 'yes';
-	$is_management = ( $type_name === 'Management' );
+	$is_management = in_array( strtolower( $type_name ), array( 'management', 'subaward' ), true );
 
 	$title_class      = 'hostlinks-card-title' . ( $is_zoom ? ' hostlinks-card-title--virtual' : '' );
 	$instructor_class = 'hostlinks-card-instructor' . ( $is_management ? ' hostlinks-card-instructor--management' : '' );

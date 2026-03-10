@@ -7,12 +7,13 @@ if ( ! current_user_can( 'manage_options' ) ) {
 }
 
 $valid_tabs = array(
-	'general'        => 'General',
-	'event-settings' => 'Event Settings',
-	'user-access'    => 'User Access',
-	'cvent'          => 'CVENT',
-	'import-export'  => 'Import / Export',
-	'type-settings'  => 'Type Settings',
+	'general'           => 'General',
+	'event-settings'    => 'Event Settings',
+	'user-access'       => 'User Access',
+	'cvent'             => 'CVENT',
+	'import-export'     => 'Import / Export',
+	'type-settings'     => 'Type Settings',
+	'public-event-list' => 'Public Event List',
 );
 
 $current_tab = sanitize_key( $_GET['tab'] ?? 'general' );
@@ -58,6 +59,9 @@ switch ( $current_tab ) {
 		break;
 	case 'type-settings':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/type-menu.php';
+		break;
+	case 'public-event-list':
+		include HOSTLINKS_PLUGIN_DIR . 'admin/public-event-list-settings.php';
 		break;
 }
 ?>

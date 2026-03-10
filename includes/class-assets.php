@@ -21,9 +21,23 @@ class Hostlinks_Assets {
 		                     has_shortcode( $post->post_content, 'oldeventlisto' );
 		$has_reports       = has_shortcode( $post->post_content, 'hostlinks_reports' );
 		$has_event_request = has_shortcode( $post->post_content, 'hostlinks_event_request_form' );
+		$has_public_list   = has_shortcode( $post->post_content, 'public_event_list' );
 
-		if ( ! $has_calendar && ! $has_reports && ! $has_event_request ) {
+		if ( ! $has_calendar && ! $has_reports && ! $has_event_request && ! $has_public_list ) {
 			return;
+		}
+
+		if ( $has_public_list ) {
+			wp_enqueue_style(
+				'hostlinks-public-event-list',
+				HOSTLINKS_PLUGIN_URL . 'assets/css/hostlinks-public-event-list.css',
+				array(),
+				HOSTLINKS_VERSION
+			);
+			// Public list is standalone — no other Hostlinks CSS needed on this page.
+			if ( ! $has_calendar && ! $has_reports && ! $has_event_request ) {
+				return;
+			}
 		}
 
 		wp_enqueue_style(

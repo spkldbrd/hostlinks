@@ -55,6 +55,17 @@ class Hostlinks_DB {
 			}
 		}
 
+		// v1.6 — add eve_public_hide and eve_zoom_time columns.
+		if ( version_compare( $installed, '1.6', '<' ) ) {
+			$table = $wpdb->prefix . 'event_details_list';
+			if ( empty( $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_public_hide' ) ) ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `eve_public_hide` tinyint(1) NOT NULL DEFAULT 0" );
+			}
+			if ( empty( $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_zoom_time' ) ) ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `eve_zoom_time` varchar(50) NOT NULL DEFAULT ''" );
+			}
+		}
+
 		// Now run dbDelta — sees the correct schema and makes no conflicting changes.
 		self::create_tables();
 
@@ -82,6 +93,8 @@ class Hostlinks_DB {
 			eve_roster_url text NOT NULL,
 			eve_trainer_url text NOT NULL,
 			eve_web_url text NOT NULL,
+			eve_zoom_time varchar(50) NOT NULL DEFAULT '',
+			eve_public_hide tinyint(1) NOT NULL DEFAULT 0,
 			eve_instructor int(11) NOT NULL DEFAULT 0,
 			eve_tot_date varchar(100) NOT NULL DEFAULT '',
 			eve_status tinyint(1) NOT NULL DEFAULT 1,

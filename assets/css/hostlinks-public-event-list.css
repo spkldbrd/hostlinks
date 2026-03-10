@@ -1,0 +1,119 @@
+/* ==========================================================================
+   Hostlinks — Public Event List  [public_event_list]
+   Matches the two-column layout shown on the Grant Writing USA site.
+   ========================================================================== */
+
+/* ── Wrapper / Two-Column Grid ────────────────────────────────────── */
+.hpl-wrapper {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 2rem 3rem;
+	font-family: inherit;
+	line-height: 1.5;
+}
+
+@media ( max-width: 700px ) {
+	.hpl-wrapper {
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+	}
+}
+
+/* ── Column headings / descriptions ──────────────────────────────── */
+.hpl-col-heading {
+	margin-top: 0;
+	margin-bottom: 0.35rem;
+	font-size: 1.25em;
+	font-weight: 700;
+	color: inherit;
+}
+
+.hpl-col-desc {
+	margin-top: 0;
+	margin-bottom: 1.1rem;
+	color: #555;
+	font-size: 0.95em;
+}
+
+/* ── Event list ───────────────────────────────────────────────────── */
+.hpl-event-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.hpl-event-item {
+	margin-bottom: 1rem;
+	padding-bottom: 0;
+}
+
+/* ── Event title line ─────────────────────────────────────────────── */
+.hpl-event-title {
+	margin-bottom: 0.1rem;
+	font-size: 0.97em;
+}
+
+.hpl-event-title strong {
+	font-weight: 700;
+}
+
+.hpl-zoom-time {
+	color: #333;
+	white-space: nowrap;
+}
+
+/* ── Details link line ────────────────────────────────────────────── */
+.hpl-event-details-row {
+	font-size: 0.9em;
+	color: #444;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.hpl-details-link {
+	color: #0073aa;
+	text-decoration: none;
+	font-weight: 400;
+}
+
+.hpl-details-link:hover {
+	text-decoration: underline;
+}
+
+/* Pending link (no URL set yet) */
+.hpl-details-pending {
+	color: #999;
+	cursor: default;
+}
+
+/* ── Zoom logo ────────────────────────────────────────────────────── */
+.hpl-zoom-logo {
+	height: 22px;
+	width: auto;
+	vertical-align: middle;
+	display: inline-block;
+}
+
+/* ── No-events fallback ───────────────────────────────────────────── */
+.hpl-no-events {
+	color: #888;
+	font-style: italic;
+}
+
+/* ── Dark mode support (DarkLooks plugin) ─────────────────────────── */
+@media ( prefers-color-scheme: dark ) {
+	.hpl-col-desc {
+		color: #aaa;
+	}
+	.hpl-details-link {
+		color: #4eb8f0;
+	}
+	.hpl-event-details-row {
+		color: #ccc;
+	}
+	.hpl-zoom-time {
+		color: #ccc;
+	}
+}

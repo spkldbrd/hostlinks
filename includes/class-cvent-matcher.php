@@ -111,14 +111,18 @@ class Hostlinks_CVENT_Matcher {
 
 	// Geographic mismatch guard — in-person events only (Zoom events are exempt
 	// because they have no city/state in CVENT venue data).
-	// If neither city nor state scored any points, there is no geographic
-	// confirmation that these are the same place; push to needs_review instead
-	// of auto-matching on title/date alone.
+	// Geo is confirmed by ANY of: city match, state match, or title_location
+	// match (CVENT title starts with "City, ST - ..." matching HL location).
+	// The title_location check handles events where CVENT returns no venues[]
+	// data — the title prefix is just as reliable as the venue fields.
 	$hl_is_zoom  = ! empty( $hl_event['eve_zoom'] );
 	$geo_blocked = false;
 	if ( ! $hl_is_zoom ) {
 		$best_breakdown = $best['breakdown'] ?? array();
-		if ( ( $best_breakdown['city'] ?? 0 ) === 0 && ( $best_breakdown['state'] ?? 0 ) === 0 ) {
+		$geo_confirmed  = ( $best_breakdown['city']           ?? 0 ) > 0
+		               || ( $best_breakdown['state']          ?? 0 ) > 0
+		               || ( $best_breakdown['title_location'] ?? 0 ) > 0;
+		if ( ! $geo_confirmed ) {
 			$geo_blocked = true;
 		}
 	}

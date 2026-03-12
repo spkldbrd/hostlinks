@@ -174,11 +174,18 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 	$priority = array( 'writing', 'subaward', 'management' );
 	foreach ( $priority as $kw ) {
 		if ( false !== strpos( $lc, $kw ) ) {
-			// 'subaward' maps to management.
-			$search = ( $kw === 'subaward' ) ? 'management' : $kw;
+			// Try to find an exact type match first (e.g. 'subaward' type).
 			foreach ( $map as $tname => $tid ) {
-				if ( false !== strpos( $tname, $search ) ) {
+				if ( false !== strpos( $tname, $kw ) ) {
 					return $tid;
+				}
+			}
+			// If 'subaward' type doesn't exist in HL yet, fall back to management.
+			if ( $kw === 'subaward' ) {
+				foreach ( $map as $tname => $tid ) {
+					if ( false !== strpos( $tname, 'management' ) ) {
+						return $tid;
+					}
 				}
 			}
 		}
@@ -259,6 +266,10 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 
 		// Pre-fill logic.
 		$prefilled_loc = Hostlinks_CVENT_Matcher::title_location_from_cvent( $title );
+		$is_subaward   = ( false !== stripos( $title, 'subaward' ) );
+		if ( $is_subaward && $prefilled_loc && false === strpos( $prefilled_loc, '| SUB' ) ) {
+			$prefilled_loc .= ' | SUB';
+		}
 		$is_zoom       = ( false !== stripos( $title, 'zoom' ) || false !== stripos( $title, 'webinar' ) );
 		$guessed_type  = hostlinks_cvent_guess_type( $title, $type_keyword_map );
 		$reg_url       = $ev['registrationUrl'] ?? $ev['publicRegistrationUrl'] ?? $ev['websiteLink'] ?? '';

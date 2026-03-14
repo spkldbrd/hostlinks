@@ -645,6 +645,20 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		}
 	}
 
+	// ── Phone normalization: auto-format to 123-456-7890 on blur ─────────
+	function formatPhone(input) {
+		input.addEventListener('blur', function() {
+			var digits = this.value.replace(/\D/g, '');
+			if (digits.length === 10) {
+				this.value = digits.slice(0,3) + '-' + digits.slice(3,6) + '-' + digits.slice(6);
+			} else if (digits.length === 11 && digits[0] === '1') {
+				this.value = digits.slice(1,4) + '-' + digits.slice(4,7) + '-' + digits.slice(7);
+			}
+			// If not 10/11 digits, leave as-is so user can correct it.
+		});
+	}
+	document.querySelectorAll('input[name="hl_contact_phone[]"], input[name="hl_contact_phone2[]"]').forEach(formatPhone);
+
 	// ── Repeatable rows ────────────────────────────────────────────────────
 	var contactIdx = <?php echo max( 1, count( $c_names ?? array(1) ) ); ?>;
 
@@ -686,6 +700,8 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		// Init ZOOM toggles and date pickers in the new row.
 		newRow.querySelectorAll('.hl-zoom-toggle').forEach(initZoomToggle);
 		newRow.querySelectorAll('input.hl-date-pick').forEach(initDatePicker);
+		// Init phone formatting on new contact rows.
+		newRow.querySelectorAll('input[name="hl_contact_phone[]"], input[name="hl_contact_phone2[]"]').forEach(formatPhone);
 		// Init hotel autocomplete on new hotel rows.
 		if (btn.dataset.template === 'hotel') {
 			var nameInput = newRow.querySelector('input[name="hl_hotel_name[]"]');

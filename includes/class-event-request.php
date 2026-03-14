@@ -149,8 +149,8 @@ class Hostlinks_Event_Request {
 				'agency'        => sanitize_text_field( $raw['hl_contact_agency']  [ $i ] ?? '' ),
 				'title'         => sanitize_text_field( $raw['hl_contact_title']   [ $i ] ?? '' ),
 				'email'         => sanitize_email(      $raw['hl_contact_email']   [ $i ] ?? '' ),
-				'phone'         => sanitize_text_field( $raw['hl_contact_phone']   [ $i ] ?? '' ),
-				'phone2'        => sanitize_text_field( $raw['hl_contact_phone2']  [ $i ] ?? '' ),
+			'phone'         => self::normalize_phone( sanitize_text_field( $raw['hl_contact_phone']  [ $i ] ?? '' ) ),
+			'phone2'        => self::normalize_phone( sanitize_text_field( $raw['hl_contact_phone2'] [ $i ] ?? '' ) ),
 				'dnl_phone'        => ! empty( $raw['hl_contact_dnl_phone']        [ $i ] ),
 				'dnl_phone2'       => ! empty( $raw['hl_contact_dnl_phone2']       [ $i ] ),
 				'include_in_email' => ! empty( $raw['hl_contact_include_email']    [ $i ] ),
@@ -241,6 +241,18 @@ class Hostlinks_Event_Request {
 		$date_part = $start ? date( 'M j, Y', strtotime( $start ) ) : '';
 		$parts     = array_filter( array( $location, $category, $date_part ) );
 		return implode( ' - ', $parts );
+	}
+
+	/** Normalize a phone number to 123-456-7890 format. */
+	public static function normalize_phone( string $raw ): string {
+		$digits = preg_replace( '/\D/', '', $raw );
+		if ( strlen( $digits ) === 11 && $digits[0] === '1' ) {
+			$digits = substr( $digits, 1 );
+		}
+		if ( strlen( $digits ) === 10 ) {
+			return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6 );
+		}
+		return $raw; // Return as-is if not a standard US number.
 	}
 
 	/** Simple Y-m-d date sanity check. */

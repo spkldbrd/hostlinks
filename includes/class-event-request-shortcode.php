@@ -107,7 +107,8 @@ class Hostlinks_Event_Request_Shortcode {
 		$instructors = $wpdb->get_results( "SELECT event_instructor_id AS id, event_instructor_name AS name FROM {$wpdb->prefix}event_instructor WHERE event_instructor_status = 1 ORDER BY name", ARRAY_A );
 		$categories  = $wpdb->get_results( "SELECT event_type_id AS id, event_type_name AS name FROM {$wpdb->prefix}event_type WHERE event_type_status = 1 ORDER BY name", ARRAY_A );
 
-		$maps_api_key = get_option( 'hostlinks_google_maps_api_key', '' );
+		$maps_api_key  = get_option( 'hostlinks_google_maps_api_key', '' );
+		$form_header   = get_option( 'hostlinks_event_request_form_header', 'New Event Build Form' );
 
 		ob_start();
 		include HOSTLINKS_PLUGIN_DIR . 'shortcode/event-request-form.php';

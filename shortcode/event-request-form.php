@@ -54,7 +54,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 <div class="hl-event-request-wrap">
 
 <div class="hl-form-topbar">
-	<span class="hl-form-topbar-title">New Event Build Form</span>
+	<span class="hl-form-topbar-title"><?php echo esc_html( $form_header ); ?></span>
 	<a href="<?php echo esc_url( Hostlinks_Page_URLs::get_upcoming() ); ?>" class="hl-form-topbar-back">
 		&#8592; Return to Hostlinks
 	</a>

@@ -11,13 +11,15 @@ $notice = '';
 if ( isset( $_POST['hl_save_request_settings'] ) ) {
 	check_admin_referer( 'hl_event_request_settings' );
 
-	$email   = sanitize_email( $_POST['hl_notification_email'] ?? '' );
-	$prefix  = sanitize_text_field( $_POST['hl_subject_prefix'] ?? '[Event Request]' );
-	$success = sanitize_textarea_field( $_POST['hl_success_message'] ?? '' );
+	$email       = sanitize_email( $_POST['hl_notification_email'] ?? '' );
+	$prefix      = sanitize_text_field( $_POST['hl_subject_prefix'] ?? '[Event Request]' );
+	$success     = sanitize_textarea_field( $_POST['hl_success_message'] ?? '' );
+	$form_header = sanitize_text_field( $_POST['hl_form_header_text'] ?? '' );
 
 	update_option( 'hostlinks_event_request_notification_email', $email );
 	update_option( 'hostlinks_event_request_email_subject_prefix', $prefix );
 	update_option( 'hostlinks_event_request_success_message', $success );
+	update_option( 'hostlinks_event_request_form_header', $form_header );
 
 	$notice = '<div class="notice notice-success is-dismissible"><p>Event Request settings saved.</p></div>';
 }
@@ -26,6 +28,7 @@ if ( isset( $_POST['hl_save_request_settings'] ) ) {
 $notif_email    = get_option( 'hostlinks_event_request_notification_email', get_option( 'admin_email' ) );
 $subject_prefix = get_option( 'hostlinks_event_request_email_subject_prefix', '[Event Request]' );
 $success_msg    = get_option( 'hostlinks_event_request_success_message', '' );
+$form_header    = get_option( 'hostlinks_event_request_form_header', 'New Event Build Form' );
 ?>
 <?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
@@ -37,6 +40,15 @@ $success_msg    = get_option( 'hostlinks_event_request_success_message', '' );
 	<?php wp_nonce_field( 'hl_event_request_settings' ); ?>
 
 	<table class="form-table" role="presentation">
+		<tr>
+			<th scope="row"><label for="hl_form_header_text">Form Header Text</label></th>
+			<td>
+				<input type="text" id="hl_form_header_text" name="hl_form_header_text"
+					value="<?php echo esc_attr( $form_header ); ?>"
+					class="regular-text" placeholder="New Event Build Form" />
+				<p class="description">Shown as the small heading at the top-left of the <code>[hostlinks_event_request_form]</code> page. Default: <em>New Event Build Form</em>.</p>
+			</td>
+		</tr>
 		<tr>
 			<th scope="row"><label for="hl_notification_email">Notification Email</label></th>
 			<td>

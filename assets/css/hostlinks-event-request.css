@@ -162,37 +162,54 @@
 .hl-event-zoom-tz { display: none; }
 .hl-event-zoom-tz.is-visible { display: block; }
 
-.hl-hotel-grid,
-.hl-contact-grid {
+.hl-hotel-grid {
   display: grid;
   gap: 0.75rem;
   flex: 1;
+  grid-template-columns: 2fr 1fr 2fr;
 }
-.hl-hotel-grid   { grid-template-columns: 2fr 1fr 2fr; }
-.hl-contact-grid { grid-template-columns: 1.2fr 1.2fr 1fr 1.2fr 1fr 1fr auto; }
+
+/* Contact row: inner wrapper stacks inputs + checkboxes vertically */
+.hl-contact-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* Both the input row and the checkbox row share identical column widths */
+.hl-contact-fields,
+.hl-contact-checks-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 1fr 1.2fr 1fr 1fr auto;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+/* Checkbox row sits just below the inputs */
+.hl-contact-checks-row {
+  padding-top: 2px;
+  border-top: 1px solid hsl(215 15% 92%);
+  padding-top: 6px;
+}
 
 .hl-check-label {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   font-size: 0.82rem;
   font-weight: 400;
   cursor: pointer;
 }
-.hl-check-label input[type="checkbox"] { width: auto; }
 
-/* Slightly larger checkboxes for DNL, Include in Email, and Reg Alerts */
-.hl-check-inline input[type="checkbox"],
+/* All contact checkboxes: consistent 16px size */
+.hl-contact-checks-row input[type="checkbox"],
 .hl-check-reg-alerts input[type="checkbox"] {
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
   cursor: pointer;
-}
-
-/* Do Not List / Include in Email — inline under their parent field */
-.hl-check-inline {
-  margin-top: 4px;
-  color: #666;
+  accent-color: #0da2e7;
 }
 
 /* Reg Alerts column — centered checkbox + label stacked */
@@ -202,7 +219,6 @@
   align-items: center;
   justify-content: flex-start;
   gap: 4px;
-  padding-top: 0;
 }
 .hl-reg-alerts-cell .hl-reg-alerts-label {
   font-size: 0.72rem;
@@ -216,7 +232,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 2px;
 }
 
 .hl-remove-row {
@@ -279,7 +294,8 @@
   .hl-event-row-grid { grid-template-columns: 1fr 1fr; }
   .hl-event-zoom-check { padding-top: 0; }
   .hl-hotel-grid   { grid-template-columns: 1fr 1fr; }
-  .hl-contact-grid { grid-template-columns: 1fr 1fr; }
+  .hl-contact-fields,
+  .hl-contact-checks-row { grid-template-columns: 1fr 1fr; }
   .hl-reg-alerts-cell { flex-direction: row; align-items: center; gap: 8px; }
 }
 

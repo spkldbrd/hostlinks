@@ -169,14 +169,7 @@
   flex: 1;
 }
 .hl-hotel-grid   { grid-template-columns: 2fr 1fr 2fr; }
-.hl-contact-grid { grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; }
-
-.hl-col-checks {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  justify-content: flex-end;
-}
+.hl-contact-grid { grid-template-columns: 1.2fr 1.2fr 1fr 1.2fr 1fr 1fr auto; }
 
 .hl-check-label {
   display: flex;
@@ -188,10 +181,42 @@
 }
 .hl-check-label input[type="checkbox"] { width: auto; }
 
-/* Do Not List inline under phone fields */
+/* Slightly larger checkboxes for DNL, Include in Email, and Reg Alerts */
+.hl-check-inline input[type="checkbox"],
+.hl-check-reg-alerts input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Do Not List / Include in Email — inline under their parent field */
 .hl-check-inline {
   margin-top: 4px;
   color: #666;
+}
+
+/* Reg Alerts column — centered checkbox + label stacked */
+.hl-reg-alerts-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding-top: 0;
+}
+.hl-reg-alerts-cell .hl-reg-alerts-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #444;
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.hl-check-reg-alerts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
 }
 
 .hl-remove-row {
@@ -255,6 +280,7 @@
   .hl-event-zoom-check { padding-top: 0; }
   .hl-hotel-grid   { grid-template-columns: 1fr 1fr; }
   .hl-contact-grid { grid-template-columns: 1fr 1fr; }
+  .hl-reg-alerts-cell { flex-direction: row; align-items: center; gap: 8px; }
 }
 
 /* ── Dark mode ────────────────────────────────────────────────────────────── */

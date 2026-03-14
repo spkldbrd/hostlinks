@@ -333,6 +333,11 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 						<label>Name</label>
 						<input type="text" name="hl_contact_name[]"
 							value="<?php echo esc_attr( $cname ); ?>" placeholder="Name" />
+						<label class="hl-check-label hl-check-inline">
+							<input type="checkbox" name="hl_contact_include_email[<?php echo $i; ?>]" value="1"
+								<?php checked( $inc_checked, '1' ); ?> />
+							Include in Email Template
+						</label>
 					</div>
 					<div class="hl-field-group">
 						<label>Agency</label>
@@ -369,16 +374,11 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 							Do Not List
 						</label>
 					</div>
-					<div class="hl-field-group hl-col-checks">
-						<label class="hl-check-label hl-check-highlight">
+					<div class="hl-reg-alerts-cell">
+						<span class="hl-reg-alerts-label">Reg<br>Alerts</span>
+						<label class="hl-check-reg-alerts" title="CC on Registration Alerts">
 							<input type="checkbox" name="hl_contact_cc[<?php echo $i; ?>]" value="1"
 								<?php checked( $cc_checked, '1' ); ?> />
-							CC on Registration Alerts
-						</label>
-						<label class="hl-check-label hl-check-highlight">
-							<input type="checkbox" name="hl_contact_include_email[<?php echo $i; ?>]" value="1"
-								<?php checked( $inc_checked, '1' ); ?> />
-							Include in Email Template
 						</label>
 					</div>
 				</div>
@@ -491,7 +491,11 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 <script id="hl-tpl-contact" type="text/x-template">
 <div class="hl-repeatable-row hl-contact-row">
 	<div class="hl-contact-grid">
-		<div class="hl-field-group"><label>Name</label><input type="text" name="hl_contact_name[]" value="" placeholder="Name" /></div>
+		<div class="hl-field-group">
+			<label>Name</label>
+			<input type="text" name="hl_contact_name[]" value="" placeholder="Name" />
+			<label class="hl-check-label hl-check-inline"><input type="checkbox" name="hl_contact_include_email[NEW_INDEX]" value="1" /> Include in Email Template</label>
+		</div>
 		<div class="hl-field-group"><label>Agency</label><input type="text" name="hl_contact_agency[]" value="" placeholder="Agency" /></div>
 		<div class="hl-field-group"><label>Title</label><input type="text" name="hl_contact_title[]" value="" placeholder="Title" /></div>
 		<div class="hl-field-group"><label>Email</label><input type="email" name="hl_contact_email[]" value="" placeholder="email@example.com" /></div>
@@ -505,9 +509,11 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 			<input type="tel" name="hl_contact_phone2[]" value="" placeholder="Phone 2" />
 			<label class="hl-check-label hl-check-inline"><input type="checkbox" name="hl_contact_dnl_phone2[NEW_INDEX]" /> Do Not List</label>
 		</div>
-		<div class="hl-field-group hl-col-checks">
-			<label class="hl-check-label hl-check-highlight"><input type="checkbox" name="hl_contact_cc[NEW_INDEX]" value="1" /> CC on Registration Alerts</label>
-			<label class="hl-check-label hl-check-highlight"><input type="checkbox" name="hl_contact_include_email[NEW_INDEX]" value="1" /> Include in Email Template</label>
+		<div class="hl-reg-alerts-cell">
+			<span class="hl-reg-alerts-label">Reg<br>Alerts</span>
+			<label class="hl-check-reg-alerts" title="CC on Registration Alerts">
+				<input type="checkbox" name="hl_contact_cc[NEW_INDEX]" value="1" />
+			</label>
 		</div>
 	</div>
 	<button type="button" class="hl-remove-row" aria-label="Remove">✕</button>

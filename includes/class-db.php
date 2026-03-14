@@ -66,6 +66,30 @@ class Hostlinks_DB {
 			}
 		}
 
+		// v1.7 — add new event request columns for form redesign.
+		if ( version_compare( $installed, '1.7', '<' ) ) {
+			$table = $wpdb->prefix . 'hostlinks_event_requests';
+			$cols  = $wpdb->get_col( "SHOW COLUMNS FROM `{$table}`", 0 );
+			if ( ! in_array( 'submission_group',     $cols, true ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `submission_group` varchar(36) NOT NULL DEFAULT '' AFTER `id`" );
+			}
+			if ( ! in_array( 'displayed_as',         $cols, true ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `displayed_as` varchar(500) NOT NULL DEFAULT '' AFTER `host_name`" );
+			}
+			if ( ! in_array( 'street_address_3',     $cols, true ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `street_address_3` varchar(255) NOT NULL DEFAULT '' AFTER `street_address_2`" );
+			}
+			if ( ! in_array( 'special_instructions', $cols, true ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `special_instructions` text NOT NULL DEFAULT '' AFTER `zip_code`" );
+			}
+			if ( ! in_array( 'parking_file_url',     $cols, true ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `parking_file_url` varchar(1000) NOT NULL DEFAULT '' AFTER `special_instructions`" );
+			}
+			if ( ! in_array( 'custom_email_intro',   $cols, true ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `custom_email_intro` text NOT NULL DEFAULT '' AFTER `parking_file_url`" );
+			}
+		}
+
 		// Now run dbDelta — sees the correct schema and makes no conflicting changes.
 		self::create_tables();
 
@@ -139,12 +163,14 @@ class Hostlinks_DB {
 		// Event request intake table — stores pending requests separately from live events.
 		$sql = "CREATE TABLE {$wpdb->prefix}hostlinks_event_requests (
 			id bigint(20) NOT NULL AUTO_INCREMENT,
+			submission_group varchar(36) NOT NULL DEFAULT '',
 			request_status varchar(20) NOT NULL DEFAULT 'new',
 			submitted_at datetime DEFAULT NULL,
 			updated_at datetime DEFAULT NULL,
 			event_title varchar(500) NOT NULL DEFAULT '',
 			hostlinks_title varchar(500) NOT NULL DEFAULT '',
 			description text NOT NULL DEFAULT '',
+			custom_email_intro text NOT NULL DEFAULT '',
 			category varchar(255) NOT NULL DEFAULT '',
 			format varchar(50) NOT NULL DEFAULT '',
 			timezone varchar(100) NOT NULL DEFAULT '',
@@ -155,12 +181,16 @@ class Hostlinks_DB {
 			start_time varchar(20) NOT NULL DEFAULT '',
 			end_time varchar(20) NOT NULL DEFAULT '',
 			host_name varchar(255) NOT NULL DEFAULT '',
+			displayed_as varchar(500) NOT NULL DEFAULT '',
 			location_name varchar(255) NOT NULL DEFAULT '',
 			street_address_1 varchar(255) NOT NULL DEFAULT '',
 			street_address_2 varchar(255) NOT NULL DEFAULT '',
+			street_address_3 varchar(255) NOT NULL DEFAULT '',
 			city varchar(100) NOT NULL DEFAULT '',
 			state varchar(100) NOT NULL DEFAULT '',
 			zip_code varchar(20) NOT NULL DEFAULT '',
+			special_instructions text NOT NULL DEFAULT '',
+			parking_file_url varchar(1000) NOT NULL DEFAULT '',
 			price decimal(10,2) DEFAULT NULL,
 			max_attendees int(11) DEFAULT NULL,
 			special_message text NOT NULL DEFAULT '',

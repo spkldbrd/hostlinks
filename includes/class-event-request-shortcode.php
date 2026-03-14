@@ -11,19 +11,17 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class Hostlinks_Event_Request_Shortcode {
 
-	/** Holds validation errors across request lifecycle. @var array */
+	/** @var array Validation errors keyed by field name. */
 	private array $errors = array();
 
-	/** Holds the last submission values so the form can be re-populated. @var array */
+	/** @var array Previous POST values for sticky form re-population. */
 	private array $old = array();
 
-	/** ID of a successfully inserted request (used for success message). @var int|null */
-	private ?int $inserted_id = null;
+	/** @var int[] IDs of successfully inserted requests. */
+	private array $inserted_ids = array();
 
 	public function __construct() {
 		add_shortcode( 'hostlinks_event_request_form', array( $this, 'render' ) );
-		// Process form on init so we can set $this->errors / $this->inserted_id
-		// before the shortcode renders.
 		add_action( 'init', array( $this, 'handle_submission' ) );
 	}
 
@@ -35,7 +33,7 @@ class Hostlinks_Event_Request_Shortcode {
 		}
 		check_admin_referer( 'hl_event_request_form' );
 
-		// Honeypot — reject silently if filled by a bot.
+		// Honeypot.
 		if ( ! empty( $_POST['hl_hp_field'] ) ) {
 			return;
 		}
@@ -44,38 +42,66 @@ class Hostlinks_Event_Request_Shortcode {
 		$this->errors = Hostlinks_Event_Request::validate( $_POST );
 
 		if ( ! empty( $this->errors ) ) {
-			return; // Shortcode re-renders the form with errors.
+			return;
 		}
 
-		$data = Hostlinks_Event_Request::normalize( $_POST );
-		$id   = Hostlinks_Event_Request_Storage::insert( $data );
+		// Handle parking PDF upload if present.
+		$parking_url = null;
+		if ( ! empty( $_FILES['hl_parking_file']['name'] ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+			$upload = wp_handle_upload(
+				$_FILES['hl_parking_file'],
+				array(
+					'test_form' => false,
+					'mimes'     => array( 'pdf' => 'application/pdf' ),
+				)
+			);
+			if ( isset( $upload['url'] ) ) {
+				$parking_url = $upload['url'];
+			} elseif ( isset( $upload['error'] ) ) {
+				$this->errors['hl_parking_file'] = 'File upload failed: ' . $upload['error'];
+				return;
+			}
+		}
 
-		if ( $id ) {
-			$this->inserted_id = $id;
-			$this->send_notification( $id, $data );
-			$this->old = array(); // Clear retained values on success.
-		} else {
+		// Generate one UUID for all records in this submission.
+		$submission_group = wp_generate_uuid4();
+
+		$records = Hostlinks_Event_Request::normalize( $_POST, $submission_group, $parking_url );
+
+		foreach ( $records as $data ) {
+			$id = Hostlinks_Event_Request_Storage::insert( $data );
+			if ( $id ) {
+				$this->inserted_ids[] = $id;
+			}
+		}
+
+		if ( empty( $this->inserted_ids ) ) {
 			$this->errors['_db'] = 'There was a problem saving your request. Please try again.';
+			return;
 		}
+
+		$this->send_notification( $this->inserted_ids, $records );
+		$this->old = array();
 	}
 
 	// ── Shortcode render ──────────────────────────────────────────────────────
 
 	public function render(): string {
-		// Success state — show configured message, not the form.
-		if ( $this->inserted_id ) {
+		if ( ! empty( $this->inserted_ids ) ) {
 			$msg = get_option( 'hostlinks_event_request_success_message', '' );
+			$count = count( $this->inserted_ids );
 			if ( $msg === '' ) {
-				$msg = 'Thank you! Your event request (ID #' . $this->inserted_id . ') has been submitted. We will be in touch soon.';
+				$msg = 'Thank you! Your event request' . ( $count > 1 ? 's (' . $count . ' events)' : '' ) .
+					' (ID #' . implode( ', #', $this->inserted_ids ) . ') ' .
+					'ha' . ( $count > 1 ? 've' : 's' ) . ' been submitted. We will be in touch soon.';
 			}
 			return '<div class="hl-request-success"><p>' . wp_kses_post( $msg ) . '</p></div>';
 		}
 
-		// Collect data needed by the form template.
 		$errors = $this->errors;
 		$old    = $this->old;
 
-		// Fetch active marketers and instructors for dropdowns.
 		global $wpdb;
 		$marketers   = $wpdb->get_results( "SELECT event_marketer_id AS id, event_marketer_name AS name FROM {$wpdb->prefix}event_marketer WHERE event_marketer_status = 1 ORDER BY name", ARRAY_A );
 		$instructors = $wpdb->get_results( "SELECT event_instructor_id AS id, event_instructor_name AS name FROM {$wpdb->prefix}event_instructor WHERE event_instructor_status = 1 ORDER BY name", ARRAY_A );
@@ -88,38 +114,44 @@ class Hostlinks_Event_Request_Shortcode {
 
 	// ── Notification email ────────────────────────────────────────────────────
 
-	private function send_notification( int $id, array $data ) {
+	private function send_notification( array $ids, array $records ) {
 		$to = get_option( 'hostlinks_event_request_notification_email', get_option( 'admin_email' ) );
 		if ( empty( $to ) ) {
 			return;
 		}
 
+		$first   = $records[0] ?? array();
 		$prefix  = get_option( 'hostlinks_event_request_email_subject_prefix', '[Event Request]' );
-		$subject = trim( $prefix ) . ' ' . $data['event_title'] . ' — #' . $id;
-
-		$admin_url = admin_url( 'admin.php?page=hostlinks-event-requests&id=' . $id );
-
-		$cc_emails    = json_decode( $data['cc_emails'],    true ) ?: array();
-		$cc_list      = implode( ', ', $cc_emails );
+		$location = trim( ( $first['city'] ?? '' ) . ( ! empty( $first['state'] ) ? ', ' . $first['state'] : '' ) );
+		$subject  = trim( $prefix ) . ' ' . $location . ' — ' . count( $records ) . ' event(s) submitted';
 
 		$lines   = array();
 		$lines[] = 'A new event request has been submitted.';
 		$lines[] = '';
-		$lines[] = 'Request ID : #' . $id;
-		$lines[] = 'Title      : ' . $data['event_title'];
-		$lines[] = 'Category   : ' . $data['category'];
-		$lines[] = 'Format     : ' . $data['format'];
-		$lines[] = 'Timezone   : ' . $data['timezone'];
-		$lines[] = 'Trainer    : ' . $data['trainer'];
-		$lines[] = 'Marketer   : ' . ( $data['marketer'] ?: '—' );
-		$lines[] = 'Dates      : ' . $data['start_date'] . ' – ' . $data['end_date'];
-		$lines[] = 'Times      : ' . $data['start_time'] . ' – ' . $data['end_time'];
-		$lines[] = 'City/State : ' . trim( $data['city'] . ' ' . $data['state'] );
-		if ( $cc_list ) {
-			$lines[] = 'CC Emails  : ' . $cc_list;
-		}
+		$lines[] = 'Marketer   : ' . ( $first['marketer'] ?? '—' );
+		$lines[] = 'Timezone   : ' . ( $first['timezone'] ?? '—' );
+		$lines[] = 'Location   : ' . $location;
+		$lines[] = 'Host       : ' . ( $first['host_name'] ?? '' );
 		$lines[] = '';
-		$lines[] = 'Review: ' . $admin_url;
+		$lines[] = 'Events in this submission:';
+
+		foreach ( $records as $idx => $data ) {
+			$rid = $ids[ $idx ] ?? '?';
+			$lines[] = sprintf(
+				'  #%s  %s  %s – %s  Trainer: %s  Price: %s',
+				$rid,
+				$data['category'],
+				$data['start_date'],
+				$data['end_date'],
+				$data['trainer'],
+				$data['price'] !== null ? '$' . number_format( (float) $data['price'], 2 ) : '—'
+			);
+		}
+
+		$lines[] = '';
+		if ( ! empty( $ids ) ) {
+			$lines[] = 'Review first: ' . admin_url( 'admin.php?page=hostlinks-event-requests&id=' . $ids[0] );
+		}
 
 		wp_mail( $to, $subject, implode( "\n", $lines ) );
 	}

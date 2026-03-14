@@ -114,10 +114,34 @@ class Hostlinks_Event_Request_Storage {
 			return null;
 		}
 		// Decode JSON columns for convenience.
-		$row['cc_emails']    = json_decode( $row['cc_emails'],    true ) ?: array();
-		$row['hotels']       = json_decode( $row['hotels'],       true ) ?: array();
-		$row['host_contacts']= json_decode( $row['host_contacts'],true ) ?: array();
+		$row['cc_emails']     = json_decode( $row['cc_emails'],     true ) ?: array();
+		$row['hotels']        = json_decode( $row['hotels'],        true ) ?: array();
+		$row['host_contacts'] = json_decode( $row['host_contacts'], true ) ?: array();
 		return $row;
+	}
+
+	/**
+	 * Fetch sibling records that share the same submission_group UUID,
+	 * excluding the current record itself.
+	 *
+	 * @param int    $exclude_id       The current request ID to exclude.
+	 * @param string $submission_group UUID.
+	 * @return array
+	 */
+	public static function get_siblings( int $exclude_id, string $submission_group ): array {
+		global $wpdb;
+		if ( $submission_group === '' ) {
+			return array();
+		}
+		return $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT id, category, start_date, end_date, trainer, request_status FROM ' . self::table() .
+				' WHERE submission_group = %s AND id != %d ORDER BY start_date ASC',
+				$submission_group,
+				$exclude_id
+			),
+			ARRAY_A
+		) ?: array();
 	}
 
 	/**

@@ -24,22 +24,14 @@ class Hostlinks_Event_Request {
 		self::STATUS_ARCHIVED  => 'Archived',
 	);
 
-	// ── Format values ─────────────────────────────────────────────────────────
-	const FORMAT_IN_PERSON = 'in-person';
-	const FORMAT_VIRTUAL   = 'virtual';
-
 	// ── US timezone options ───────────────────────────────────────────────────
 	const TIMEZONES = array(
-		'EST (Eastern Time)'      => 'EST (Eastern Time)',
-		'CST (Central Time)'      => 'CST (Central Time)',
-		'MST (Mountain Time)'     => 'MST (Mountain Time)',
-		'PST (Pacific Time)'      => 'PST (Pacific Time)',
-		'AKST (Alaska Time)'      => 'AKST (Alaska Time)',
-		'HST (Hawaii Time)'       => 'HST (Hawaii Time)',
-		'America/New_York'        => 'America/New_York',
-		'America/Chicago'         => 'America/Chicago',
-		'America/Denver'          => 'America/Denver',
-		'America/Los_Angeles'     => 'America/Los_Angeles',
+		'EST (Eastern Time)'  => 'EST (Eastern Time)',
+		'CST (Central Time)'  => 'CST (Central Time)',
+		'MST (Mountain Time)' => 'MST (Mountain Time)',
+		'PST (Pacific Time)'  => 'PST (Pacific Time)',
+		'AKST (Alaska Time)'  => 'AKST (Alaska Time)',
+		'HST (Hawaii Time)'   => 'HST (Hawaii Time)',
 	);
 
 	// ── Validate ─────────────────────────────────────────────────────────────
@@ -50,62 +42,61 @@ class Hostlinks_Event_Request {
 	 * @param array $raw  Raw $_POST data.
 	 * @return array      Keyed errors: [ field_name => message ]. Empty = valid.
 	 */
-	public static function validate( array $raw ) {
+	public static function validate( array $raw ): array {
 		$errors = array();
-		$format = sanitize_text_field( $raw['hl_format'] ?? '' );
 
-		// Event Details
-		if ( empty( trim( $raw['hl_event_title'] ?? '' ) ) ) {
-			$errors['hl_event_title'] = 'Event title is required.';
+		// Marketer — now required
+		if ( empty( trim( $raw['hl_marketer'] ?? '' ) ) ) {
+			$errors['hl_marketer'] = 'Please select a marketer.';
 		}
-		if ( empty( trim( $raw['hl_category'] ?? '' ) ) ) {
-			$errors['hl_category'] = 'Category is required.';
-		}
-		if ( ! in_array( $format, array( self::FORMAT_IN_PERSON, self::FORMAT_VIRTUAL ), true ) ) {
-			$errors['hl_format'] = 'Please select a format.';
-		}
+
+		// Timezone
 		if ( empty( trim( $raw['hl_timezone'] ?? '' ) ) ) {
 			$errors['hl_timezone'] = 'Timezone is required.';
 		}
-		if ( empty( trim( $raw['hl_trainer'] ?? '' ) ) ) {
-			$errors['hl_trainer'] = 'Trainer is required.';
-		}
 
-		// Dates & Times
-		if ( empty( trim( $raw['hl_start_date'] ?? '' ) ) ) {
-			$errors['hl_start_date'] = 'Start date is required.';
-		} elseif ( ! self::is_valid_date( $raw['hl_start_date'] ) ) {
-			$errors['hl_start_date'] = 'Invalid start date.';
-		}
-		if ( empty( trim( $raw['hl_end_date'] ?? '' ) ) ) {
-			$errors['hl_end_date'] = 'End date is required.';
-		} elseif ( ! self::is_valid_date( $raw['hl_end_date'] ) ) {
-			$errors['hl_end_date'] = 'Invalid end date.';
-		}
-		if ( empty( trim( $raw['hl_start_time'] ?? '' ) ) ) {
-			$errors['hl_start_time'] = 'Start time is required.';
-		}
-		if ( empty( trim( $raw['hl_end_time'] ?? '' ) ) ) {
-			$errors['hl_end_time'] = 'End time is required.';
-		}
+		// Event rows — at least one required
+		$event_categories  = (array) ( $raw['hl_event_category']   ?? array() );
+		$event_start_dates = (array) ( $raw['hl_event_start_date']  ?? array() );
+		$event_end_dates   = (array) ( $raw['hl_event_end_date']    ?? array() );
+		$event_trainers    = (array) ( $raw['hl_event_trainer']     ?? array() );
 
-		// Venue — only required for in-person events
-		if ( $format === self::FORMAT_IN_PERSON ) {
-			if ( empty( trim( $raw['hl_street_address_1'] ?? '' ) ) ) {
-				$errors['hl_street_address_1'] = 'Street address is required for in-person events.';
+		$has_event = false;
+		foreach ( $event_categories as $i => $cat ) {
+			$cat = trim( $cat );
+			if ( $cat === '' ) {
+				continue;
 			}
-			if ( empty( trim( $raw['hl_city'] ?? '' ) ) ) {
-				$errors['hl_city'] = 'City is required for in-person events.';
+			$has_event = true;
+			$start = trim( $event_start_dates[ $i ] ?? '' );
+			$end   = trim( $event_end_dates[ $i ]   ?? '' );
+			$trainer = trim( $event_trainers[ $i ]  ?? '' );
+
+			if ( $start === '' ) {
+				$errors[ 'hl_event_start_date_' . $i ] = 'Start date is required for event row ' . ( $i + 1 ) . '.';
+			} elseif ( ! self::is_valid_date( $start ) ) {
+				$errors[ 'hl_event_start_date_' . $i ] = 'Invalid start date on event row ' . ( $i + 1 ) . '.';
 			}
-			if ( empty( trim( $raw['hl_state'] ?? '' ) ) ) {
-				$errors['hl_state'] = 'State is required for in-person events.';
+			if ( $end === '' ) {
+				$errors[ 'hl_event_end_date_' . $i ] = 'End date is required for event row ' . ( $i + 1 ) . '.';
+			} elseif ( ! self::is_valid_date( $end ) ) {
+				$errors[ 'hl_event_end_date_' . $i ] = 'Invalid end date on event row ' . ( $i + 1 ) . '.';
+			}
+			if ( $trainer === '' ) {
+				$errors[ 'hl_event_trainer_' . $i ] = 'Trainer is required for event row ' . ( $i + 1 ) . '.';
 			}
 		}
 
-		// Price — numeric if provided
-		$price_raw = trim( $raw['hl_price'] ?? '' );
-		if ( $price_raw !== '' && ! is_numeric( $price_raw ) ) {
-			$errors['hl_price'] = 'Price must be a number.';
+		if ( ! $has_event ) {
+			$errors['hl_events'] = 'At least one event row is required.';
+		}
+
+		// Venue — city and state always required
+		if ( empty( trim( $raw['hl_city']  ?? '' ) ) ) {
+			$errors['hl_city']  = 'City is required.';
+		}
+		if ( empty( trim( $raw['hl_state'] ?? '' ) ) ) {
+			$errors['hl_state'] = 'State is required.';
 		}
 
 		// Max attendees — integer if provided
@@ -114,11 +105,11 @@ class Hostlinks_Event_Request {
 			$errors['hl_max_attendees'] = 'Max attendees must be a positive whole number.';
 		}
 
-		// CC emails — validate each non-empty address
-		foreach ( (array) ( $raw['hl_cc_email'] ?? array() ) as $i => $email ) {
-			$email = trim( $email );
-			if ( $email !== '' && ! is_email( $email ) ) {
-				$errors[ 'hl_cc_email_' . $i ] = 'Invalid email address: ' . esc_html( $email );
+		// Price per event row — numeric if provided
+		foreach ( (array) ( $raw['hl_event_price'] ?? array() ) as $i => $price_raw ) {
+			$price_raw = trim( $price_raw );
+			if ( $price_raw !== '' && ! is_numeric( $price_raw ) ) {
+				$errors[ 'hl_event_price_' . $i ] = 'Price must be a number on event row ' . ( $i + 1 ) . '.';
 			}
 		}
 
@@ -128,30 +119,29 @@ class Hostlinks_Event_Request {
 	// ── Normalize ─────────────────────────────────────────────────────────────
 
 	/**
-	 * Sanitize and reshape the raw POST data into a clean insert-ready array.
+	 * Sanitize and reshape the raw POST data into an array of insert-ready records,
+	 * one per event row submitted. All records share the same submission_group UUID
+	 * and venue / host / hotel / contact data.
+	 *
 	 * Must only be called after validate() returns an empty error array.
 	 *
-	 * @param array $raw  Raw $_POST data.
-	 * @return array      Clean data ready for Hostlinks_Event_Request_Storage::insert().
+	 * @param array       $raw              Raw $_POST data.
+	 * @param string      $submission_group UUID shared across all records in this submit.
+	 * @param string|null $parking_file_url URL of the uploaded parking PDF (or null).
+	 * @return array[]    Array of complete row arrays ready for Storage::insert().
 	 */
-	public static function normalize( array $raw ) {
-		$format = sanitize_text_field( $raw['hl_format'] );
-		$city   = sanitize_text_field( $raw['hl_city']   ?? '' );
-		$state  = sanitize_text_field( $raw['hl_state']  ?? '' );
+	public static function normalize( array $raw, string $submission_group, ?string $parking_file_url = null ): array {
+		$now = current_time( 'mysql' );
 
-		// Build the cc_emails JSON array — strip empties.
-		$cc_emails = array_values( array_filter(
-			array_map( 'sanitize_email', (array) ( $raw['hl_cc_email'] ?? array() ) )
-		) );
+		// ── Shared (venue / host / hotel / contact) fields ─────────────────
+		$city  = sanitize_text_field( $raw['hl_city']  ?? '' );
+		$state = sanitize_text_field( $raw['hl_state'] ?? '' );
 
 		// Hotels repeatable group
 		$hotels = array();
-		$hotel_names = (array) ( $raw['hl_hotel_name'] ?? array() );
-		foreach ( $hotel_names as $i => $name ) {
+		foreach ( (array) ( $raw['hl_hotel_name'] ?? array() ) as $i => $name ) {
 			$name = sanitize_text_field( $name );
-			if ( $name === '' ) {
-				continue;
-			}
+			if ( $name === '' ) continue;
 			$hotels[] = array(
 				'name'    => $name,
 				'phone'   => sanitize_text_field( $raw['hl_hotel_phone']   [ $i ] ?? '' ),
@@ -160,14 +150,11 @@ class Hostlinks_Event_Request {
 			);
 		}
 
-		// Host contacts repeatable group
+		// Host contacts repeatable group (includes cc_on_alerts flag)
 		$host_contacts = array();
-		$contact_names = (array) ( $raw['hl_contact_name'] ?? array() );
-		foreach ( $contact_names as $i => $cname ) {
+		foreach ( (array) ( $raw['hl_contact_name'] ?? array() ) as $i => $cname ) {
 			$cname = sanitize_text_field( $cname );
-			if ( $cname === '' ) {
-				continue;
-			}
+			if ( $cname === '' ) continue;
 			$host_contacts[] = array(
 				'name'          => $cname,
 				'agency'        => sanitize_text_field( $raw['hl_contact_agency']  [ $i ] ?? '' ),
@@ -178,69 +165,87 @@ class Hostlinks_Event_Request {
 				'dnl_phone'     => ! empty( $raw['hl_contact_dnl_phone']  [ $i ] ),
 				'dnl_phone2'    => ! empty( $raw['hl_contact_dnl_phone2'] [ $i ] ),
 				'publish'       => ! empty( $raw['hl_contact_publish']    [ $i ] ),
+				'cc_on_alerts'  => ! empty( $raw['hl_contact_cc']         [ $i ] ),
 			);
 		}
 
-		$price_raw = trim( $raw['hl_price'] ?? '' );
-		$max_raw   = trim( $raw['hl_max_attendees'] ?? '' );
+		$max_raw = trim( $raw['hl_max_attendees'] ?? '' );
 
-		$event_title = sanitize_text_field( $raw['hl_event_title'] );
-
-		return array(
-			'request_status'  => self::STATUS_NEW,
-			'submitted_at'    => current_time( 'mysql' ),
-			'updated_at'      => current_time( 'mysql' ),
-			'event_title'     => $event_title,
-			'hostlinks_title' => self::build_hostlinks_title( $raw ),
-			'description'     => sanitize_textarea_field( $raw['hl_description'] ?? '' ),
-			'category'        => sanitize_text_field( $raw['hl_category'] ),
-			'format'          => $format,
-			'timezone'        => sanitize_text_field( $raw['hl_timezone'] ),
-			'marketer'        => sanitize_text_field( $raw['hl_marketer']  ?? '' ),
-			'trainer'         => sanitize_text_field( $raw['hl_trainer'] ),
-			'start_date'      => sanitize_text_field( $raw['hl_start_date'] ),
-			'end_date'        => sanitize_text_field( $raw['hl_end_date'] ),
-			'start_time'      => sanitize_text_field( $raw['hl_start_time'] ),
-			'end_time'        => sanitize_text_field( $raw['hl_end_time'] ),
-			'host_name'       => sanitize_text_field( $raw['hl_host_name']       ?? '' ),
-			'location_name'   => sanitize_text_field( $raw['hl_location_name']   ?? '' ),
-			'street_address_1'=> sanitize_text_field( $raw['hl_street_address_1']?? '' ),
-			'street_address_2'=> sanitize_text_field( $raw['hl_street_address_2']?? '' ),
-			'city'            => $city,
-			'state'           => $state,
-			'zip_code'        => sanitize_text_field( $raw['hl_zip_code'] ?? '' ),
-			'price'           => $price_raw !== '' ? (float) $price_raw : null,
-			'max_attendees'   => $max_raw   !== '' ? (int)   $max_raw   : null,
-			'special_message' => sanitize_textarea_field( $raw['hl_special_message'] ?? '' ),
-			'cc_emails'       => wp_json_encode( $cc_emails ),
-			'hotels'          => wp_json_encode( $hotels ),
-			'host_contacts'   => wp_json_encode( $host_contacts ),
+		$shared = array(
+			'submission_group'    => $submission_group,
+			'request_status'      => self::STATUS_NEW,
+			'submitted_at'        => $now,
+			'updated_at'          => $now,
+			'event_title'         => '',
+			'hostlinks_title'     => '',
+			'description'         => '',
+			'custom_email_intro'  => sanitize_textarea_field( $raw['hl_custom_email_intro'] ?? '' ),
+			'format'              => '',
+			'timezone'            => sanitize_text_field( $raw['hl_timezone'] ?? '' ),
+			'marketer'            => sanitize_text_field( $raw['hl_marketer'] ?? '' ),
+			'host_name'           => sanitize_text_field( $raw['hl_host_name']        ?? '' ),
+			'displayed_as'        => sanitize_text_field( $raw['hl_displayed_as']     ?? '' ),
+			'location_name'       => sanitize_text_field( $raw['hl_location_name']    ?? '' ),
+			'street_address_1'    => sanitize_text_field( $raw['hl_street_address_1'] ?? '' ),
+			'street_address_2'    => sanitize_text_field( $raw['hl_street_address_2'] ?? '' ),
+			'street_address_3'    => sanitize_text_field( $raw['hl_street_address_3'] ?? '' ),
+			'city'                => $city,
+			'state'               => $state,
+			'zip_code'            => sanitize_text_field( $raw['hl_zip_code'] ?? '' ),
+			'special_instructions'=> sanitize_textarea_field( $raw['hl_special_instructions'] ?? '' ),
+			'parking_file_url'    => $parking_file_url ?? '',
+			'max_attendees'       => $max_raw !== '' ? (int) $max_raw : null,
+			'special_message'     => '',
+			'cc_emails'           => '[]',
+			'start_time'          => '',
+			'end_time'            => '',
+			'hotels'              => wp_json_encode( $hotels ),
+			'host_contacts'       => wp_json_encode( $host_contacts ),
 		);
+
+		// ── Per-event-row records ───────────────────────────────────────────
+		$records           = array();
+		$event_categories  = (array) ( $raw['hl_event_category']  ?? array() );
+		$event_start_dates = (array) ( $raw['hl_event_start_date'] ?? array() );
+		$event_end_dates   = (array) ( $raw['hl_event_end_date']   ?? array() );
+		$event_trainers    = (array) ( $raw['hl_event_trainer']    ?? array() );
+		$event_prices      = (array) ( $raw['hl_event_price']      ?? array() );
+
+		foreach ( $event_categories as $i => $cat ) {
+			$cat = sanitize_text_field( $cat );
+			if ( $cat === '' ) continue;
+
+			$start     = sanitize_text_field( $event_start_dates[ $i ] ?? '' );
+			$end       = sanitize_text_field( $event_end_dates[ $i ]   ?? '' );
+			$trainer   = sanitize_text_field( $event_trainers[ $i ]    ?? '' );
+			$price_raw = trim( $event_prices[ $i ] ?? '' );
+
+			$hl_title = self::build_hostlinks_title( $city, $state, $cat, $start );
+
+			$records[] = array_merge( $shared, array(
+				'category'        => $cat,
+				'trainer'         => $trainer,
+				'start_date'      => $start,
+				'end_date'        => $end,
+				'price'           => $price_raw !== '' ? (float) $price_raw : null,
+				'hostlinks_title' => $hl_title,
+				'event_title'     => $hl_title,
+			) );
+		}
+
+		return $records;
 	}
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
 
 	/**
 	 * Auto-generate an internal Hostlinks-style title.
-	 * Format: "City, ST - Category (Format) Start"  or  "Zoom - Category Start"
-	 *
-	 * @param array $raw
-	 * @return string
+	 * Format: "City, ST - Category - Start Date"
 	 */
-	public static function build_hostlinks_title( array $raw ) {
-		$format    = sanitize_text_field( $raw['hl_format']     ?? '' );
-		$city      = sanitize_text_field( $raw['hl_city']       ?? '' );
-		$state     = sanitize_text_field( $raw['hl_state']      ?? '' );
-		$category  = sanitize_text_field( $raw['hl_category']   ?? '' );
-		$start     = sanitize_text_field( $raw['hl_start_date'] ?? '' );
-
-		$location = ( $format === self::FORMAT_VIRTUAL )
-			? 'Zoom'
-			: trim( $city . ( $state ? ', ' . $state : '' ) );
-
+	public static function build_hostlinks_title( string $city, string $state, string $category, string $start ): string {
+		$location  = trim( $city . ( $state ? ', ' . $state : '' ) );
 		$date_part = $start ? date( 'M j, Y', strtotime( $start ) ) : '';
-
-		$parts = array_filter( array( $location, $category, $date_part ) );
+		$parts     = array_filter( array( $location, $category, $date_part ) );
 		return implode( ' - ', $parts );
 	}
 

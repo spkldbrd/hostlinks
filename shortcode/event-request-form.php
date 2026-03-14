@@ -33,7 +33,7 @@ if ( empty( $old_event_categories ) ) {
 
 $nonce_field = wp_nonce_field( 'hl_event_request_form', '_wpnonce', true, false );
 
-// Build category/trainer option HTML for JS templates (rendered once, reused).
+// Build category/trainer/timezone option HTML for JS templates (rendered once, reused).
 $category_options = '<option value="">— select type —</option>';
 foreach ( $categories as $cat ) {
 	$category_options .= '<option value="' . esc_attr( $cat['name'] ) . '">' . esc_html( $cat['name'] ) . '</option>';
@@ -42,6 +42,14 @@ $trainer_options = '<option value="TBA" selected>TBA</option>';
 foreach ( $instructors as $inst ) {
 	$trainer_options .= '<option value="' . esc_attr( $inst['name'] ) . '">' . esc_html( $inst['name'] ) . '</option>';
 }
+$timezone_options = '<option value="">— select timezone —</option>';
+foreach ( Hostlinks_Event_Request::TIMEZONES as $tz ) {
+	$timezone_options .= '<option value="' . esc_attr( $tz ) . '">' . esc_html( $tz ) . '</option>';
+}
+
+// Restore ZOOM/timezone per-event row values on validation failure.
+$old_event_zooms     = (array) ( $old['hl_event_zoom']     ?? array() );
+$old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 ?>
 <div class="hl-event-request-wrap">
 
@@ -92,7 +100,10 @@ foreach ( $instructors as $inst ) {
 		<?php endif; ?>
 
 		<div id="hl-event-rows">
-		<?php foreach ( $old_event_categories as $i => $old_cat ) : ?>
+		<?php foreach ( $old_event_categories as $i => $old_cat ) :
+			$is_zoom   = ! empty( $old_event_zooms[$i] );
+			$row_tz    = $old_event_timezones[$i] ?? '';
+		?>
 			<div class="hl-repeatable-row hl-event-row-item">
 				<div class="hl-event-row-grid">
 					<div class="hl-field-group">
@@ -111,17 +122,17 @@ foreach ( $instructors as $inst ) {
 						<label>Start Date <span class="hl-req">*</span></label>
 						<input type="date" name="hl_event_start_date[]"
 							value="<?php echo esc_attr( $old_event_start_dates[$i] ?? '' ); ?>"
-							class="<?php echo isset($errors['hl_event_start_date_' . $i]) ? 'hl-has-error' : ''; ?>" />
+							class="hl-date-pick<?php echo isset($errors['hl_event_start_date_' . $i]) ? ' hl-has-error' : ''; ?>" />
 					</div>
 					<div class="hl-field-group">
 						<label>End Date <span class="hl-req">*</span></label>
 						<input type="date" name="hl_event_end_date[]"
 							value="<?php echo esc_attr( $old_event_end_dates[$i] ?? '' ); ?>"
-							class="<?php echo isset($errors['hl_event_end_date_' . $i]) ? 'hl-has-error' : ''; ?>" />
+							class="hl-date-pick<?php echo isset($errors['hl_event_end_date_' . $i]) ? ' hl-has-error' : ''; ?>" />
 					</div>
 					<div class="hl-field-group">
-						<label>Trainer <span class="hl-req">*</span></label>
-						<select name="hl_event_trainer[]" class="<?php echo isset($errors['hl_event_trainer_' . $i]) ? 'hl-has-error' : ''; ?>">
+						<label>Trainer</label>
+						<select name="hl_event_trainer[]">
 							<option value="TBA" <?php selected( $old_event_trainers[$i] ?? 'TBA', 'TBA' ); ?>>TBA</option>
 							<?php foreach ( $instructors as $inst ) : ?>
 							<option value="<?php echo esc_attr( $inst['name'] ); ?>"
@@ -130,6 +141,26 @@ foreach ( $instructors as $inst ) {
 							</option>
 							<?php endforeach; ?>
 						</select>
+					</div>
+					<div class="hl-field-group hl-event-zoom-cell">
+						<label class="hl-event-zoom-check">
+							<input type="checkbox" name="hl_event_zoom[]" value="1"
+								<?php checked( $is_zoom ); ?>
+								class="hl-zoom-toggle" />
+							ZOOM?
+						</label>
+						<div class="hl-event-zoom-tz<?php echo $is_zoom ? ' is-visible' : ''; ?>">
+							<label>Timezone</label>
+							<select name="hl_event_timezone[]">
+								<option value="">— select timezone —</option>
+								<?php foreach ( Hostlinks_Event_Request::TIMEZONES as $tz ) : ?>
+								<option value="<?php echo esc_attr( $tz ); ?>"
+									<?php selected( $row_tz, $tz ); ?>>
+									<?php echo esc_html( $tz ); ?>
+								</option>
+								<?php endforeach; ?>
+							</select>
+						</div>
 					</div>
 				</div>
 				<button type="button" class="hl-remove-row" aria-label="Remove event row"
@@ -421,15 +452,25 @@ foreach ( $instructors as $inst ) {
 		</div>
 		<div class="hl-field-group">
 			<label>Start Date <span class="hl-req">*</span></label>
-			<input type="date" name="hl_event_start_date[]" />
+			<input type="date" name="hl_event_start_date[]" class="hl-date-pick" />
 		</div>
 		<div class="hl-field-group">
 			<label>End Date <span class="hl-req">*</span></label>
-			<input type="date" name="hl_event_end_date[]" />
+			<input type="date" name="hl_event_end_date[]" class="hl-date-pick" />
 		</div>
 		<div class="hl-field-group">
-			<label>Trainer <span class="hl-req">*</span></label>
+			<label>Trainer</label>
 			<select name="hl_event_trainer[]"><?php echo $trainer_options; ?></select>
+		</div>
+		<div class="hl-field-group hl-event-zoom-cell">
+			<label class="hl-event-zoom-check">
+				<input type="checkbox" name="hl_event_zoom[]" value="1" class="hl-zoom-toggle" />
+				ZOOM?
+			</label>
+			<div class="hl-event-zoom-tz">
+				<label>Timezone</label>
+				<select name="hl_event_timezone[]"><?php echo $timezone_options; ?></select>
+			</div>
 		</div>
 	</div>
 	<button type="button" class="hl-remove-row" aria-label="Remove event row">✕</button>
@@ -477,6 +518,28 @@ foreach ( $instructors as $inst ) {
 (function(){
 	var form = document.getElementById('hl-event-request-form');
 	if (!form) return;
+
+	// ── Date picker: open on any click in the field ───────────────────────
+	function initDatePicker(input) {
+		input.addEventListener('click', function() {
+			if (typeof this.showPicker === 'function') {
+				try { this.showPicker(); } catch(e) {}
+			}
+		});
+	}
+	document.querySelectorAll('input.hl-date-pick').forEach(initDatePicker);
+
+	// ── ZOOM toggle: show/hide per-event timezone ──────────────────────────
+	function initZoomToggle(checkbox) {
+		var cell = checkbox.closest('.hl-event-zoom-cell');
+		if (!cell) return;
+		var tzDiv = cell.querySelector('.hl-event-zoom-tz');
+		if (!tzDiv) return;
+		checkbox.addEventListener('change', function() {
+			tzDiv.classList.toggle('is-visible', this.checked);
+		});
+	}
+	document.querySelectorAll('.hl-zoom-toggle').forEach(initZoomToggle);
 
 	// ── "Displayed as" live preview ────────────────────────────────────────
 	var hostNameField    = document.getElementById('hl_host_name');
@@ -538,6 +601,9 @@ foreach ( $instructors as $inst ) {
 			target.appendChild(newRow);
 			attachRemove(newRow);
 			updateFirstRemoveBtn(target);
+			// Init ZOOM toggles and date pickers in the new row.
+			newRow.querySelectorAll('.hl-zoom-toggle').forEach(initZoomToggle);
+			newRow.querySelectorAll('input.hl-date-pick').forEach(initDatePicker);
 		});
 	});
 })();

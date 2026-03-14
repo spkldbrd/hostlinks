@@ -99,6 +99,7 @@ if ( ! empty( $req['submission_group'] ) ) {
 		<table style="width:100%;border-collapse:collapse;">
 			<?php
 			hl_detail_row( 'Category',  $req['category'] );
+			hl_detail_row( 'Format',    $req['format'] === 'virtual' ? 'ZOOM / Virtual' : ( $req['format'] ? 'In-Person' : '' ) );
 			hl_detail_row( 'Trainer',   $req['trainer'] );
 			hl_detail_row( 'Marketer',  $req['marketer'] );
 			hl_detail_row( 'Timezone',  $req['timezone'] );

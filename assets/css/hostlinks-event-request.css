@@ -139,10 +139,28 @@
 
 .hl-event-row-grid {
   display: grid;
-  grid-template-columns: 1.6fr 1fr 1fr 1.6fr;
+  grid-template-columns: 1fr 0.9fr 0.9fr 1fr 1.5fr;
   gap: 0.75rem;
   flex: 1;
+  align-items: start;
 }
+.hl-event-zoom-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.hl-event-zoom-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding-top: 1.6rem;
+  cursor: pointer;
+}
+.hl-event-zoom-check input[type="checkbox"] { width: auto; }
+.hl-event-zoom-tz { display: none; }
+.hl-event-zoom-tz.is-visible { display: block; }
 
 .hl-hotel-grid,
 .hl-contact-grid {
@@ -234,6 +252,7 @@
   .hl-field-row.hl-col-2,
   .hl-field-row.hl-col-3 { grid-template-columns: 1fr; }
   .hl-event-row-grid { grid-template-columns: 1fr 1fr; }
+  .hl-event-zoom-check { padding-top: 0; }
   .hl-hotel-grid   { grid-template-columns: 1fr 1fr; }
   .hl-contact-grid { grid-template-columns: 1fr 1fr; }
 }

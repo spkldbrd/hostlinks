@@ -199,6 +199,10 @@ class Hostlinks_Event_Request {
 		$event_start_dates = (array) ( $raw['hl_event_start_date'] ?? array() );
 		$event_end_dates   = (array) ( $raw['hl_event_end_date']   ?? array() );
 		$event_trainers    = (array) ( $raw['hl_event_trainer']    ?? array() );
+		$event_zooms       = (array) ( $raw['hl_event_zoom']       ?? array() );
+		$event_timezones   = (array) ( $raw['hl_event_timezone']   ?? array() );
+		$shared_timezone   = $shared['timezone'];
+
 		foreach ( $event_categories as $i => $cat ) {
 			$cat = sanitize_text_field( $cat );
 			if ( $cat === '' ) continue;
@@ -206,6 +210,8 @@ class Hostlinks_Event_Request {
 			$start   = sanitize_text_field( $event_start_dates[ $i ] ?? '' );
 			$end     = sanitize_text_field( $event_end_dates[ $i ]   ?? '' );
 			$trainer = sanitize_text_field( $event_trainers[ $i ]    ?? '' );
+			$is_zoom = ! empty( $event_zooms[ $i ] );
+			$row_tz  = $is_zoom ? sanitize_text_field( $event_timezones[ $i ] ?? '' ) : $shared_timezone;
 
 			$hl_title = self::build_hostlinks_title( $city, $state, $cat, $start );
 
@@ -214,6 +220,8 @@ class Hostlinks_Event_Request {
 				'trainer'         => $trainer,
 				'start_date'      => $start,
 				'end_date'        => $end,
+				'format'          => $is_zoom ? 'virtual' : 'in-person',
+				'timezone'        => $row_tz,
 				'price'           => null,
 				'hostlinks_title' => $hl_title,
 				'event_title'     => $hl_title,

@@ -237,9 +237,19 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 			</div>
 			<div class="hl-field-group">
 				<label for="hl_state">State <span id="hl-state-req" class="hl-req" style="<?php echo ! empty( $o('hl_street_address_1') ) ? '' : 'display:none;'; ?>">*</span></label>
-				<input type="text" id="hl_state" name="hl_state"
-					value="<?php echo $o('hl_state'); ?>" placeholder="State" maxlength="50"
-					class="<?php echo isset($errors['hl_state']) ? 'hl-has-error' : ''; ?>" />
+				<select id="hl_state" name="hl_state"
+					class="<?php echo isset($errors['hl_state']) ? 'hl-has-error' : ''; ?>">
+					<option value="">— select —</option>
+					<?php
+					$us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC' ];
+					foreach ( $us_states as $abbr ) :
+					?>
+					<option value="<?php echo esc_attr( $abbr ); ?>"
+						<?php selected( $o('hl_state'), $abbr ); ?>>
+						<?php echo esc_html( $abbr ); ?>
+					</option>
+					<?php endforeach; ?>
+				</select>
 				<?php echo $err('hl_state'); ?>
 			</div>
 			<div class="hl-field-group">

@@ -661,12 +661,66 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 			tmp.innerHTML = html.trim();
 			var newRow = tmp.firstChild;
 			target.appendChild(newRow);
-			attachRemove(newRow);
-			updateFirstRemoveBtn(target);
-			// Init ZOOM toggles and date pickers in the new row.
-			newRow.querySelectorAll('.hl-zoom-toggle').forEach(initZoomToggle);
-			newRow.querySelectorAll('input.hl-date-pick').forEach(initDatePicker);
-		});
+		attachRemove(newRow);
+		updateFirstRemoveBtn(target);
+		// Init ZOOM toggles and date pickers in the new row.
+		newRow.querySelectorAll('.hl-zoom-toggle').forEach(initZoomToggle);
+		newRow.querySelectorAll('input.hl-date-pick').forEach(initDatePicker);
+		// Init hotel autocomplete on new hotel rows.
+		if (btn.dataset.template === 'hotel') {
+			var nameInput = newRow.querySelector('input[name="hl_hotel_name[]"]');
+			if (nameInput) initHotelAutocomplete(nameInput);
+		}
 	});
+});
+
+<?php if ( ! empty( $maps_api_key ) ) : ?>
+// ── Hotel name autocomplete with city/state bias ───────────────────────
+var hotelBounds = null;
+
+function geocodeVenueBounds(callback) {
+	var city  = (document.getElementById('hl_city')  || {}).value  || '';
+	var state = (document.getElementById('hl_state') || {}).value  || '';
+	if (!city && !state) { callback(null); return; }
+	var geocoder = new google.maps.Geocoder();
+	geocoder.geocode({ address: city + ', ' + state + ', USA' }, function(results, status) {
+		callback(status === 'OK' ? results[0].geometry.viewport : null);
+	});
+}
+
+function initHotelAutocomplete(input) {
+	if (typeof google === 'undefined' || !google.maps || !google.maps.places) return;
+	var ac = new google.maps.places.Autocomplete(input, {
+		types: ['lodging'],
+		componentRestrictions: { country: 'us' },
+		fields: ['name', 'formatted_phone_number', 'formatted_address']
+	});
+	if (hotelBounds) ac.setBounds(hotelBounds);
+	ac.addListener('place_changed', function() {
+		var place = ac.getPlace();
+		if (!place) return;
+		var row       = input.closest('.hl-hotel-row');
+		var phoneInput = row ? row.querySelector('input[name="hl_hotel_phone[]"]') : null;
+		var addrInput  = row ? row.querySelector('input[name="hl_hotel_address[]"]') : null;
+		if (place.name)                   input.value = place.name;
+		if (phoneInput && place.formatted_phone_number) phoneInput.value = place.formatted_phone_number;
+		if (addrInput  && place.formatted_address)      addrInput.value  = place.formatted_address;
+	});
+}
+
+function initAllHotelAutocompletes() {
+	geocodeVenueBounds(function(bounds) {
+		hotelBounds = bounds;
+		document.querySelectorAll('#hl-hotel-rows input[name="hl_hotel_name[]"]').forEach(initHotelAutocomplete);
+	});
+}
+
+if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+	initAllHotelAutocompletes();
+} else {
+	window.addEventListener('load', initAllHotelAutocompletes);
+}
+<?php endif; ?>
+
 })();
 </script>

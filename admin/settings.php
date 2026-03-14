@@ -8,7 +8,7 @@ if ( ! current_user_can( 'manage_options' ) ) {
 
 $valid_tabs = array(
 	'general'           => 'General',
-	'event-settings'    => 'Event Settings',
+	'event-settings'    => 'Build Request Form',
 	'user-access'       => 'User Access',
 	'cvent'             => 'CVENT',
 	'import-export'     => 'Import / Export',

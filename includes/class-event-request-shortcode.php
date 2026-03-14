@@ -96,7 +96,15 @@ class Hostlinks_Event_Request_Shortcode {
 					' (ID #' . implode( ', #', $this->inserted_ids ) . ') ' .
 					'ha' . ( $count > 1 ? 've' : 's' ) . ' been submitted. We will be in touch soon.';
 			}
-			return '<div class="hl-request-success"><p>' . wp_kses_post( $msg ) . '</p></div>';
+			$form_url      = esc_url( get_permalink() );
+			$hostlinks_url = esc_url( Hostlinks_Page_URLs::get_upcoming() );
+			return '<div class="hl-request-success">'
+				. '<p>' . wp_kses_post( $msg ) . '</p>'
+				. '<div class="hl-success-actions">'
+				. '<a href="' . $form_url . '" class="hl-success-btn hl-success-btn--secondary">&#8592; Return to Form</a>'
+				. '<a href="' . $hostlinks_url . '" class="hl-success-btn hl-success-btn--primary">Return to Hostlinks</a>'
+				. '</div>'
+				. '</div>';
 		}
 
 		$errors = $this->errors;

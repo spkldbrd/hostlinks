@@ -203,8 +203,8 @@
 /* Checkbox row sits just below the inputs */
 .hl-contact-checks-row {
   padding-top: 2px;
-  border-top: 1px solid hsl(215 15% 92%);
-  padding-top: 6px;
+  border-bottom: 1px solid hsl(215 15% 92%);
+  padding-bottom: 3px;
 }
 
 .hl-check-label {

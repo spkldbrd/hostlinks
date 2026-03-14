@@ -63,7 +63,7 @@
   margin-bottom: 1rem;
 }
 .hl-field-row.hl-col-2 { grid-template-columns: 1fr 1fr; }
-.hl-field-row.hl-col-3 { grid-template-columns: 2fr 1fr 1fr; }
+.hl-field-row.hl-col-3 { grid-template-columns: 1fr 1fr 1fr; }
 .hl-col-1 { margin-bottom: 1rem; }
 
 /* Inputs */

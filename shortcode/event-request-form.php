@@ -71,26 +71,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 	</div>
 
 	<!-- ═══════════════════════════════════════════════════════════════════════
-	     SECTION 1: Marketer
-	════════════════════════════════════════════════════════════════════════ -->
-	<div class="hl-form-section">
-		<div class="hl-field-group hl-col-1">
-			<label for="hl_marketer">Who is marketing this event? <span class="hl-req">*</span></label>
-			<select id="hl_marketer" name="hl_marketer" class="<?php echo isset($errors['hl_marketer']) ? 'hl-has-error' : ''; ?>" style="max-width:320px;">
-				<option value="">— select marketer —</option>
-				<?php foreach ( $marketers as $mkt ) : ?>
-				<option value="<?php echo esc_attr( $mkt['name'] ); ?>"
-					<?php selected( $old['hl_marketer'] ?? '', $mkt['name'] ); ?>>
-					<?php echo esc_html( $mkt['name'] ); ?>
-				</option>
-				<?php endforeach; ?>
-			</select>
-			<?php echo $err('hl_marketer'); ?>
-		</div>
-	</div>
-
-	<!-- ═══════════════════════════════════════════════════════════════════════
-	     SECTION 2: Event Rows
+	     SECTION 1: Event Rows
 	════════════════════════════════════════════════════════════════════════ -->
 	<div class="hl-form-section">
 		<h3 class="hl-section-title">Events <span class="hl-section-note">(add one row per class date)</span></h3>
@@ -172,20 +153,33 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 	</div>
 
 	<!-- ═══════════════════════════════════════════════════════════════════════
-	     SECTION 3: Capacity & Timezone
+	     SECTION 2: Marketer, Capacity & Timezone
 	════════════════════════════════════════════════════════════════════════ -->
 	<div class="hl-form-section">
-		<div class="hl-field-row hl-col-2">
+		<div class="hl-field-row hl-col-3">
+			<div class="hl-field-group">
+				<label for="hl_marketer">Who is marketing this event? <span class="hl-req">*</span></label>
+				<select id="hl_marketer" name="hl_marketer" class="<?php echo isset($errors['hl_marketer']) ? 'hl-has-error' : ''; ?>">
+					<option value="">— select marketer —</option>
+					<?php foreach ( $marketers as $mkt ) : ?>
+					<option value="<?php echo esc_attr( $mkt['name'] ); ?>"
+						<?php selected( $old['hl_marketer'] ?? '', $mkt['name'] ); ?>>
+						<?php echo esc_html( $mkt['name'] ); ?>
+					</option>
+					<?php endforeach; ?>
+				</select>
+				<?php echo $err('hl_marketer'); ?>
+			</div>
 			<div class="hl-field-group">
 				<label for="hl_max_attendees">Event Capacity <span class="hl-optional">(Optional)</span></label>
 				<input type="number" id="hl_max_attendees" name="hl_max_attendees"
 					value="<?php echo $o('hl_max_attendees'); ?>"
-					placeholder="Unlimited" min="1" style="max-width:180px;" />
+					placeholder="Unlimited" min="1" />
 				<?php echo $err('hl_max_attendees'); ?>
 			</div>
 			<div class="hl-field-group">
-				<label for="hl_timezone">Timezone <span class="hl-req">*</span></label>
-				<select id="hl_timezone" name="hl_timezone" class="<?php echo isset($errors['hl_timezone']) ? 'hl-has-error' : ''; ?>" style="max-width:260px;">
+				<label for="hl_timezone">Default Timezone <span class="hl-req">*</span></label>
+				<select id="hl_timezone" name="hl_timezone" class="<?php echo isset($errors['hl_timezone']) ? 'hl-has-error' : ''; ?>">
 					<option value="">Select timezone</option>
 					<?php foreach ( Hostlinks_Event_Request::TIMEZONES as $tz ) : ?>
 					<option value="<?php echo esc_attr( $tz ); ?>"

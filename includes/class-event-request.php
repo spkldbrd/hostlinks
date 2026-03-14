@@ -152,10 +152,10 @@ class Hostlinks_Event_Request {
 				'email'         => sanitize_email(      $raw['hl_contact_email']   [ $i ] ?? '' ),
 				'phone'         => sanitize_text_field( $raw['hl_contact_phone']   [ $i ] ?? '' ),
 				'phone2'        => sanitize_text_field( $raw['hl_contact_phone2']  [ $i ] ?? '' ),
-				'dnl_phone'     => ! empty( $raw['hl_contact_dnl_phone']  [ $i ] ),
-				'dnl_phone2'    => ! empty( $raw['hl_contact_dnl_phone2'] [ $i ] ),
-				'publish'       => ! empty( $raw['hl_contact_publish']    [ $i ] ),
-				'cc_on_alerts'  => ! empty( $raw['hl_contact_cc']         [ $i ] ),
+				'dnl_phone'        => ! empty( $raw['hl_contact_dnl_phone']        [ $i ] ),
+				'dnl_phone2'       => ! empty( $raw['hl_contact_dnl_phone2']       [ $i ] ),
+				'include_in_email' => ! empty( $raw['hl_contact_include_email']    [ $i ] ),
+				'cc_on_alerts'     => ! empty( $raw['hl_contact_cc']               [ $i ] ),
 			);
 		}
 

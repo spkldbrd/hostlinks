@@ -170,6 +170,12 @@
 }
 .hl-check-label input[type="checkbox"] { width: auto; }
 
+/* Do Not List inline under phone fields */
+.hl-check-inline {
+  margin-top: 4px;
+  color: #666;
+}
+
 .hl-remove-row {
   flex-shrink: 0;
   background: none;

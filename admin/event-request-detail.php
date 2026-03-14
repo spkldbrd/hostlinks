@@ -188,7 +188,7 @@ if ( ! empty( $req['submission_group'] ) ) {
 				<?php if ( ! empty( $contact['dnl_phone2'] ) ) echo ' <em style="color:#999;">(Do Not List)</em>'; ?>
 				<br>
 			<?php endif; ?>
-			<?php if ( ! empty( $contact['publish'] ) ) echo '<em style="color:#4caf50;">Publish</em>'; ?>
+			<?php if ( ! empty( $contact['include_in_email'] ) ) echo '<em style="color:#4caf50;">Include in Email Template</em>'; ?>
 		</div>
 		<?php endforeach; ?>
 		<?php endif; ?>

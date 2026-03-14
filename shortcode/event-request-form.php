@@ -285,12 +285,16 @@ foreach ( $instructors as $inst ) {
 			$c_phones   = (array) ( $old['hl_contact_phone']  ?? array() );
 			$c_phones2  = (array) ( $old['hl_contact_phone2'] ?? array() );
 			$c_cc       = (array) ( $old['hl_contact_cc']     ?? array() );
+			$c_include  = (array) ( $old['hl_contact_include_email'] ?? array() );
 			if ( empty( $c_names ) ) {
 				$c_names = $c_agencies = $c_titles = $c_emails = $c_phones = $c_phones2 = array( '' );
-				$c_cc = array( '1' );
+				$c_cc      = array( '1' );
+				$c_include = array( '1' );
 			}
 			foreach ( $c_names as $i => $cname ) :
-				$is_first = ( $i === 0 );
+				$is_first    = ( $i === 0 );
+				$cc_checked  = isset( $c_cc[$i] )      ? $c_cc[$i]      : ( $is_first ? '1' : '' );
+				$inc_checked = isset( $c_include[$i] ) ? $c_include[$i] : ( $is_first ? '1' : '' );
 			?>
 			<div class="hl-repeatable-row hl-contact-row">
 				<div class="hl-contact-grid">
@@ -318,32 +322,32 @@ foreach ( $instructors as $inst ) {
 						<label>Phone</label>
 						<input type="tel" name="hl_contact_phone[]"
 							value="<?php echo esc_attr( $c_phones[$i] ?? '' ); ?>" placeholder="Phone" />
+						<label class="hl-check-label hl-check-inline">
+							<input type="checkbox" name="hl_contact_dnl_phone[<?php echo $i; ?>]"
+								<?php checked( ! empty( $old['hl_contact_dnl_phone'][$i] ) ); ?> />
+							Do Not List
+						</label>
 					</div>
 					<div class="hl-field-group">
 						<label>Phone 2</label>
 						<input type="tel" name="hl_contact_phone2[]"
 							value="<?php echo esc_attr( $c_phones2[$i] ?? '' ); ?>" placeholder="Phone 2" />
+						<label class="hl-check-label hl-check-inline">
+							<input type="checkbox" name="hl_contact_dnl_phone2[<?php echo $i; ?>]"
+								<?php checked( ! empty( $old['hl_contact_dnl_phone2'][$i] ) ); ?> />
+							Do Not List
+						</label>
 					</div>
 					<div class="hl-field-group hl-col-checks">
 						<label class="hl-check-label hl-check-highlight">
 							<input type="checkbox" name="hl_contact_cc[<?php echo $i; ?>]" value="1"
-								<?php checked( isset( $c_cc[$i] ) ? $c_cc[$i] : ( $is_first ? '1' : '' ), '1' ); ?> />
+								<?php checked( $cc_checked, '1' ); ?> />
 							CC on Registration Alerts
 						</label>
-						<label class="hl-check-label">
-							<input type="checkbox" name="hl_contact_dnl_phone[<?php echo $i; ?>]"
-								<?php checked( ! empty( $old['hl_contact_dnl_phone'][$i] ) ); ?> />
-							Do Not List Phone
-						</label>
-						<label class="hl-check-label">
-							<input type="checkbox" name="hl_contact_dnl_phone2[<?php echo $i; ?>]"
-								<?php checked( ! empty( $old['hl_contact_dnl_phone2'][$i] ) ); ?> />
-							Do Not List Phone 2
-						</label>
-						<label class="hl-check-label">
-							<input type="checkbox" name="hl_contact_publish[<?php echo $i; ?>]"
-								<?php checked( ! empty( $old['hl_contact_publish'][$i] ) ); ?> />
-							Publish Contact
+						<label class="hl-check-label hl-check-highlight">
+							<input type="checkbox" name="hl_contact_include_email[<?php echo $i; ?>]" value="1"
+								<?php checked( $inc_checked, '1' ); ?> />
+							Include in Email Template
 						</label>
 					</div>
 				</div>
@@ -450,13 +454,19 @@ foreach ( $instructors as $inst ) {
 		<div class="hl-field-group"><label>Agency</label><input type="text" name="hl_contact_agency[]" value="" placeholder="Agency" /></div>
 		<div class="hl-field-group"><label>Title</label><input type="text" name="hl_contact_title[]" value="" placeholder="Title" /></div>
 		<div class="hl-field-group"><label>Email</label><input type="email" name="hl_contact_email[]" value="" placeholder="email@example.com" /></div>
-		<div class="hl-field-group"><label>Phone</label><input type="tel" name="hl_contact_phone[]" value="" placeholder="Phone" /></div>
-		<div class="hl-field-group"><label>Phone 2</label><input type="tel" name="hl_contact_phone2[]" value="" placeholder="Phone 2" /></div>
+		<div class="hl-field-group">
+			<label>Phone</label>
+			<input type="tel" name="hl_contact_phone[]" value="" placeholder="Phone" />
+			<label class="hl-check-label hl-check-inline"><input type="checkbox" name="hl_contact_dnl_phone[NEW_INDEX]" /> Do Not List</label>
+		</div>
+		<div class="hl-field-group">
+			<label>Phone 2</label>
+			<input type="tel" name="hl_contact_phone2[]" value="" placeholder="Phone 2" />
+			<label class="hl-check-label hl-check-inline"><input type="checkbox" name="hl_contact_dnl_phone2[NEW_INDEX]" /> Do Not List</label>
+		</div>
 		<div class="hl-field-group hl-col-checks">
 			<label class="hl-check-label hl-check-highlight"><input type="checkbox" name="hl_contact_cc[NEW_INDEX]" value="1" /> CC on Registration Alerts</label>
-			<label class="hl-check-label"><input type="checkbox" name="hl_contact_dnl_phone[NEW_INDEX]" /> Do Not List Phone</label>
-			<label class="hl-check-label"><input type="checkbox" name="hl_contact_dnl_phone2[NEW_INDEX]" /> Do Not List Phone 2</label>
-			<label class="hl-check-label"><input type="checkbox" name="hl_contact_publish[NEW_INDEX]" /> Publish Contact</label>
+			<label class="hl-check-label hl-check-highlight"><input type="checkbox" name="hl_contact_include_email[NEW_INDEX]" value="1" /> Include in Email Template</label>
 		</div>
 	</div>
 	<button type="button" class="hl-remove-row" aria-label="Remove">✕</button>

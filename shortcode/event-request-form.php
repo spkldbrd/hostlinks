@@ -86,7 +86,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 			$row_tz    = $old_event_timezones[$i] ?? '';
 		?>
 			<div class="hl-repeatable-row hl-event-row-item">
-				<div class="hl-event-row-grid">
+				<div class="hl-event-row-grid<?php echo ! $is_zoom ? ' hl-no-tz' : ''; ?>">
 					<div class="hl-field-group">
 						<label>Type <span class="hl-req">*</span></label>
 						<select name="hl_event_category[]" class="<?php echo isset($errors['hl_event_category_' . $i]) ? 'hl-has-error' : ''; ?>">
@@ -123,25 +123,25 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 							<?php endforeach; ?>
 						</select>
 					</div>
-					<div class="hl-field-group hl-event-zoom-cell">
+					<div class="hl-field-group hl-event-zoom-col">
 						<label class="hl-event-zoom-check">
 							<input type="checkbox" name="hl_event_zoom[]" value="1"
 								<?php checked( $is_zoom ); ?>
 								class="hl-zoom-toggle" />
 							ZOOM?
 						</label>
-						<div class="hl-event-zoom-tz<?php echo $is_zoom ? ' is-visible' : ''; ?>">
-							<label>Timezone</label>
-							<select name="hl_event_timezone[]">
-								<option value="">— select timezone —</option>
-								<?php foreach ( Hostlinks_Event_Request::TIMEZONES as $tz ) : ?>
-								<option value="<?php echo esc_attr( $tz ); ?>"
-									<?php selected( $row_tz, $tz ); ?>>
-									<?php echo esc_html( $tz ); ?>
-								</option>
-								<?php endforeach; ?>
-							</select>
-						</div>
+					</div>
+					<div class="hl-field-group hl-event-tz-col">
+						<label>Timezone</label>
+						<select name="hl_event_timezone[]">
+							<option value="">— select timezone —</option>
+							<?php foreach ( Hostlinks_Event_Request::TIMEZONES as $tz ) : ?>
+							<option value="<?php echo esc_attr( $tz ); ?>"
+								<?php selected( $row_tz, $tz ); ?>>
+								<?php echo esc_html( $tz ); ?>
+							</option>
+							<?php endforeach; ?>
+						</select>
 					</div>
 				</div>
 				<button type="button" class="hl-remove-row" aria-label="Remove event row"
@@ -153,10 +153,11 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 	</div>
 
 	<!-- ═══════════════════════════════════════════════════════════════════════
-	     SECTION 2: Marketer, Capacity & Timezone
+	     SECTION 2: Additional Event Details
 	════════════════════════════════════════════════════════════════════════ -->
 	<div class="hl-form-section">
-		<div class="hl-field-row hl-col-3">
+		<h3 class="hl-section-title">Additional Event Details</h3>
+		<div class="hl-field-row hl-col-2">
 			<div class="hl-field-group">
 				<label for="hl_marketer">Who is marketing this event? <span class="hl-req">*</span></label>
 				<select id="hl_marketer" name="hl_marketer" class="<?php echo isset($errors['hl_marketer']) ? 'hl-has-error' : ''; ?>">
@@ -176,19 +177,6 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 					value="<?php echo $o('hl_max_attendees'); ?>"
 					placeholder="Unlimited" min="1" />
 				<?php echo $err('hl_max_attendees'); ?>
-			</div>
-			<div class="hl-field-group">
-				<label for="hl_timezone">Default Timezone <span class="hl-optional">(Optional)</span></label>
-				<select id="hl_timezone" name="hl_timezone" class="<?php echo isset($errors['hl_timezone']) ? 'hl-has-error' : ''; ?>">
-					<option value="">Select timezone</option>
-					<?php foreach ( Hostlinks_Event_Request::TIMEZONES as $tz ) : ?>
-					<option value="<?php echo esc_attr( $tz ); ?>"
-						<?php selected( $old['hl_timezone'] ?? 'EST (Eastern Time)', $tz ); ?>>
-						<?php echo esc_html( $tz ); ?>
-					</option>
-					<?php endforeach; ?>
-				</select>
-				<?php echo $err('hl_timezone'); ?>
 			</div>
 		</div>
 	</div>
@@ -452,7 +440,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 <?php /* ── JS templates for repeatable rows ─────────────────────────────── */ ?>
 <script id="hl-tpl-event" type="text/x-template">
 <div class="hl-repeatable-row hl-event-row-item">
-	<div class="hl-event-row-grid">
+	<div class="hl-event-row-grid hl-no-tz">
 		<div class="hl-field-group">
 			<label>Type <span class="hl-req">*</span></label>
 			<select name="hl_event_category[]"><?php echo $category_options; ?></select>
@@ -469,15 +457,15 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 			<label>Trainer</label>
 			<select name="hl_event_trainer[]"><?php echo $trainer_options; ?></select>
 		</div>
-		<div class="hl-field-group hl-event-zoom-cell">
+		<div class="hl-field-group hl-event-zoom-col">
 			<label class="hl-event-zoom-check">
 				<input type="checkbox" name="hl_event_zoom[]" value="1" class="hl-zoom-toggle" />
 				ZOOM?
 			</label>
-			<div class="hl-event-zoom-tz">
-				<label>Timezone</label>
-				<select name="hl_event_timezone[]"><?php echo $timezone_options; ?></select>
-			</div>
+		</div>
+		<div class="hl-field-group hl-event-tz-col">
+			<label>Timezone</label>
+			<select name="hl_event_timezone[]"><?php echo $timezone_options; ?></select>
 		</div>
 	</div>
 	<button type="button" class="hl-remove-row" aria-label="Remove event row">✕</button>
@@ -554,14 +542,12 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 	}
 	document.querySelectorAll('input.hl-date-pick').forEach(initDatePicker);
 
-	// ── ZOOM toggle: show/hide per-event timezone ──────────────────────────
+	// ── ZOOM toggle: expand/collapse Timezone column ───────────────────────
 	function initZoomToggle(checkbox) {
-		var cell = checkbox.closest('.hl-event-zoom-cell');
-		if (!cell) return;
-		var tzDiv = cell.querySelector('.hl-event-zoom-tz');
-		if (!tzDiv) return;
+		var grid = checkbox.closest('.hl-event-row-grid');
+		if (!grid) return;
 		checkbox.addEventListener('change', function() {
-			tzDiv.classList.toggle('is-visible', this.checked);
+			grid.classList.toggle('hl-no-tz', !this.checked);
 		});
 	}
 	document.querySelectorAll('.hl-zoom-toggle').forEach(initZoomToggle);

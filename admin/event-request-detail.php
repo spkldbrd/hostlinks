@@ -104,9 +104,6 @@ if ( ! empty( $req['submission_group'] ) ) {
 			hl_detail_row( 'Timezone',  $req['timezone'] );
 			hl_detail_row( 'Start Date',$req['start_date'] ?? '' );
 			hl_detail_row( 'End Date',  $req['end_date']   ?? '' );
-			if ( ! empty( $req['price'] ) ) {
-				hl_detail_row( 'Price', '$' . number_format( (float) $req['price'], 2 ) );
-			}
 			hl_detail_row( 'Capacity',  $req['max_attendees'] !== null ? (string) $req['max_attendees'] : 'Unlimited' );
 			?>
 		</table>

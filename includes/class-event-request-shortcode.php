@@ -138,13 +138,12 @@ class Hostlinks_Event_Request_Shortcode {
 		foreach ( $records as $idx => $data ) {
 			$rid = $ids[ $idx ] ?? '?';
 			$lines[] = sprintf(
-				'  #%s  %s  %s – %s  Trainer: %s  Price: %s',
+				'  #%s  %s  %s – %s  Trainer: %s',
 				$rid,
 				$data['category'],
 				$data['start_date'],
 				$data['end_date'],
-				$data['trainer'],
-				$data['price'] !== null ? '$' . number_format( (float) $data['price'], 2 ) : '—'
+				$data['trainer']
 			);
 		}
 

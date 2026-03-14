@@ -105,14 +105,6 @@ class Hostlinks_Event_Request {
 			$errors['hl_max_attendees'] = 'Max attendees must be a positive whole number.';
 		}
 
-		// Price per event row — numeric if provided
-		foreach ( (array) ( $raw['hl_event_price'] ?? array() ) as $i => $price_raw ) {
-			$price_raw = trim( $price_raw );
-			if ( $price_raw !== '' && ! is_numeric( $price_raw ) ) {
-				$errors[ 'hl_event_price_' . $i ] = 'Price must be a number on event row ' . ( $i + 1 ) . '.';
-			}
-		}
-
 		return $errors;
 	}
 
@@ -209,16 +201,13 @@ class Hostlinks_Event_Request {
 		$event_start_dates = (array) ( $raw['hl_event_start_date'] ?? array() );
 		$event_end_dates   = (array) ( $raw['hl_event_end_date']   ?? array() );
 		$event_trainers    = (array) ( $raw['hl_event_trainer']    ?? array() );
-		$event_prices      = (array) ( $raw['hl_event_price']      ?? array() );
-
 		foreach ( $event_categories as $i => $cat ) {
 			$cat = sanitize_text_field( $cat );
 			if ( $cat === '' ) continue;
 
-			$start     = sanitize_text_field( $event_start_dates[ $i ] ?? '' );
-			$end       = sanitize_text_field( $event_end_dates[ $i ]   ?? '' );
-			$trainer   = sanitize_text_field( $event_trainers[ $i ]    ?? '' );
-			$price_raw = trim( $event_prices[ $i ] ?? '' );
+			$start   = sanitize_text_field( $event_start_dates[ $i ] ?? '' );
+			$end     = sanitize_text_field( $event_end_dates[ $i ]   ?? '' );
+			$trainer = sanitize_text_field( $event_trainers[ $i ]    ?? '' );
 
 			$hl_title = self::build_hostlinks_title( $city, $state, $cat, $start );
 
@@ -227,7 +216,7 @@ class Hostlinks_Event_Request {
 				'trainer'         => $trainer,
 				'start_date'      => $start,
 				'end_date'        => $end,
-				'price'           => $price_raw !== '' ? (float) $price_raw : null,
+				'price'           => null,
 				'hostlinks_title' => $hl_title,
 				'event_title'     => $hl_title,
 			) );

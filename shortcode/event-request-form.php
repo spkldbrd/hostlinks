@@ -27,9 +27,8 @@ $old_event_categories  = (array) ( $old['hl_event_category']   ?? array( '' ) );
 $old_event_start_dates = (array) ( $old['hl_event_start_date']  ?? array( '' ) );
 $old_event_end_dates   = (array) ( $old['hl_event_end_date']    ?? array( '' ) );
 $old_event_trainers    = (array) ( $old['hl_event_trainer']     ?? array( '' ) );
-$old_event_prices      = (array) ( $old['hl_event_price']       ?? array( '' ) );
 if ( empty( $old_event_categories ) ) {
-	$old_event_categories = $old_event_start_dates = $old_event_end_dates = $old_event_trainers = $old_event_prices = array( '' );
+	$old_event_categories = $old_event_start_dates = $old_event_end_dates = $old_event_trainers = array( '' );
 }
 
 $nonce_field = wp_nonce_field( 'hl_event_request_form', '_wpnonce', true, false );
@@ -131,13 +130,6 @@ foreach ( $instructors as $inst ) {
 							</option>
 							<?php endforeach; ?>
 						</select>
-					</div>
-					<div class="hl-field-group">
-						<label>Price ($)</label>
-						<input type="number" name="hl_event_price[]"
-							value="<?php echo esc_attr( $old_event_prices[$i] ?? '' ); ?>"
-							placeholder="0.00" step="0.01" min="0"
-							class="<?php echo isset($errors['hl_event_price_' . $i]) ? 'hl-has-error' : ''; ?>" />
 					</div>
 				</div>
 				<button type="button" class="hl-remove-row" aria-label="Remove event row"
@@ -439,10 +431,6 @@ foreach ( $instructors as $inst ) {
 		<div class="hl-field-group">
 			<label>Trainer <span class="hl-req">*</span></label>
 			<select name="hl_event_trainer[]"><?php echo $trainer_options; ?></select>
-		</div>
-		<div class="hl-field-group">
-			<label>Price ($)</label>
-			<input type="number" name="hl_event_price[]" placeholder="0.00" step="0.01" min="0" />
 		</div>
 	</div>
 	<button type="button" class="hl-remove-row" aria-label="Remove event row">✕</button>

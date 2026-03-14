@@ -26,7 +26,17 @@ class Hostlinks_Admin_Menus {
 		add_submenu_page( 'booking-menu', 'Events',          'Events',          'manage_options', 'booking-menu',              array( $this, 'page_events' ) );
 		add_submenu_page( 'booking-menu', 'Add New Event',   'Add New Event',   'manage_options', 'admin.php?page=booking-menu&add=1' );
 		add_submenu_page( 'booking-menu', 'Marketers',       'Marketers',       'manage_options', 'marketer-menu',             array( $this, 'page_marketer' ) );
-		add_submenu_page( 'booking-menu', 'Event Requests',  'Event Requests',  'manage_options', 'hostlinks-event-requests',  array( $this, 'page_event_requests' ) );
+		global $wpdb;
+		$req_count  = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM {$wpdb->prefix}hostlinks_event_requests WHERE request_status = %s",
+			'new'
+		) );
+		$req_label  = 'Event Requests';
+		if ( $req_count > 0 ) {
+			$req_label .= ' <span class="awaiting-mod update-plugins" style="margin-left:4px;">'
+				. esc_html( $req_count ) . '</span>';
+		}
+		add_submenu_page( 'booking-menu', 'Event Requests', $req_label, 'manage_options', 'hostlinks-event-requests', array( $this, 'page_event_requests' ) );
 		add_submenu_page( 'booking-menu', 'Instructors',     'Instructors',     'manage_options', 'istructor-menu',            array( $this, 'page_instructor' ) );
 		add_submenu_page( 'booking-menu', 'CVENT Sync',      'CVENT Sync',      'manage_options', 'cvent-sync',                array( $this, 'page_cvent_sync' ) );
 

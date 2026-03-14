@@ -389,11 +389,6 @@ foreach ( $instructors as $inst ) {
 						<input type="text" name="hl_hotel_address[]"
 							value="<?php echo esc_attr( $hotel_addrs[$i] ?? '' ); ?>" placeholder="Address" />
 					</div>
-					<div class="hl-field-group">
-						<label>Website URL</label>
-						<input type="url" name="hl_hotel_url[]"
-							value="<?php echo esc_attr( $hotel_urls[$i] ?? '' ); ?>" placeholder="https://..." />
-					</div>
 				</div>
 				<button type="button" class="hl-remove-row" aria-label="Remove"
 					<?php echo $i === 0 ? 'style="visibility:hidden;"' : ''; ?>>✕</button>
@@ -443,7 +438,6 @@ foreach ( $instructors as $inst ) {
 		<div class="hl-field-group"><label>Hotel Name</label><input type="text" name="hl_hotel_name[]" value="" placeholder="Hotel Name" /></div>
 		<div class="hl-field-group"><label>Phone</label><input type="tel" name="hl_hotel_phone[]" value="" placeholder="Phone" /></div>
 		<div class="hl-field-group"><label>Address</label><input type="text" name="hl_hotel_address[]" value="" placeholder="Address" /></div>
-		<div class="hl-field-group"><label>Website URL</label><input type="url" name="hl_hotel_url[]" value="" placeholder="https://..." /></div>
 	</div>
 	<button type="button" class="hl-remove-row" aria-label="Remove">✕</button>
 </div>

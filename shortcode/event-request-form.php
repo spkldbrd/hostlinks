@@ -178,7 +178,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 				<?php echo $err('hl_max_attendees'); ?>
 			</div>
 			<div class="hl-field-group">
-				<label for="hl_timezone">Default Timezone <span class="hl-req">*</span></label>
+				<label for="hl_timezone">Default Timezone <span class="hl-optional">(Optional)</span></label>
 				<select id="hl_timezone" name="hl_timezone" class="<?php echo isset($errors['hl_timezone']) ? 'hl-has-error' : ''; ?>">
 					<option value="">Select timezone</option>
 					<?php foreach ( Hostlinks_Event_Request::TIMEZONES as $tz ) : ?>
@@ -201,13 +201,13 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 
 		<div class="hl-field-row hl-col-2">
 			<div class="hl-field-group">
-				<label for="hl_host_name">Host Name</label>
+				<label for="hl_host_name">Host Name <span class="hl-optional">(Optional)</span></label>
 				<input type="text" id="hl_host_name" name="hl_host_name"
 					value="<?php echo $o('hl_host_name'); ?>"
 					placeholder="e.g. City of Phoenix" />
 			</div>
 			<div class="hl-field-group">
-				<label for="hl_displayed_as">Displayed as</label>
+				<label for="hl_displayed_as">Displayed as <span class="hl-optional">(Optional)</span></label>
 				<input type="text" id="hl_displayed_as" name="hl_displayed_as"
 					value="<?php echo $o('hl_displayed_as'); ?>"
 					placeholder="Hosted by …" />

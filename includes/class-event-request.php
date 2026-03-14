@@ -50,10 +50,7 @@ class Hostlinks_Event_Request {
 			$errors['hl_marketer'] = 'Please select a marketer.';
 		}
 
-		// Timezone
-		if ( empty( trim( $raw['hl_timezone'] ?? '' ) ) ) {
-			$errors['hl_timezone'] = 'Timezone is required.';
-		}
+		// Timezone is optional — only required per-event when ZOOM is checked.
 
 		// Event rows — at least one required
 		$event_categories  = (array) ( $raw['hl_event_category']   ?? array() );

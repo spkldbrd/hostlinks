@@ -543,6 +543,39 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		if (cityReqSpan)  cityReqSpan.style.display  = hasAddr ? '' : 'none';
 		if (stateReqSpan) stateReqSpan.style.display = hasAddr ? '' : 'none';
 	}
+	// ── Auto end-date based on event type ────────────────────────────────
+	// Management / Writing → end = start + 1 day
+	// Subaward            → end = start (same day)
+	function autoEndDate(row) {
+		var typeSelect  = row.querySelector('select[name="hl_event_category[]"]');
+		var startInput  = row.querySelector('input[name="hl_event_start_date[]"]');
+		var endInput    = row.querySelector('input[name="hl_event_end_date[]"]');
+		if (!typeSelect || !startInput || !endInput) return;
+
+		function applyEndDate() {
+			var type  = typeSelect.value.toLowerCase().trim();
+			var start = startInput.value;
+			if (!start || !type) return;
+			var d = new Date(start + 'T00:00:00'); // force local midnight
+			if (isNaN(d)) return;
+			if (type === 'subaward') {
+				// same day — no offset
+			} else if (type === 'management' || type === 'writing') {
+				d.setDate(d.getDate() + 1);
+			} else {
+				return; // other types: don't auto-set
+			}
+			var y = d.getFullYear();
+			var m = String(d.getMonth() + 1).padStart(2, '0');
+			var day = String(d.getDate()).padStart(2, '0');
+			endInput.value = y + '-' + m + '-' + day;
+		}
+
+		startInput.addEventListener('change', applyEndDate);
+		typeSelect.addEventListener('change', applyEndDate);
+	}
+	document.querySelectorAll('.hl-event-row-item').forEach(autoEndDate);
+
 	// ── Hotel section: lock until Address Line 1 is filled ───────────────
 	var hotelSection    = document.getElementById('hl-hotel-section');
 	var hotelLockedNote = document.getElementById('hl-hotel-locked-note');
@@ -697,9 +730,10 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 			target.appendChild(newRow);
 		attachRemove(newRow);
 		updateFirstRemoveBtn(target);
-		// Init ZOOM toggles and date pickers in the new row.
+		// Init ZOOM toggles, date pickers, and end-date logic in the new row.
 		newRow.querySelectorAll('.hl-zoom-toggle').forEach(initZoomToggle);
 		newRow.querySelectorAll('input.hl-date-pick').forEach(initDatePicker);
+		if (newRow.classList.contains('hl-event-row-item')) autoEndDate(newRow);
 		// Init phone formatting on new contact rows.
 		newRow.querySelectorAll('input[name="hl_contact_phone[]"], input[name="hl_contact_phone2[]"]').forEach(formatPhone);
 		// Init hotel autocomplete on new hotel rows.

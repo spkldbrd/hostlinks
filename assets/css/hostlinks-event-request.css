@@ -137,6 +137,13 @@
 }
 .hl-cc-row input { flex: 1; }
 
+.hl-event-row-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1.6fr;
+  gap: 0.75rem;
+  flex: 1;
+}
+
 .hl-hotel-grid,
 .hl-contact-grid {
   display: grid;
@@ -220,6 +227,7 @@
 @media (max-width: 700px) {
   .hl-field-row.hl-col-2,
   .hl-field-row.hl-col-3 { grid-template-columns: 1fr; }
+  .hl-event-row-grid { grid-template-columns: 1fr 1fr; }
   .hl-hotel-grid   { grid-template-columns: 1fr 1fr; }
   .hl-contact-grid { grid-template-columns: 1fr 1fr; }
 }

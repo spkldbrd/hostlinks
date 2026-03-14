@@ -38,7 +38,7 @@ $category_options = '<option value="">— select type —</option>';
 foreach ( $categories as $cat ) {
 	$category_options .= '<option value="' . esc_attr( $cat['name'] ) . '">' . esc_html( $cat['name'] ) . '</option>';
 }
-$trainer_options = '<option value="">— select trainer —</option>';
+$trainer_options = '<option value="TBA" selected>TBA</option>';
 foreach ( $instructors as $inst ) {
 	$trainer_options .= '<option value="' . esc_attr( $inst['name'] ) . '">' . esc_html( $inst['name'] ) . '</option>';
 }
@@ -122,10 +122,10 @@ foreach ( $instructors as $inst ) {
 					<div class="hl-field-group">
 						<label>Trainer <span class="hl-req">*</span></label>
 						<select name="hl_event_trainer[]" class="<?php echo isset($errors['hl_event_trainer_' . $i]) ? 'hl-has-error' : ''; ?>">
-							<option value="">— select trainer —</option>
+							<option value="TBA" <?php selected( $old_event_trainers[$i] ?? 'TBA', 'TBA' ); ?>>TBA</option>
 							<?php foreach ( $instructors as $inst ) : ?>
 							<option value="<?php echo esc_attr( $inst['name'] ); ?>"
-								<?php selected( $old_event_trainers[$i] ?? '', $inst['name'] ); ?>>
+								<?php selected( $old_event_trainers[$i] ?? 'TBA', $inst['name'] ); ?>>
 								<?php echo esc_html( $inst['name'] ); ?>
 							</option>
 							<?php endforeach; ?>

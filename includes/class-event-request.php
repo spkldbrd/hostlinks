@@ -82,9 +82,7 @@ class Hostlinks_Event_Request {
 			} elseif ( ! self::is_valid_date( $end ) ) {
 				$errors[ 'hl_event_end_date_' . $i ] = 'Invalid end date on event row ' . ( $i + 1 ) . '.';
 			}
-			if ( $trainer === '' ) {
-				$errors[ 'hl_event_trainer_' . $i ] = 'Trainer is required for event row ' . ( $i + 1 ) . '.';
-			}
+			// Trainer defaults to TBA so it is always set.
 		}
 
 		if ( ! $has_event ) {

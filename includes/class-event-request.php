@@ -86,12 +86,14 @@ class Hostlinks_Event_Request {
 			$errors['hl_events'] = 'At least one event row is required.';
 		}
 
-		// Venue — city and state always required
-		if ( empty( trim( $raw['hl_city']  ?? '' ) ) ) {
-			$errors['hl_city']  = 'City is required.';
-		}
-		if ( empty( trim( $raw['hl_state'] ?? '' ) ) ) {
-			$errors['hl_state'] = 'State is required.';
+		// City and state required only when an address line is provided
+		if ( ! empty( trim( $raw['hl_street_address_1'] ?? '' ) ) ) {
+			if ( empty( trim( $raw['hl_city']  ?? '' ) ) ) {
+				$errors['hl_city']  = 'City is required when an address is provided.';
+			}
+			if ( empty( trim( $raw['hl_state'] ?? '' ) ) ) {
+				$errors['hl_state'] = 'State is required when an address is provided.';
+			}
 		}
 
 		// Max attendees — integer if provided

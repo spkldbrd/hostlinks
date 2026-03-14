@@ -241,14 +241,14 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 
 		<div class="hl-field-row hl-col-3">
 			<div class="hl-field-group">
-				<label for="hl_city">City <span class="hl-req">*</span></label>
+				<label for="hl_city">City <span id="hl-city-req" class="hl-req" style="<?php echo ! empty( $o('hl_street_address_1') ) ? '' : 'display:none;'; ?>">*</span></label>
 				<input type="text" id="hl_city" name="hl_city"
 					value="<?php echo $o('hl_city'); ?>" placeholder="City"
 					class="<?php echo isset($errors['hl_city']) ? 'hl-has-error' : ''; ?>" />
 				<?php echo $err('hl_city'); ?>
 			</div>
 			<div class="hl-field-group">
-				<label for="hl_state">State <span class="hl-req">*</span></label>
+				<label for="hl_state">State <span id="hl-state-req" class="hl-req" style="<?php echo ! empty( $o('hl_street_address_1') ) ? '' : 'display:none;'; ?>">*</span></label>
 				<input type="text" id="hl_state" name="hl_state"
 					value="<?php echo $o('hl_state'); ?>" placeholder="State" maxlength="50"
 					class="<?php echo isset($errors['hl_state']) ? 'hl-has-error' : ''; ?>" />
@@ -518,6 +518,20 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 (function(){
 	var form = document.getElementById('hl-event-request-form');
 	if (!form) return;
+
+	// ── City/State required indicator when Address 1 is filled ──────────
+	var addr1Field  = document.getElementById('hl_street_address_1');
+	var cityReqSpan = document.getElementById('hl-city-req');
+	var stateReqSpan= document.getElementById('hl-state-req');
+	function updateAddrRequired() {
+		var hasAddr = addr1Field && addr1Field.value.trim() !== '';
+		if (cityReqSpan)  cityReqSpan.style.display  = hasAddr ? '' : 'none';
+		if (stateReqSpan) stateReqSpan.style.display = hasAddr ? '' : 'none';
+	}
+	if (addr1Field) {
+		addr1Field.addEventListener('input', updateAddrRequired);
+		updateAddrRequired();
+	}
 
 	// ── Date picker: open on any click in the field ───────────────────────
 	function initDatePicker(input) {

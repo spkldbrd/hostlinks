@@ -38,6 +38,19 @@
   padding-bottom: 0.4rem;
 }
 
+/* Locked section (e.g. Hotels until address is entered) */
+.hl-section-locked {
+  opacity: 0.4;
+  pointer-events: none;
+  user-select: none;
+}
+.hl-hotel-locked-msg {
+  font-size: 0.82rem;
+  color: hsl(215 15% 50%);
+  font-style: italic;
+  margin: 0 0 0.75rem;
+}
+
 .hl-section-note {
   font-weight: 400;
   font-size: 0.85rem;

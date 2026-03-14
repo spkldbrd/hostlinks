@@ -397,8 +397,9 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 	<!-- ═══════════════════════════════════════════════════════════════════════
 	     SECTION 8: Hotel Recommendations
 	════════════════════════════════════════════════════════════════════════ -->
-	<div class="hl-form-section">
+	<div class="hl-form-section" id="hl-hotel-section">
 		<h3 class="hl-section-title">Hotel Recommendations <span class="hl-section-note">(Optional)</span></h3>
+		<p id="hl-hotel-locked-note" class="hl-hotel-locked-msg">Enter a venue address above to add hotel recommendations.</p>
 
 		<div id="hl-hotel-rows">
 			<?php
@@ -535,9 +536,21 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		if (cityReqSpan)  cityReqSpan.style.display  = hasAddr ? '' : 'none';
 		if (stateReqSpan) stateReqSpan.style.display = hasAddr ? '' : 'none';
 	}
+	// ── Hotel section: lock until Address Line 1 is filled ───────────────
+	var hotelSection    = document.getElementById('hl-hotel-section');
+	var hotelLockedNote = document.getElementById('hl-hotel-locked-note');
+	function updateHotelLock() {
+		var hasAddr = addr1Field && addr1Field.value.trim() !== '';
+		if (!hotelSection) return;
+		hotelSection.classList.toggle('hl-section-locked', !hasAddr);
+		if (hotelLockedNote) hotelLockedNote.style.display = hasAddr ? 'none' : '';
+	}
+
 	if (addr1Field) {
 		addr1Field.addEventListener('input', updateAddrRequired);
+		addr1Field.addEventListener('input', updateHotelLock);
 		updateAddrRequired();
+		updateHotelLock();
 	}
 
 	// ── Google Places address autocomplete ────────────────────────────────

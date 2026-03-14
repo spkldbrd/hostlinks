@@ -54,6 +54,17 @@ class Hostlinks_Assets {
 				array(),
 				HOSTLINKS_VERSION
 			);
+
+			$maps_key = get_option( 'hostlinks_google_maps_api_key', '' );
+			if ( $maps_key ) {
+				wp_enqueue_script(
+					'google-maps-places',
+					'https://maps.googleapis.com/maps/api/js?key=' . urlencode( $maps_key ) . '&libraries=places&loading=async',
+					array(),
+					null,
+					false // load in <head> so Places is ready before the inline form script
+				);
+			}
 		}
 
 		if ( $has_reports ) {

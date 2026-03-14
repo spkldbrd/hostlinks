@@ -540,6 +540,45 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		updateAddrRequired();
 	}
 
+	// ── Google Places address autocomplete ────────────────────────────────
+	<?php if ( ! empty( $maps_api_key ) ) : ?>
+	function initPlacesAutocomplete() {
+		if ( typeof google === 'undefined' || !google.maps || !google.maps.places ) return;
+		if ( !addr1Field ) return;
+		var ac = new google.maps.places.Autocomplete( addr1Field, {
+			types: ['address'],
+			componentRestrictions: { country: 'us' },
+			fields: ['address_components']
+		});
+		ac.addListener('place_changed', function() {
+			var place = ac.getPlace();
+			if ( !place || !place.address_components ) return;
+			var streetNum = '', route = '', city = '', state = '', zip = '';
+			place.address_components.forEach(function(c) {
+				var t = c.types[0];
+				if      ( t === 'street_number' )                streetNum = c.long_name;
+				else if ( t === 'route' )                        route     = c.short_name;
+				else if ( t === 'locality' )                     city      = c.long_name;
+				else if ( t === 'administrative_area_level_1' )  state     = c.short_name;
+				else if ( t === 'postal_code' )                  zip       = c.long_name;
+			});
+			addr1Field.value = (streetNum + ' ' + route).trim();
+			var cityField  = document.getElementById('hl_city');
+			var stateField = document.getElementById('hl_state');
+			var zipField   = document.getElementById('hl_zip');
+			if (cityField)  cityField.value  = city;
+			if (stateField) stateField.value = state;
+			if (zipField)   zipField.value   = zip;
+			updateAddrRequired();
+		});
+	}
+	if ( typeof google !== 'undefined' && google.maps && google.maps.places ) {
+		initPlacesAutocomplete();
+	} else {
+		window.addEventListener('load', initPlacesAutocomplete);
+	}
+	<?php endif; ?>
+
 	// ── Date picker: open on any click in the field ───────────────────────
 	function initDatePicker(input) {
 		input.addEventListener('click', function() {

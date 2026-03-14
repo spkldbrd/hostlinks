@@ -12,6 +12,16 @@ if ( ! current_user_can( 'manage_options' ) ) {
 	wp_die( 'Unauthorized' );
 }
 
+// ── Save Google Maps API key ──────────────────────────────────────────────────
+$maps_notice = '';
+if ( isset( $_POST['hostlinks_save_maps_key'] ) ) {
+	check_admin_referer( 'hostlinks_maps_key' );
+	$key = sanitize_text_field( wp_unslash( $_POST['hostlinks_google_maps_api_key'] ?? '' ) );
+	update_option( 'hostlinks_google_maps_api_key', $key );
+	$maps_notice = '<div class="notice notice-success is-dismissible"><p>Google Maps API key saved.</p></div>';
+}
+$maps_api_key = get_option( 'hostlinks_google_maps_api_key', '' );
+
 // ── Save / clear URL cache ────────────────────────────────────────────────────
 $page_url_notice = '';
 if ( isset( $_POST['hostlinks_save_page_urls'] ) ) {
@@ -47,7 +57,38 @@ $page_labels = array(
 	'public_event_list' => 'Public Event List <code>[public_event_list]</code>',
 );
 ?>
+<?php echo $maps_notice; ?>
 <?php echo $page_url_notice; ?>
+
+<h2 style="margin-top:0;">Google Maps API</h2>
+<p>Used for address autocomplete on the Event Request form. Requires the <strong>Maps JavaScript API</strong> and <strong>Places API (New)</strong> enabled in Google Cloud Console.</p>
+<form method="post">
+	<?php wp_nonce_field( 'hostlinks_maps_key' ); ?>
+	<table class="form-table" role="presentation">
+		<tr>
+			<th scope="row"><label for="hostlinks_google_maps_api_key">Google Maps API Key</label></th>
+			<td>
+				<input type="text" id="hostlinks_google_maps_api_key" name="hostlinks_google_maps_api_key"
+					value="<?php echo esc_attr( $maps_api_key ); ?>"
+					class="regular-text" placeholder="AIza..." autocomplete="off" />
+				<p class="description">
+					Restrict this key to your domain(s) in Google Cloud Console → Credentials → HTTP referrers.<br>
+					Enable: Maps JavaScript API, Places API (New), Geocoding API, Directions API, Maps Embed API.
+				</p>
+				<?php if ( $maps_api_key ) : ?>
+					<p class="description" style="color:#00a32a;margin-top:4px;">&#9679; Key is set.</p>
+				<?php else : ?>
+					<p class="description" style="color:#d63638;margin-top:4px;">&#9679; No key set — address autocomplete is disabled.</p>
+				<?php endif; ?>
+			</td>
+		</tr>
+	</table>
+	<p class="submit">
+		<button type="submit" name="hostlinks_save_maps_key" class="button button-primary">Save API Key</button>
+	</p>
+</form>
+
+<hr style="margin:24px 0;" />
 
 <h2 style="margin-top:0;">Page Link Settings</h2>
 <p>The frontend shortcode pages resolve their URLs in this order:</p>

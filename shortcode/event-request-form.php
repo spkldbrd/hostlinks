@@ -82,11 +82,11 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 
 		<div id="hl-event-rows">
 		<?php foreach ( $old_event_categories as $i => $old_cat ) :
-			$is_zoom   = ! empty( $old_event_zooms[$i] );
-			$row_tz    = $old_event_timezones[$i] ?? '';
+			$is_zoom = ! empty( $old_event_zooms[$i] );
+			$row_tz  = $old_event_timezones[$i] ?? '';
 		?>
 			<div class="hl-repeatable-row hl-event-row-item">
-				<div class="hl-event-row-grid<?php echo ! $is_zoom ? ' hl-no-tz' : ''; ?>">
+				<div class="hl-event-row-grid">
 					<div class="hl-field-group">
 						<label>Type <span class="hl-req">*</span></label>
 						<select name="hl_event_category[]" class="<?php echo isset($errors['hl_event_category_' . $i]) ? 'hl-has-error' : ''; ?>">
@@ -124,16 +124,15 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 						</select>
 					</div>
 					<div class="hl-field-group hl-event-zoom-col">
-						<label class="hl-event-zoom-check">
-							<input type="checkbox" name="hl_event_zoom[]" value="1"
-								<?php checked( $is_zoom ); ?>
-								class="hl-zoom-toggle" />
-							ZOOM?
-						</label>
+						<label>ZOOM?</label>
+						<input type="checkbox" name="hl_event_zoom[]" value="1"
+							<?php checked( $is_zoom ); ?>
+							class="hl-zoom-toggle" />
 					</div>
 					<div class="hl-field-group hl-event-tz-col">
 						<label>Timezone</label>
-						<select name="hl_event_timezone[]">
+						<span class="hl-tz-na"<?php echo $is_zoom ? ' style="display:none;"' : ''; ?>>N/A</span>
+						<select name="hl_event_timezone[]"<?php echo ! $is_zoom ? ' style="display:none;"' : ''; ?>>
 							<option value="">— select timezone —</option>
 							<?php foreach ( Hostlinks_Event_Request::TIMEZONES as $tz ) : ?>
 							<option value="<?php echo esc_attr( $tz ); ?>"
@@ -450,7 +449,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 <?php /* ── JS templates for repeatable rows ─────────────────────────────── */ ?>
 <script id="hl-tpl-event" type="text/x-template">
 <div class="hl-repeatable-row hl-event-row-item">
-	<div class="hl-event-row-grid hl-no-tz">
+	<div class="hl-event-row-grid">
 		<div class="hl-field-group">
 			<label>Type <span class="hl-req">*</span></label>
 			<select name="hl_event_category[]"><?php echo $category_options; ?></select>
@@ -468,14 +467,13 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 			<select name="hl_event_trainer[]"><?php echo $trainer_options; ?></select>
 		</div>
 		<div class="hl-field-group hl-event-zoom-col">
-			<label class="hl-event-zoom-check">
-				<input type="checkbox" name="hl_event_zoom[]" value="1" class="hl-zoom-toggle" />
-				ZOOM?
-			</label>
+			<label>ZOOM?</label>
+			<input type="checkbox" name="hl_event_zoom[]" value="1" class="hl-zoom-toggle" />
 		</div>
 		<div class="hl-field-group hl-event-tz-col">
 			<label>Timezone</label>
-			<select name="hl_event_timezone[]"><?php echo $timezone_options; ?></select>
+			<span class="hl-tz-na">N/A</span>
+			<select name="hl_event_timezone[]" style="display:none;"><?php echo $timezone_options; ?></select>
 		</div>
 	</div>
 	<button type="button" class="hl-remove-row" aria-label="Remove event row">✕</button>
@@ -552,12 +550,16 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 	}
 	document.querySelectorAll('input.hl-date-pick').forEach(initDatePicker);
 
-	// ── ZOOM toggle: expand/collapse Timezone column ───────────────────────
+	// ── ZOOM toggle: swap N/A text ↔ Timezone dropdown ────────────────────
 	function initZoomToggle(checkbox) {
-		var grid = checkbox.closest('.hl-event-row-grid');
+		var grid     = checkbox.closest('.hl-event-row-grid');
 		if (!grid) return;
+		var naSpan   = grid.querySelector('.hl-tz-na');
+		var tzSelect = grid.querySelector('.hl-event-tz-col select');
 		checkbox.addEventListener('change', function() {
-			grid.classList.toggle('hl-no-tz', !this.checked);
+			var zoomed = this.checked;
+			if (naSpan)   naSpan.style.display   = zoomed ? 'none' : '';
+			if (tzSelect) tzSelect.style.display  = zoomed ? ''     : 'none';
 		});
 	}
 	document.querySelectorAll('.hl-zoom-toggle').forEach(initZoomToggle);

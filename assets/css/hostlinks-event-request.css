@@ -144,36 +144,29 @@
   flex: 1;
   align-items: start;
 }
-/* Collapse the Timezone column when ZOOM is unchecked */
-.hl-event-row-grid.hl-no-tz {
-  grid-template-columns: 1.4fr 0.9fr 0.9fr 1.4fr 0.5fr 0px;
-}
-.hl-event-row-grid.hl-no-tz .hl-event-tz-col {
-  overflow: hidden;
-  min-width: 0;
-  opacity: 0;
-}
-/* ZOOM? column: just the checkbox + label */
+/* ZOOM? column: label on top, checkbox centred below */
 .hl-event-zoom-col {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
 }
-.hl-event-zoom-check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding-top: 1.6rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.hl-event-zoom-check input[type="checkbox"] {
+.hl-event-zoom-col input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  flex-shrink: 0;
+  margin-top: 0.45rem;
   cursor: pointer;
   accent-color: #0da2e7;
+}
+/* Timezone column: N/A text styled to match input height */
+.hl-tz-na {
+  display: inline-block;
+  padding: 0.42rem 0.6rem;
+  font-size: 0.85rem;
+  color: #aaa;
+  background: hsl(215 15% 97%);
+  border: 1px solid hsl(215 15% 86%);
+  border-radius: 4px;
+  line-height: 1.4;
 }
 
 .hl-hotel-grid {
@@ -305,9 +298,7 @@
 @media (max-width: 700px) {
   .hl-field-row.hl-col-2,
   .hl-field-row.hl-col-3 { grid-template-columns: 1fr; }
-  .hl-event-row-grid,
-  .hl-event-row-grid.hl-no-tz { grid-template-columns: 1fr 1fr; }
-  .hl-event-zoom-check { padding-top: 0; }
+  .hl-event-row-grid { grid-template-columns: 1fr 1fr; }
   .hl-hotel-grid   { grid-template-columns: 1fr 1fr; }
   .hl-contact-fields,
   .hl-contact-checks-row { grid-template-columns: 1fr 1fr; }

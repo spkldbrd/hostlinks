@@ -6,6 +6,37 @@
   font-family: inherit;
 }
 
+/* Top bar: title + back button */
+.hl-form-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.hl-form-topbar-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a2533;
+  letter-spacing: 0.01em;
+}
+.hl-form-topbar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0da2e7;
+  text-decoration: none;
+  border: 1px solid #0da2e7;
+  border-radius: 4px;
+  padding: 4px 12px;
+  transition: background 0.15s, color 0.15s;
+}
+.hl-form-topbar-back:hover {
+  background: #0da2e7;
+  color: #fff;
+}
+
 /* Error summary box */
 .hl-form-errors {
   background: #fff3f3;

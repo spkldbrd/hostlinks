@@ -53,6 +53,13 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 ?>
 <div class="hl-event-request-wrap">
 
+<div class="hl-form-topbar">
+	<span class="hl-form-topbar-title">New Event Build Form</span>
+	<a href="<?php echo esc_url( Hostlinks_Page_URLs::get_upcoming() ); ?>" class="hl-form-topbar-back">
+		&#8592; Return to Hostlinks
+	</a>
+</div>
+
 <?php if ( ! empty( $errors ) ) : ?>
 <div class="hl-form-errors">
 	<strong>Please fix the following errors before submitting:</strong>

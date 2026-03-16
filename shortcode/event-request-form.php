@@ -746,11 +746,10 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 
 <?php if ( ! empty( $maps_api_key ) ) : ?>
 // ── Hotel name autocomplete with city/state bias ───────────────────────
-var hotelBounds = null;
-
+// Geocode is deferred to first focus so City/State are already filled.
 function geocodeVenueBounds(callback) {
-	var city  = (document.getElementById('hl_city')  || {}).value  || '';
-	var state = (document.getElementById('hl_state') || {}).value  || '';
+	var city  = (document.getElementById('hl_city')  || {}).value.trim()  || '';
+	var state = (document.getElementById('hl_state') || {}).value.trim() || '';
 	if (!city && !state) { callback(null); return; }
 	var geocoder = new google.maps.Geocoder();
 	geocoder.geocode({ address: city + ', ' + state + ', USA' }, function(results, status) {
@@ -765,24 +764,29 @@ function initHotelAutocomplete(input) {
 		componentRestrictions: { country: 'us' },
 		fields: ['name', 'formatted_phone_number', 'formatted_address']
 	});
-	if (hotelBounds) ac.setBounds(hotelBounds);
+
+	// Geocode on first focus — by then Address/City/State should be filled.
+	input.addEventListener('focus', function onFirstFocus() {
+		input.removeEventListener('focus', onFirstFocus);
+		geocodeVenueBounds(function(bounds) {
+			if (bounds) ac.setBounds(bounds);
+		});
+	});
+
 	ac.addListener('place_changed', function() {
 		var place = ac.getPlace();
 		if (!place) return;
-		var row       = input.closest('.hl-hotel-row');
+		var row        = input.closest('.hl-hotel-row');
 		var phoneInput = row ? row.querySelector('input[name="hl_hotel_phone[]"]') : null;
 		var addrInput  = row ? row.querySelector('input[name="hl_hotel_address[]"]') : null;
-		if (place.name)                   input.value = place.name;
+		if (place.name)                                 input.value      = place.name;
 		if (phoneInput && place.formatted_phone_number) phoneInput.value = place.formatted_phone_number;
 		if (addrInput  && place.formatted_address)      addrInput.value  = place.formatted_address;
 	});
 }
 
 function initAllHotelAutocompletes() {
-	geocodeVenueBounds(function(bounds) {
-		hotelBounds = bounds;
-		document.querySelectorAll('#hl-hotel-rows input[name="hl_hotel_name[]"]').forEach(initHotelAutocomplete);
-	});
+	document.querySelectorAll('#hl-hotel-rows input[name="hl_hotel_name[]"]').forEach(initHotelAutocomplete);
 }
 
 if (typeof google !== 'undefined' && google.maps && google.maps.places) {

@@ -217,7 +217,10 @@
   display: grid;
   gap: 0.75rem;
   flex: 1;
-  grid-template-columns: 2fr 1fr 2fr;
+  grid-template-columns: 1fr 1fr;
+}
+.hl-hotel-grid .hl-hotel-name-col {
+  grid-column: 1 / -1;
 }
 
 /* Contact row: inner wrapper stacks inputs + checkboxes vertically */
@@ -371,7 +374,8 @@
   .hl-field-row.hl-col-2,
   .hl-field-row.hl-col-3 { grid-template-columns: 1fr; }
   .hl-event-row-grid { grid-template-columns: 1fr 1fr; }
-  .hl-hotel-grid   { grid-template-columns: 1fr 1fr; }
+  .hl-hotel-grid   { grid-template-columns: 1fr; }
+  .hl-hotel-grid .hl-hotel-name-col { grid-column: 1; }
   .hl-contact-fields,
   .hl-contact-checks-row { grid-template-columns: 1fr 1fr; }
   .hl-reg-alerts-cell { flex-direction: row; align-items: center; gap: 8px; }

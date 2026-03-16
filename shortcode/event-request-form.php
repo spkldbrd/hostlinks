@@ -421,7 +421,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 			?>
 			<div class="hl-repeatable-row hl-hotel-row">
 				<div class="hl-hotel-grid">
-					<div class="hl-field-group">
+					<div class="hl-field-group hl-hotel-name-col">
 						<label>Hotel Name</label>
 						<input type="text" name="hl_hotel_name[]"
 							value="<?php echo esc_attr( $hname ); ?>" placeholder="Hotel Name" />
@@ -491,7 +491,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 <script id="hl-tpl-hotel" type="text/x-template">
 <div class="hl-repeatable-row hl-hotel-row">
 	<div class="hl-hotel-grid">
-		<div class="hl-field-group"><label>Hotel Name</label><input type="text" name="hl_hotel_name[]" value="" placeholder="Hotel Name" /></div>
+		<div class="hl-field-group hl-hotel-name-col"><label>Hotel Name</label><input type="text" name="hl_hotel_name[]" value="" placeholder="Hotel Name" /></div>
 		<div class="hl-field-group"><label>Phone</label><input type="tel" name="hl_hotel_phone[]" value="" placeholder="Phone" /></div>
 		<div class="hl-field-group"><label>Address</label><input type="text" name="hl_hotel_address[]" value="" placeholder="Address" /></div>
 	</div>

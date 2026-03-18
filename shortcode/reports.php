@@ -137,6 +137,43 @@ $active_marketer_names = $wpdb->get_col(
 	"SELECT event_marketer_name FROM {$table13} WHERE event_marketer_status = 1"
 );
 
+// ── Year-over-Year data (always last 4 calendar years, active marketers only) ──
+$yoy_current_year = (int) gmdate( 'Y' );
+$yoy_years        = array( $yoy_current_year, $yoy_current_year - 1, $yoy_current_year - 2, $yoy_current_year - 3 );
+
+$yoy_rows = $wpdb->get_results( $wpdb->prepare(
+	"SELECT YEAR(e.eve_start)             AS yr,
+	        m.event_marketer_name         AS marketer,
+	        SUM(e.eve_paid + e.eve_free)  AS total_regs,
+	        COUNT(e.eve_id)               AS event_count
+	 FROM   {$table11} e
+	 JOIN   {$table13} m ON e.eve_marketer = m.event_marketer_id
+	 WHERE  e.eve_status = '1'
+	   AND  m.event_marketer_status = 1
+	   AND  YEAR(e.eve_start) >= %d
+	 GROUP  BY yr, m.event_marketer_id
+	 ORDER  BY m.event_marketer_name ASC, yr ASC",
+	$yoy_current_year - 3
+), ARRAY_A );
+
+$yoy_idx       = array();
+$yoy_marketers = array();
+foreach ( $yoy_rows as $r ) {
+	$yoy_idx[ $r['marketer'] ][ (int) $r['yr'] ] = array(
+		'total' => (int) $r['total_regs'],
+		'count' => (int) $r['event_count'],
+	);
+	$yoy_marketers[ $r['marketer'] ] = true;
+}
+$yoy_marketers = array_keys( $yoy_marketers );
+sort( $yoy_marketers );
+
+usort( $yoy_marketers, function( $a, $b ) use ( $yoy_idx, $yoy_current_year ) {
+	$ta = $yoy_idx[ $a ][ $yoy_current_year ]['total'] ?? 0;
+	$tb = $yoy_idx[ $b ][ $yoy_current_year ]['total'] ?? 0;
+	return $tb - $ta;
+} );
+
 // ── JSON payload for Chart.js ─────────────────────────────────────────────────
 $chart_data = array(
 	'labels'    => $display_labels,
@@ -309,6 +346,73 @@ $chart_data = array(
 				</tr>
 				<?php endforeach; ?>
 			</tbody>
+		</table>
+	</div>
+
+	<?php /* ── Year-over-Year summary table ── */ ?>
+	<div class="hl-reports-card" style="margin-top:1rem;">
+		<div class="hl-reports-header">
+			<h2 class="hl-reports-title">Year over Year</h2>
+			<span style="font-size:.85rem;color:#666;">Active marketers &mdash; <?php echo (int)( $yoy_current_year - 3 ); ?> &ndash; <?php echo (int) $yoy_current_year; ?></span>
+		</div>
+		<table class="hl-summary-table">
+			<thead>
+				<tr>
+					<th>Marketer</th>
+					<?php foreach ( $yoy_years as $yr ) : ?>
+					<th colspan="2" style="text-align:center;border-left:2px solid #e5e7eb;">
+						<?php echo (int) $yr; ?>
+					</th>
+					<?php endforeach; ?>
+				</tr>
+				<tr>
+					<th></th>
+					<?php foreach ( $yoy_years as $yr ) : ?>
+					<th style="border-left:2px solid #e5e7eb;color:#888;font-weight:500;font-size:.8rem;">Total</th>
+					<th style="color:#888;font-weight:500;font-size:.8rem;">Avg/Class</th>
+					<?php endforeach; ?>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $yoy_marketers as $name ) :
+					$has_any = false;
+					foreach ( $yoy_years as $yr ) {
+						if ( isset( $yoy_idx[ $name ][ $yr ] ) ) { $has_any = true; break; }
+					}
+					if ( ! $has_any ) continue;
+				?>
+				<tr>
+					<td><strong><?php echo esc_html( $name ); ?></strong></td>
+					<?php foreach ( $yoy_years as $yr ) :
+						$d     = $yoy_idx[ $name ][ $yr ] ?? null;
+						$total = $d ? $d['total'] : 0;
+						$cnt   = $d ? $d['count'] : 0;
+						$avg   = ( $cnt > 0 ) ? round( $total / $cnt, 1 ) : '—';
+					?>
+					<td style="border-left:2px solid #e5e7eb;">
+						<?php echo $total > 0 ? number_format( $total ) : '<span style="color:#ccc;">—</span>'; ?>
+					</td>
+					<td><?php echo $total > 0 ? $avg : '<span style="color:#ccc;">—</span>'; ?></td>
+					<?php endforeach; ?>
+				</tr>
+				<?php endforeach; ?>
+			</tbody>
+			<tfoot>
+				<tr style="font-weight:600;background:#f8fafc;">
+					<td>Total</td>
+					<?php foreach ( $yoy_years as $yr ) :
+						$yr_total = 0; $yr_cnt = 0;
+						foreach ( $yoy_marketers as $name ) {
+							$d = $yoy_idx[ $name ][ $yr ] ?? null;
+							if ( $d ) { $yr_total += $d['total']; $yr_cnt += $d['count']; }
+						}
+						$yr_avg = $yr_cnt > 0 ? round( $yr_total / $yr_cnt, 1 ) : '—';
+					?>
+					<td style="border-left:2px solid #e5e7eb;"><?php echo $yr_total > 0 ? number_format( $yr_total ) : '—'; ?></td>
+					<td><?php echo $yr_total > 0 ? $yr_avg : '—'; ?></td>
+					<?php endforeach; ?>
+				</tr>
+			</tfoot>
 		</table>
 	</div>
 

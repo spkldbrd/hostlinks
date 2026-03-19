@@ -531,8 +531,16 @@ jQuery(function() {
           <tr class="alternate" id="user-<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
             <th class="check-column"><input type="checkbox" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" class="administrator splchkkr" name="users[]"></th>
             <input type="hidden" name="originalid[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
-            <td><p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
-              <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required></td>
+            <td>
+              <p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
+              <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required>
+              <?php if ( ! empty( $alldriver['cvent_event_id'] ) ) :
+                $roster_url = admin_url( 'admin.php?page=hostlinks-roster&eve_id=' . (int) $alldriver['eve_id'] );
+              ?>
+              <br><a href="<?php echo esc_url( $roster_url ); ?>" target="_blank"
+                style="font-size:11px;color:#0da2e7;text-decoration:none;white-space:nowrap;">&#x1F4CB; Roster</a>
+              <?php endif; ?>
+            </td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_paid'] ?? '' ); ?></p>
               <input type="number" value="<?php echo esc_attr( $alldriver['eve_paid'] ?? '' ); ?>" name="eve_paid[]" required style="width:50px;"></td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_free'] ?? '' ); ?></p>

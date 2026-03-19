@@ -60,6 +60,7 @@ class Hostlinks_Admin_Menus {
 		add_submenu_page( null, 'CVENT Settings',         'CVENT Settings',         'manage_options', 'cvent-settings',                   array( $this, 'page_cvent_settings' ) );
 		add_submenu_page( null, 'Event Request Settings', 'Event Request Settings', 'manage_options', 'hostlinks-event-request-settings', array( $this, 'page_event_request_settings' ) );
 		add_submenu_page( null, 'User Access',            'User Access',            'manage_options', 'hostlinks-user-access',            array( $this, 'page_user_access' ) );
+		add_submenu_page( null, 'Event Roster',           'Event Roster',           'manage_options', 'hostlinks-roster',                 array( $this, 'page_roster' ) );
 	}
 
 	public function page_events() {
@@ -112,6 +113,10 @@ class Hostlinks_Admin_Menus {
 
 	public function page_cvent_new_events() {
 		include HOSTLINKS_PLUGIN_DIR . 'admin/cvent-new-events.php';
+	}
+
+	public function page_roster() {
+		include HOSTLINKS_PLUGIN_DIR . 'admin/roster.php';
 	}
 
 	/**

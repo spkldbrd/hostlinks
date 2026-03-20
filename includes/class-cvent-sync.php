@@ -246,19 +246,27 @@ class Hostlinks_CVENT_Sync {
 					'cvent_match_status'    => $match['status'],
 					'cvent_staleness_hash'  => $hash,
 				);
-				$bootstrap_fmt  = array( '%s', '%s', '%s', '%d', '%s', '%s' );
-				// Also write Reg URL on first match if the field is currently blank.
-				if ( $cvent_reg_url && empty( $row['eve_trainer_url'] ) ) {
-					$bootstrap_data['eve_trainer_url'] = esc_url_raw( $cvent_reg_url );
-					$bootstrap_fmt[]                   = '%s';
+			$bootstrap_fmt  = array( '%s', '%s', '%s', '%d', '%s', '%s' );
+			// Also write Reg URL on first match if the field is currently blank.
+			if ( $cvent_reg_url && empty( $row['eve_trainer_url'] ) ) {
+				$bootstrap_data['eve_trainer_url'] = esc_url_raw( $cvent_reg_url );
+				$bootstrap_fmt[]                   = '%s';
+			}
+			// Auto-fill Roster URL on first match if the field is currently blank.
+			if ( empty( $row['eve_roster_url'] ) ) {
+				$roster_base = Hostlinks_Page_URLs::get_roster();
+				if ( $roster_base ) {
+					$bootstrap_data['eve_roster_url'] = rtrim( $roster_base, '/' ) . '/?eve_id=' . $eve_id;
+					$bootstrap_fmt[]                  = '%s';
 				}
-				$wpdb->update(
-					$table,
-					$bootstrap_data,
-					array( 'eve_id' => $eve_id ),
-					$bootstrap_fmt,
-					array( '%d' )
-				);
+			}
+			$wpdb->update(
+				$table,
+				$bootstrap_data,
+				array( 'eve_id' => $eve_id ),
+				$bootstrap_fmt,
+				array( '%d' )
+			);
 			}
 
 			if ( 'needs_review' === $match['status'] ) {
@@ -410,21 +418,36 @@ class Hostlinks_CVENT_Sync {
 			return $cvent_event;
 		}
 
-		$hash = Hostlinks_CVENT_Matcher::staleness_hash( $cvent_event );
+		$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $cvent_event );
 		$table = $wpdb->prefix . 'event_details_list';
+
+		$link_data   = array(
+			'cvent_event_id'        => $cvent_id,
+			'cvent_event_title'     => $cvent_event['title'] ?? '',
+			'cvent_event_start_utc' => isset( $cvent_event['start'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $cvent_event['start'] ) ) : null,
+			'cvent_match_score'     => null,
+			'cvent_match_status'    => 'manual',
+			'cvent_staleness_hash'  => $hash,
+		);
+		$link_fmt = array( '%s', '%s', '%s', null, '%s', '%s' );
+
+		// Auto-fill Roster URL if the field is currently blank.
+		$current_roster = $wpdb->get_var( $wpdb->prepare(
+			"SELECT eve_roster_url FROM `{$table}` WHERE eve_id = %d", $eve_id
+		) );
+		if ( empty( $current_roster ) ) {
+			$roster_base = Hostlinks_Page_URLs::get_roster();
+			if ( $roster_base ) {
+				$link_data['eve_roster_url'] = rtrim( $roster_base, '/' ) . '/?eve_id=' . $eve_id;
+				$link_fmt[]                  = '%s';
+			}
+		}
 
 		$wpdb->update(
 			$table,
-			array(
-				'cvent_event_id'        => $cvent_id,
-				'cvent_event_title'     => $cvent_event['title'] ?? '',
-				'cvent_event_start_utc' => isset( $cvent_event['start'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $cvent_event['start'] ) ) : null,
-				'cvent_match_score'     => null,
-				'cvent_match_status'    => 'manual',
-				'cvent_staleness_hash'  => $hash,
-			),
+			$link_data,
 			array( 'eve_id' => $eve_id ),
-			array( '%s', '%s', '%s', null, '%s', '%s' ),
+			$link_fmt,
 			array( '%d' )
 		);
 
@@ -598,6 +621,14 @@ class Hostlinks_CVENT_Sync {
 		if ( $cvent_reg_url && empty( $row['eve_trainer_url'] ) ) {
 			$update_data['eve_trainer_url'] = esc_url_raw( $cvent_reg_url );
 			$update_format[]               = '%s';
+		}
+		// Auto-fill Roster URL if the field is currently blank.
+		if ( empty( $row['eve_roster_url'] ) ) {
+			$roster_base = Hostlinks_Page_URLs::get_roster();
+			if ( $roster_base ) {
+				$update_data['eve_roster_url'] = rtrim( $roster_base, '/' ) . '/?eve_id=' . $eve_id;
+				$update_format[]              = '%s';
+			}
 		}
 		$wpdb->update(
 			$table,

@@ -55,6 +55,7 @@ if ( $do_refresh ) {
 
 $attendees_raw = get_transient( $cache_key );
 $from_cache    = ( $attendees_raw !== false );
+$debug_order_items = array(); // populated in debug mode only
 
 if ( ! $from_cache ) {
 	$attendees_raw = Hostlinks_CVENT_API::get_roster_attendees( $cvent_id );
@@ -62,6 +63,14 @@ if ( ! $from_cache ) {
 		wp_die( 'CVENT API error: ' . esc_html( $attendees_raw->get_error_message() ) );
 	}
 	set_transient( $cache_key, $attendees_raw, HOUR_IN_SECONDS );
+}
+
+// In debug mode, always fetch raw order items directly so we can inspect them.
+if ( $do_debug ) {
+	$debug_order_items = Hostlinks_CVENT_API::get_order_items( $cvent_id );
+	if ( is_wp_error( $debug_order_items ) ) {
+		$debug_order_items = array( 'error' => $debug_order_items->get_error_message() );
+	}
 }
 
 // ── Filter out non-attending statuses ────────────────────────────────────────
@@ -293,12 +302,27 @@ body {
 	</table>
 	<?php endif; ?>
 
-	<?php if ( $do_debug && ! empty( $attendees_raw ) ) : ?>
+	<?php if ( $do_debug ) : ?>
 	<div class="hl-debug-box">
-		<strong>Debug — raw first attendee record from CVENT API:</strong>
-		<pre><?php echo esc_html( wp_json_encode( $attendees_raw[0], JSON_PRETTY_PRINT ) ); ?></pre>
-		<strong>Total raw records:</strong> <?php echo count( $attendees_raw ); ?><br>
-		<strong>After filtering:</strong> <?php echo count( $attendees ); ?>
+		<strong>Debug — CVENT ID:</strong> <?php echo esc_html( $cvent_id ); ?><br><br>
+
+		<strong>Order Items (<?php echo is_array( $debug_order_items ) ? count( $debug_order_items ) : 0; ?> total):</strong><br>
+		<?php if ( empty( $debug_order_items ) ) : ?>
+			<em style="color:#c00;">No order items returned — event may have no registrations in CVENT, or the linked CVENT ID may be wrong.</em>
+		<?php elseif ( isset( $debug_order_items['error'] ) ) : ?>
+			<em style="color:#c00;">Order items error: <?php echo esc_html( $debug_order_items['error'] ); ?></em>
+		<?php else : ?>
+			<strong>First order item (field names):</strong>
+			<pre><?php echo esc_html( wp_json_encode( $debug_order_items[0], JSON_PRETTY_PRINT ) ); ?></pre>
+		<?php endif; ?>
+
+		<br><strong>Attendee Records (<?php echo count( $attendees_raw ); ?> fetched, <?php echo count( $attendees ); ?> after status filter):</strong><br>
+		<?php if ( ! empty( $attendees_raw ) ) : ?>
+			<strong>First raw attendee record:</strong>
+			<pre><?php echo esc_html( wp_json_encode( $attendees_raw[0], JSON_PRETTY_PRINT ) ); ?></pre>
+		<?php else : ?>
+			<em style="color:#c00;">No attendee records — either order items were empty or no attendee UUIDs could be extracted.</em>
+		<?php endif; ?>
 	</div>
 	<?php endif; ?>
 

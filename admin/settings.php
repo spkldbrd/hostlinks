@@ -15,6 +15,7 @@ $valid_tabs = array(
 	'type-settings'     => 'Type Settings',
 	'public-event-list' => 'Public Event List',
 	'roster'            => 'Roster',
+	'alerts'            => 'Alerts',
 );
 
 $current_tab = sanitize_key( $_GET['tab'] ?? 'general' );
@@ -66,6 +67,9 @@ switch ( $current_tab ) {
 		break;
 	case 'roster':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/settings-roster.php';
+		break;
+	case 'alerts':
+		include HOSTLINKS_PLUGIN_DIR . 'admin/settings-alerts.php';
 		break;
 }
 ?>

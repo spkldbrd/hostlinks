@@ -87,6 +87,21 @@ foreach ( $all_pending_bookings as $ev ) {
 	}
 }
 
+// ── Alert settings (loaded once before render) ────────────────────────────
+$hl_a1_on    = (int) get_option( 'hostlinks_alert_1_enabled', 1 );
+$hl_a1_days  = (int) get_option( 'hostlinks_alert_1_days',    30 );
+$hl_a1_regs  = (int) get_option( 'hostlinks_alert_1_regs',    15 );
+$hl_a1_color =       get_option( 'hostlinks_alert_1_color',   '#f59e0b' );
+
+$hl_a2_on    = (int) get_option( 'hostlinks_alert_2_enabled', 1 );
+$hl_a2_days  = (int) get_option( 'hostlinks_alert_2_days',    20 );
+$hl_a2_regs  = (int) get_option( 'hostlinks_alert_2_regs',    20 );
+$hl_a2_color =       get_option( 'hostlinks_alert_2_color',   '#dc2626' );
+
+// Sanitize colors — fall back to defaults if stored value is invalid.
+if ( ! preg_match( '/^#[0-9a-f]{6}$/i', $hl_a1_color ) ) { $hl_a1_color = '#f59e0b'; }
+if ( ! preg_match( '/^#[0-9a-f]{6}$/i', $hl_a2_color ) ) { $hl_a2_color = '#dc2626'; }
+
 // ── Pass 2: render ─────────────────────────────────────────────────────────
 $today         = new DateTime();
 $current_month = null;
@@ -97,7 +112,22 @@ $last_updated  = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->form
 $past_events_url  = Hostlinks_Page_URLs::get_past_events();
 $upcoming_url     = Hostlinks_Page_URLs::get_upcoming();
 $reports_page_url = Hostlinks_Page_URLs::get_reports();
-?>
+<?php if ( $hl_a1_on || $hl_a2_on ) : ?>
+<style>
+<?php if ( $hl_a1_on ) : ?>
+.hostlinks-card--alert-1 {
+	border-color: <?php echo esc_attr( $hl_a1_color ); ?> !important;
+	box-shadow: 0 0 0 3px <?php echo esc_attr( $hl_a1_color ); ?>59 !important;
+}
+<?php endif; ?>
+<?php if ( $hl_a2_on ) : ?>
+.hostlinks-card--alert-2 {
+	border-color: <?php echo esc_attr( $hl_a2_color ); ?> !important;
+	box-shadow: 0 0 0 3px <?php echo esc_attr( $hl_a2_color ); ?>59 !important;
+}
+<?php endif; ?>
+</style>
+<?php endif; ?>
 <div class="hostlinks-page">
 <div class="hostlinks-container">
 
@@ -204,8 +234,21 @@ $empty_msg = $focus_name
 
 	$title_class      = 'hostlinks-card-title' . ( $is_zoom ? ' hostlinks-card-title--virtual' : '' );
 	$instructor_class = 'hostlinks-card-instructor' . ( $is_management ? ' hostlinks-card-instructor--management' : '' );
+
+	// ── Registration alert class ──────────────────────────────────────────
+	$alert_class = '';
+	if ( $today < $dt_start ) {
+		$days_away = $today->diff( $dt_start )->days + 1;
+		$paid      = (int) $alldriver['eve_paid'];
+		// Alert 2 takes priority when both thresholds are met.
+		if ( $hl_a2_on && $days_away <= $hl_a2_days && $paid < $hl_a2_regs ) {
+			$alert_class = 'hostlinks-card--alert-2';
+		} elseif ( $hl_a1_on && $days_away <= $hl_a1_days && $paid < $hl_a1_regs ) {
+			$alert_class = 'hostlinks-card--alert-1';
+		}
+	}
 	?>
-		<div class="hostlinks-card">
+		<div class="hostlinks-card<?php echo $alert_class ? ' ' . esc_attr( $alert_class ) : ''; ?>">
 			<div class="hostlinks-card-inner">
 				<div class="hostlinks-card-top">
 					<span class="hostlinks-reg-count"><?php echo (int) $alldriver['eve_paid']; ?>+<?php echo (int) $alldriver['eve_free']; ?></span>

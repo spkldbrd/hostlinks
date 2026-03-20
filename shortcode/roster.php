@@ -73,6 +73,20 @@ if ( ! $from_cache ) {
 	}
 }
 
+// ── Phone number formatter ────────────────────────────────────────────────────
+if ( ! function_exists( 'hl_roster_format_phone' ) ) {
+	function hl_roster_format_phone( $raw ) {
+		$digits = preg_replace( '/\D/', '', $raw );
+		if ( strlen( $digits ) === 11 && $digits[0] === '1' ) {
+			$digits = substr( $digits, 1 );
+		}
+		if ( strlen( $digits ) === 10 ) {
+			return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6 );
+		}
+		return $raw;
+	}
+}
+
 // ── Filter non-attending statuses ─────────────────────────────────────────────
 $skip_statuses = array( 'Cancelled', 'Declined', 'Deleted', 'TestAttendee', 'Waitlisted',
                         'cancelled', 'declined', 'deleted', 'testattendee', 'waitlisted' );
@@ -90,7 +104,7 @@ foreach ( $attendees_raw as $att ) {
 		'company' => $att['companyName'] ?? $contact['company']     ?? $contact['companyName'] ?? '',
 		'title'   => $att['title']       ?? $contact['title']       ?? '',
 		'email'   => $att['email']       ?? $contact['email']       ?? '',
-		'phone'   => $att['workPhone']   ?? $contact['workPhone']   ?? $att['phone'] ?? $contact['phone'] ?? '',
+		'phone'   => hl_roster_format_phone( $att['workPhone'] ?? $contact['workPhone'] ?? $att['phone'] ?? $contact['phone'] ?? '' ),
 	);
 }
 
@@ -208,7 +222,7 @@ $refresh_url = add_query_arg( 'refresh', '1', remove_query_arg( 'refresh', $curr
 .hl-fe-roster-table td { padding:6px 10px; border:1px solid #ddd; vertical-align:top; }
 .hl-fe-roster-table tr:nth-child(even) td { background:#f9f9f9; }
 .hl-fe-num { color:#aaa; font-size:11px; width:30px; }
-.hl-fe-sign-in { width:130px; min-width:80px; }
+.hl-fe-sign-in { width:260px; min-width:160px; }
 .hl-fe-col-email, .hl-fe-col-phone { display:none; }
 @media print {
 	/* Hide every element on the page, then reveal only the roster.
@@ -228,7 +242,7 @@ $refresh_url = add_query_arg( 'refresh', '1', remove_query_arg( 'refresh', $curr
 	.hl-fe-roster-table th          { border:1px solid #666 !important; padding:5px 8px; }
 	.hl-fe-col-email.hl-fe-col-visible,
 	.hl-fe-col-phone.hl-fe-col-visible { display:table-cell !important; }
-	.hl-fe-sign-in                  { width:100pt; }
+	.hl-fe-sign-in                  { width:200pt; }
 }
 </style>
 <script>

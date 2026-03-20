@@ -90,6 +90,19 @@ if ( $do_debug ) {
 	}
 }
 
+// ── Phone number formatter ────────────────────────────────────────────────────
+function hl_roster_format_phone( $raw ) {
+	$digits = preg_replace( '/\D/', '', $raw );
+	// Strip leading country code 1 if 11 digits.
+	if ( strlen( $digits ) === 11 && $digits[0] === '1' ) {
+		$digits = substr( $digits, 1 );
+	}
+	if ( strlen( $digits ) === 10 ) {
+		return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6 );
+	}
+	return $raw; // Return as-is if not a standard 10-digit number.
+}
+
 // ── Filter out non-attending statuses ────────────────────────────────────────
 $skip_statuses = array( 'Cancelled', 'Declined', 'Deleted', 'TestAttendee', 'Waitlisted',
                         'cancelled', 'declined', 'deleted', 'testattendee', 'waitlisted' );
@@ -108,7 +121,7 @@ foreach ( $attendees_raw as $att ) {
 	$co    = $att['companyName'] ?? $contact['company']     ?? $contact['companyName'] ?? '';
 	$title = $att['title']       ?? $contact['title']       ?? '';
 	$email = $att['email']       ?? $contact['email']       ?? '';
-	$phone = $att['workPhone']   ?? $contact['workPhone']   ?? $att['phone'] ?? $contact['phone'] ?? '';
+	$phone = hl_roster_format_phone( $att['workPhone'] ?? $contact['workPhone'] ?? $att['phone'] ?? $contact['phone'] ?? '' );
 
 	$attendees[] = array(
 		'last'    => $last,
@@ -253,7 +266,7 @@ body {
 	font-size: 13px;
 }
 .hl-roster-table tr:nth-child(even) td { background: #f9f9f9; }
-.hl-sign-in-col { width: 140px; min-width: 100px; }
+.hl-sign-in-col { width: 280px; min-width: 200px; }
 
 /* Hidden columns — toggled by JS */
 .hl-col-email, .hl-col-phone { display: none; }
@@ -281,7 +294,7 @@ body {
 	.hl-roster-table { width: 100%; }
 	.hl-roster-table th { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 	.hl-roster-table td, .hl-roster-table th { border: 1px solid #666 !important; padding: 5px 7px; }
-	.hl-sign-in-col { width: 120pt; }
+	.hl-sign-in-col { width: 240pt; }
 	tr { page-break-inside: avoid; }
 	/* When printing, show whichever optional columns are currently visible */
 	.hl-col-email.hl-col-visible, .hl-col-phone.hl-col-visible { display: table-cell !important; }

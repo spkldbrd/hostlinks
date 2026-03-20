@@ -4,13 +4,11 @@
  *
  * URL: admin.php?page=hostlinks-roster&eve_id={HL_EVENT_ID}
  *
- * Fetches attendees from the CVENT API (cached 1 hour), filters out
+ * Fetches attendees from the CVENT API (cached 24 hours), filters out
  * non-attending statuses, sorts by last/first name, and renders a
  * print-ready sign-in sheet.
  *
- * Append &debug=1 (manage_options only) to dump the raw first attendee
- * record so field names can be confirmed against the live API.
- *
+ * Append &debug=1 (manage_options only) to dump raw API records.
  * Append &refresh=1 to bust the transient cache and re-fetch.
  */
 if ( ! defined( 'ABSPATH' ) ) {
@@ -22,8 +20,8 @@ if ( ! current_user_can( 'manage_options' ) ) {
 
 global $wpdb;
 
-$eve_id    = isset( $_GET['eve_id'] ) ? (int) $_GET['eve_id'] : 0;
-$do_debug  = ! empty( $_GET['debug'] ) && current_user_can( 'manage_options' );
+$eve_id     = isset( $_GET['eve_id'] ) ? (int) $_GET['eve_id'] : 0;
+$do_debug   = ! empty( $_GET['debug'] ) && current_user_can( 'manage_options' );
 $do_refresh = ! empty( $_GET['refresh'] );
 
 if ( ! $eve_id ) {
@@ -46,7 +44,7 @@ if ( ! $cvent_id ) {
 	wp_die( 'Event #' . $eve_id . ' does not have a linked CVENT ID. Link it via CVENT Sync first.' );
 }
 
-// ── Attendee fetch (cached 1 hour) ────────────────────────────────────────────
+// ── Attendee fetch (cached 24 hours) ─────────────────────────────────────────
 $cache_key = 'hostlinks_roster_' . md5( $cvent_id );
 
 if ( $do_refresh ) {
@@ -55,17 +53,17 @@ if ( $do_refresh ) {
 
 $attendees_raw = get_transient( $cache_key );
 $from_cache    = ( $attendees_raw !== false );
-$debug_order_items = array(); // populated in debug mode only
+$debug_order_items = array();
 
 if ( ! $from_cache ) {
 	$attendees_raw = Hostlinks_CVENT_API::get_roster_attendees( $cvent_id );
 	if ( is_wp_error( $attendees_raw ) ) {
 		wp_die( 'CVENT API error: ' . esc_html( $attendees_raw->get_error_message() ) );
 	}
-	set_transient( $cache_key, $attendees_raw, HOUR_IN_SECONDS );
+	set_transient( $cache_key, $attendees_raw, 24 * HOUR_IN_SECONDS );
 }
 
-// In debug mode, always fetch raw order items directly so we can inspect them.
+// In debug mode, fetch raw order items for inspection.
 if ( $do_debug ) {
 	$debug_order_items = Hostlinks_CVENT_API::get_order_items( $cvent_id );
 	if ( is_wp_error( $debug_order_items ) ) {
@@ -83,17 +81,23 @@ foreach ( $attendees_raw as $att ) {
 	if ( in_array( $status, $skip_statuses, true ) ) {
 		continue;
 	}
-	// Normalise name fields — CVENT may nest under 'contact' or at top level.
-	$first = $att['firstName']   ?? $att['contact']['firstName']   ?? '';
-	$last  = $att['lastName']    ?? $att['contact']['lastName']    ?? '';
-	$co    = $att['companyName'] ?? $att['contact']['company']     ?? $att['contact']['companyName'] ?? '';
-	$title = $att['title']       ?? $att['contact']['title']       ?? '';
+	// CVENT nests contact fields under 'contact'; handle both flat and nested.
+	$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
+
+	$first = $att['firstName']   ?? $contact['firstName']   ?? '';
+	$last  = $att['lastName']    ?? $contact['lastName']    ?? '';
+	$co    = $att['companyName'] ?? $contact['company']     ?? $contact['companyName'] ?? '';
+	$title = $att['title']       ?? $contact['title']       ?? '';
+	$email = $att['email']       ?? $contact['email']       ?? '';
+	$phone = $att['workPhone']   ?? $contact['workPhone']   ?? $att['phone'] ?? $contact['phone'] ?? '';
 
 	$attendees[] = array(
 		'last'    => $last,
 		'first'   => $first,
 		'company' => $co,
 		'title'   => $title,
+		'email'   => $email,
+		'phone'   => $phone,
 		'status'  => $status,
 	);
 }
@@ -132,7 +136,7 @@ body {
 	padding: 0;
 }
 .hl-roster-wrap {
-	max-width: 960px;
+	max-width: 1080px;
 	margin: 24px auto;
 	background: #fff;
 	border: 1px solid #c3c4c7;
@@ -147,14 +151,8 @@ body {
 	gap: 16px;
 	flex-wrap: wrap;
 }
-.hl-roster-header h1 {
-	font-size: 20px;
-	margin: 0 0 4px;
-}
-.hl-roster-meta {
-	font-size: 13px;
-	color: #666;
-}
+.hl-roster-header h1 { font-size: 20px; margin: 0 0 4px; }
+.hl-roster-meta { font-size: 13px; color: #666; }
 .hl-roster-controls {
 	display: flex;
 	gap: 8px;
@@ -180,15 +178,24 @@ body {
 	border: 1px solid #c3c4c7;
 }
 .hl-roster-btn--secondary:hover { background: #e9eaeb; color: #2c3338; }
-.hl-cache-note {
-	font-size: 12px;
-	color: #888;
-	margin-top: 4px;
+.hl-cache-note { font-size: 12px; color: #888; margin-top: 4px; }
+
+/* Column toggles */
+.hl-col-toggles {
+	display: flex;
+	gap: 16px;
+	align-items: center;
+	padding: 8px 0 12px;
+	font-size: 13px;
+	color: #444;
 }
+.hl-col-toggles label { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+.hl-col-toggles input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; }
+
 .hl-roster-table {
 	width: 100%;
 	border-collapse: collapse;
-	margin-top: 8px;
+	margin-top: 4px;
 }
 .hl-roster-table th {
 	background: #1d2327;
@@ -208,11 +215,11 @@ body {
 }
 .hl-roster-table tr:nth-child(even) td { background: #f9f9f9; }
 .hl-sign-in-col { width: 140px; min-width: 100px; }
-.hl-roster-empty {
-	text-align: center;
-	padding: 40px;
-	color: #666;
-}
+
+/* Hidden columns — toggled by JS */
+.hl-col-email, .hl-col-phone { display: none; }
+
+.hl-roster-empty { text-align: center; padding: 40px; color: #666; }
 .hl-debug-box {
 	background: #f0f6fc;
 	border: 1px solid #0da2e7;
@@ -220,17 +227,14 @@ body {
 	padding: 12px 16px;
 	margin-top: 20px;
 }
-.hl-debug-box pre {
-	overflow-x: auto;
-	font-size: 12px;
-	margin: 8px 0 0;
-}
+.hl-debug-box pre { overflow-x: auto; font-size: 12px; margin: 8px 0 0; }
 
 /* ── Print styles ── */
 @media print {
 	body { background: #fff; font-size: 11pt; }
 	.hl-roster-wrap { border: none; box-shadow: none; padding: 0; max-width: 100%; margin: 0; }
 	.hl-roster-controls,
+	.hl-col-toggles,
 	.hl-cache-note,
 	.hl-debug-box { display: none !important; }
 	.hl-roster-header { margin-bottom: 12px; }
@@ -240,6 +244,8 @@ body {
 	.hl-roster-table td, .hl-roster-table th { border: 1px solid #666 !important; padding: 5px 7px; }
 	.hl-sign-in-col { width: 120pt; }
 	tr { page-break-inside: avoid; }
+	/* When printing, show whichever optional columns are currently visible */
+	.hl-col-email.hl-col-visible, .hl-col-phone.hl-col-visible { display: table-cell !important; }
 }
 </style>
 </head>
@@ -257,7 +263,7 @@ body {
 				<?php endif; ?>
 			</div>
 			<?php if ( $from_cache && ! $do_refresh ) : ?>
-			<div class="hl-cache-note">Data cached for up to 1 hour. <a href="<?php echo esc_url( $refresh_url ); ?>">Refresh now</a></div>
+			<div class="hl-cache-note">Data cached for up to 24 hours. <a href="<?php echo esc_url( $refresh_url ); ?>">Refresh now</a></div>
 			<?php endif; ?>
 		</div>
 		<div class="hl-roster-controls">
@@ -269,6 +275,14 @@ body {
 			<a href="<?php echo esc_url( $back_url ); ?>" class="hl-roster-btn hl-roster-btn--secondary">&#x2190; Back to Events</a>
 		</div>
 	</div>
+
+	<?php if ( ! empty( $attendees ) ) : ?>
+	<div class="hl-col-toggles">
+		<span style="color:#888;font-size:12px;">Show columns:</span>
+		<label><input type="checkbox" id="hl-toggle-email"> Email</label>
+		<label><input type="checkbox" id="hl-toggle-phone"> Phone</label>
+	</div>
+	<?php endif; ?>
 
 	<?php if ( empty( $attendees ) ) : ?>
 	<div class="hl-roster-empty">
@@ -284,6 +298,8 @@ body {
 				<th>First Name</th>
 				<th>Company / Agency</th>
 				<th>Title</th>
+				<th class="hl-col-email">Email</th>
+				<th class="hl-col-phone">Phone</th>
 				<th class="hl-sign-in-col">Sign In</th>
 			</tr>
 		</thead>
@@ -295,6 +311,8 @@ body {
 				<td><?php echo esc_html( $att['first'] ); ?></td>
 				<td><?php echo esc_html( $att['company'] ); ?></td>
 				<td><?php echo esc_html( $att['title'] ); ?></td>
+				<td class="hl-col-email"><?php echo esc_html( $att['email'] ); ?></td>
+				<td class="hl-col-phone"><?php echo esc_html( $att['phone'] ); ?></td>
 				<td class="hl-sign-in-col">&nbsp;</td>
 			</tr>
 		<?php endforeach; ?>
@@ -333,8 +351,28 @@ body {
 	<?php endif; ?>
 
 </div>
+
+<script>
+(function() {
+	function toggleCol(cls, show) {
+		var els = document.querySelectorAll('.' + cls);
+		for (var i = 0; i < els.length; i++) {
+			if (show) {
+				els[i].style.display = 'table-cell';
+				els[i].classList.add('hl-col-visible');
+			} else {
+				els[i].style.display = 'none';
+				els[i].classList.remove('hl-col-visible');
+			}
+		}
+	}
+	var emailChk = document.getElementById('hl-toggle-email');
+	var phoneChk = document.getElementById('hl-toggle-phone');
+	if (emailChk) emailChk.addEventListener('change', function() { toggleCol('hl-col-email', this.checked); });
+	if (phoneChk) phoneChk.addEventListener('change', function() { toggleCol('hl-col-phone', this.checked); });
+})();
+</script>
 </body>
 </html>
 <?php
-// Stop WP from appending the admin footer to our standalone print page.
 exit;

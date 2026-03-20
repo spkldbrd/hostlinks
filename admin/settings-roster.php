@@ -63,11 +63,17 @@ $logo_url = get_option( 'hostlinks_roster_logo_url', '' );
 (function () {
 	var btn   = document.getElementById( 'hl-roster-logo-picker' );
 	var input = document.getElementById( 'hostlinks_roster_logo_url' );
-	if ( ! btn || ! input || typeof wp === 'undefined' || ! wp.media ) return;
+	if ( ! btn || ! input ) return;
 
 	var frame;
 	btn.addEventListener( 'click', function ( e ) {
 		e.preventDefault();
+		// Check wp.media here (inside click handler) — media scripts load in
+		// the footer, after this inline script runs, so the check must be deferred.
+		if ( typeof wp === 'undefined' || ! wp.media ) {
+			alert( 'Media library unavailable. Please paste the image URL directly into the field.' );
+			return;
+		}
 		if ( frame ) { frame.open(); return; }
 		frame = wp.media( {
 			title:    'Select Roster Logo',

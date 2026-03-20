@@ -45,11 +45,12 @@ $_sh_do_refresh = ! empty( $_GET['refresh'] ) && current_user_can( 'manage_optio
 $_sh_nonce      = wp_create_nonce( 'hostlinks_roster_fetch' );
 $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 ?>
-<?php if ( current_user_can( 'manage_options' ) ) : ?>
 <div id="hl-roster-admin-bar" style="display:none;text-align:right;margin-bottom:8px;">
+	<button id="hl-roster-print-btn" class="hl-roster-admin-btn hl-roster-admin-btn--primary" onclick="window.print()">&#x1F5A8; Print</button>
+	<?php if ( current_user_can( 'manage_options' ) ) : ?>
 	<button id="hl-roster-refresh-btn" class="hl-roster-admin-btn">&#x21BB; Refresh Roster</button>
+	<?php endif; ?>
 </div>
-<?php endif; ?>
 
 <div id="hl-roster-loader">
 	<div class="hl-roster-spinner"></div>
@@ -83,9 +84,12 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 .hl-roster-admin-btn {
 	padding: 5px 14px; background: #f0f0f0; color: #333;
 	border: 1px solid #ccc; border-radius: 3px; font-size: 13px;
-	cursor: pointer; line-height: 1.5;
+	cursor: pointer; line-height: 1.5; margin-left: 6px;
 }
 .hl-roster-admin-btn:hover { background: #e0e0e0; }
+.hl-roster-admin-btn--primary { background: #0da2e7; color: #fff; border-color: #0b8fcf; }
+.hl-roster-admin-btn--primary:hover { background: #0b8fcf; color: #fff; }
+@media print { #hl-roster-admin-bar { display: none !important; } }
 </style>
 
 <script>

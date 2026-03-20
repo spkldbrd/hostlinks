@@ -135,12 +135,11 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
 				<?php echo $_rc_count; ?> attendee<?php echo $_rc_count !== 1 ? 's' : ''; ?>
 			</p>
 		</div>
+		<?php if ( $_rc_logo ) : ?>
 		<div class="hl-fe-roster-actions">
-			<?php if ( $_rc_logo ) : ?>
 			<img src="<?php echo esc_url( $_rc_logo ); ?>" alt="" class="hl-fe-roster-logo" />
-			<?php endif; ?>
-			<button class="hl-fe-roster-btn" onclick="window.print()">&#x1F5A8; Print</button>
 		</div>
+		<?php endif; ?>
 	</div>
 
 	<?php if ( ! empty( $_rc_attendees ) ) : ?>

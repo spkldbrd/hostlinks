@@ -142,6 +142,14 @@ $event_title  = implode( ' – ', $header_parts );
 $current_url = ( is_ssl() ? 'https' : 'http' ) . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 $refresh_url = add_query_arg( 'refresh', '1', remove_query_arg( 'refresh', $current_url ) );
 ?>
+<?php if ( ! $from_cache ) : ?>
+<div id="hl-roster-loader" style="text-align:center;padding:60px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+	<div style="font-size:36px;margin-bottom:16px;animation:hl-spin 1.2s linear infinite;display:inline-block;">&#9696;</div>
+	<p style="font-size:15px;color:#555;margin:0;">Updating the roster, this can take a moment. Please wait&hellip;</p>
+	<style>@keyframes hl-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+</div>
+<div id="hl-roster-content" style="display:none;">
+<?php endif; ?>
 <div class="hl-fe-roster">
 
 	<div class="hl-fe-roster-header">
@@ -259,4 +267,14 @@ $refresh_url = add_query_arg( 'refresh', '1', remove_query_arg( 'refresh', $curr
 	if(ec) ec.addEventListener('change',function(){tog('hl-fe-col-email',this.checked);});
 	if(pc) pc.addEventListener('change',function(){tog('hl-fe-col-phone',this.checked);});
 })();
+<?php if ( ! $from_cache ) : ?>
+// Swap loader → content once the page has fully rendered.
+document.addEventListener('DOMContentLoaded',function(){
+	var loader=document.getElementById('hl-roster-loader');
+	var content=document.getElementById('hl-roster-content');
+	if(loader) loader.style.display='none';
+	if(content) content.style.display='block';
+});
+<?php endif; ?>
 </script>
+<?php if ( ! $from_cache ) : ?></div><!-- #hl-roster-content --><?php endif; ?>

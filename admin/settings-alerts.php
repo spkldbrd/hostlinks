@@ -29,6 +29,8 @@ if ( isset( $_POST['hostlinks_save_alerts'] ) ) {
 	$c2 = sanitize_hex_color( $_POST['hostlinks_alert_2_color'] ?? '#dc2626' );
 	update_option( 'hostlinks_alert_2_color',   $c2 ?: '#dc2626' );
 
+	update_option( 'hostlinks_alert_badge_enabled', isset( $_POST['hostlinks_alert_badge_enabled'] ) ? 1 : 0 );
+
 	$notice = '<div class="notice notice-success is-dismissible"><p>Alert settings saved.</p></div>';
 }
 
@@ -41,6 +43,8 @@ $a2_enabled = (int) get_option( 'hostlinks_alert_2_enabled', 1 );
 $a2_days    = (int) get_option( 'hostlinks_alert_2_days',    20 );
 $a2_regs    = (int) get_option( 'hostlinks_alert_2_regs',    20 );
 $a2_color   =       get_option( 'hostlinks_alert_2_color',   '#dc2626' );
+
+$badge_on   = (int) get_option( 'hostlinks_alert_badge_enabled', 1 );
 ?>
 <?php echo $notice; ?>
 
@@ -125,6 +129,21 @@ Alerts only apply to <strong>future</strong> events. If both alert conditions ar
 					value="<?php echo esc_attr( $a2_color ); ?>"
 					style="width:52px;height:36px;padding:2px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
 				<span class="description" style="margin-left:6px;">Used for the card border and glow</span>
+			</td>
+		</tr>
+	</table>
+
+	<!-- ── Triangle badge ─────────────────────────────────────────────────── -->
+	<h3 style="margin-top:28px;border-bottom:1px solid #ddd;padding-bottom:8px;">Triangle Badge</h3>
+	<table class="form-table" role="presentation">
+		<tr>
+			<th scope="row">Show triangle badge</th>
+			<td>
+				<label>
+					<input type="checkbox" name="hostlinks_alert_badge_enabled" value="1" <?php checked( $badge_on, 1 ); ?>>
+					Display a colored triangle on alerted cards
+				</label>
+				<p class="description">The triangle appears in the bottom-right corner of the card. Hovering over it shows the specific registration count and days remaining that triggered the alert.</p>
 			</td>
 		</tr>
 	</table>

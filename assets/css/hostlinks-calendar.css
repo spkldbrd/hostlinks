@@ -142,6 +142,7 @@
   border-radius: 0.75rem;
   padding: 1rem;
   transition: box-shadow 0.2s;
+  position: relative;
 }
 
 .hostlinks-card:hover {
@@ -206,6 +207,55 @@
 
 .hostlinks-roster-link:hover {
   text-decoration: underline;
+}
+
+/* Registration alert badge (triangle + tooltip) */
+.hl-alert-badge {
+  position: absolute;
+  bottom: 9px;
+  right: 10px;
+  font-size: 17px;
+  line-height: 1;
+  cursor: help;
+  user-select: none;
+  z-index: 1;
+}
+
+.hl-alert-badge::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: rgba(30, 30, 30, 0.88);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  padding: 6px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 100;
+}
+
+/* Down-arrow pointer on the tooltip */
+.hl-alert-badge::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 3px);
+  right: 5px;
+  border: 5px solid transparent;
+  border-top-color: rgba(30, 30, 30, 0.88);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 100;
+}
+
+.hl-alert-badge:hover::after,
+.hl-alert-badge:hover::before {
+  opacity: 1;
 }
 
 /* Date text */

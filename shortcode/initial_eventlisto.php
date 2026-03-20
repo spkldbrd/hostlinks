@@ -98,6 +98,8 @@ $hl_a2_days  = (int) get_option( 'hostlinks_alert_2_days',    20 );
 $hl_a2_regs  = (int) get_option( 'hostlinks_alert_2_regs',    20 );
 $hl_a2_color =       get_option( 'hostlinks_alert_2_color',   '#dc2626' );
 
+$hl_badge_on = (int) get_option( 'hostlinks_alert_badge_enabled', 1 );
+
 // Sanitize colors — fall back to defaults if stored value is invalid.
 if ( ! preg_match( '/^#[0-9a-f]{6}$/i', $hl_a1_color ) ) { $hl_a1_color = '#f59e0b'; }
 if ( ! preg_match( '/^#[0-9a-f]{6}$/i', $hl_a2_color ) ) { $hl_a2_color = '#dc2626'; }
@@ -120,12 +122,18 @@ $reports_page_url = Hostlinks_Page_URLs::get_reports();
 	border-color: <?php echo esc_attr( $hl_a1_color ); ?> !important;
 	box-shadow: 0 0 0 3px <?php echo esc_attr( $hl_a1_color ); ?>59 !important;
 }
+<?php if ( $hl_badge_on ) : ?>
+.hostlinks-card--alert-1 .hl-alert-badge { color: <?php echo esc_attr( $hl_a1_color ); ?>; }
+<?php endif; ?>
 <?php endif; ?>
 <?php if ( $hl_a2_on ) : ?>
 .hostlinks-card--alert-2 {
 	border-color: <?php echo esc_attr( $hl_a2_color ); ?> !important;
 	box-shadow: 0 0 0 3px <?php echo esc_attr( $hl_a2_color ); ?>59 !important;
 }
+<?php if ( $hl_badge_on ) : ?>
+.hostlinks-card--alert-2 .hl-alert-badge { color: <?php echo esc_attr( $hl_a2_color ); ?>; }
+<?php endif; ?>
 <?php endif; ?>
 </style>
 <?php endif; ?>
@@ -238,18 +246,24 @@ $empty_msg = $focus_name
 
 	// ── Registration alert class ──────────────────────────────────────────
 	$alert_class = '';
+	$alert_tip   = '';
 	if ( $today < $dt_start ) {
 		$days_away = $today->diff( $dt_start )->days + 1;
 		$paid      = (int) $alldriver['eve_paid'];
 		// Alert 2 takes priority when both thresholds are met.
 		if ( $hl_a2_on && $days_away <= $hl_a2_days && $paid < $hl_a2_regs ) {
 			$alert_class = 'hostlinks-card--alert-2';
+			$alert_tip   = $paid . ' paid registration' . ( 1 === $paid ? '' : 's' ) . ' — ' . $days_away . ' days to event';
 		} elseif ( $hl_a1_on && $days_away <= $hl_a1_days && $paid < $hl_a1_regs ) {
 			$alert_class = 'hostlinks-card--alert-1';
+			$alert_tip   = $paid . ' paid registration' . ( 1 === $paid ? '' : 's' ) . ' — ' . $days_away . ' days to event';
 		}
 	}
 	?>
 		<div class="hostlinks-card<?php echo $alert_class ? ' ' . esc_attr( $alert_class ) : ''; ?>">
+			<?php if ( $hl_badge_on && $alert_tip ) : ?>
+			<span class="hl-alert-badge" data-tip="<?php echo esc_attr( $alert_tip ); ?>" aria-label="<?php echo esc_attr( $alert_tip ); ?>">&#x26A0;&#xFE0E;</span>
+			<?php endif; ?>
 			<div class="hostlinks-card-inner">
 				<div class="hostlinks-card-top">
 					<span class="hostlinks-reg-count"><?php echo (int) $alldriver['eve_paid']; ?>+<?php echo (int) $alldriver['eve_free']; ?></span>

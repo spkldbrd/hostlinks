@@ -113,9 +113,21 @@ $_upd_raw      = get_option( 'last_data_updation', '' );
 $_upd_dt       = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;
 $last_updated  = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->format( 'm/d' );
 
-$past_events_url  = Hostlinks_Page_URLs::get_past_events();
-$upcoming_url     = Hostlinks_Page_URLs::get_upcoming();
-$reports_page_url = Hostlinks_Page_URLs::get_reports();
+$past_events_url      = Hostlinks_Page_URLs::get_past_events();
+$upcoming_url         = Hostlinks_Page_URLs::get_upcoming();
+$reports_page_url     = Hostlinks_Page_URLs::get_reports();
+$add_event_btn_mode   = get_option( 'hostlinks_add_event_btn', 'disabled' );
+$event_request_url    = ( $add_event_btn_mode !== 'disabled' ) ? Hostlinks_Page_URLs::get_event_request_form() : '';
+
+// Determine if the current user should see the "+ Event" button.
+$show_add_event_btn = false;
+if ( $event_request_url ) {
+	if ( $add_event_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
+		$show_add_event_btn = true;
+	} elseif ( $add_event_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'eventlisto' ) ) {
+		$show_add_event_btn = true;
+	}
+}
 ?>
 <?php if ( $hl_a1_on || $hl_a2_on ) : ?>
 <style>
@@ -173,6 +185,11 @@ $reports_page_url = Hostlinks_Page_URLs::get_reports();
 
 		<?php if ( $reports_page_url ) : ?>
 		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
+		<?php elseif ( $show_add_event_btn ) : ?>
+		<span style="margin-left:auto;"></span>
+		<?php endif; ?>
+		<?php if ( $show_add_event_btn ) : ?>
+		<a href="<?php echo esc_url( $event_request_url ); ?>" class="hostlinks-btn hostlinks-btn--add-event">&#x2B; Event</a>
 		<?php endif; ?>
 		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
 	</div>

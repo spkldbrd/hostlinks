@@ -15,11 +15,16 @@ if ( isset( $_POST['hl_save_request_settings'] ) ) {
 	$prefix      = sanitize_text_field( $_POST['hl_subject_prefix'] ?? '[Event Request]' );
 	$success     = sanitize_textarea_field( $_POST['hl_success_message'] ?? '' );
 	$form_header = sanitize_text_field( $_POST['hl_form_header_text'] ?? '' );
+	$add_btn     = sanitize_key( $_POST['hl_add_event_btn'] ?? 'disabled' );
+	if ( ! in_array( $add_btn, array( 'disabled', 'admin', 'all' ), true ) ) {
+		$add_btn = 'disabled';
+	}
 
 	update_option( 'hostlinks_event_request_notification_email', $email );
 	update_option( 'hostlinks_event_request_email_subject_prefix', $prefix );
 	update_option( 'hostlinks_event_request_success_message', $success );
 	update_option( 'hostlinks_event_request_form_header', $form_header );
+	update_option( 'hostlinks_add_event_btn', $add_btn );
 
 	$notice = '<div class="notice notice-success is-dismissible"><p>Event Request settings saved.</p></div>';
 }
@@ -29,6 +34,7 @@ $notif_email    = get_option( 'hostlinks_event_request_notification_email', get_
 $subject_prefix = get_option( 'hostlinks_event_request_email_subject_prefix', '[Event Request]' );
 $success_msg    = get_option( 'hostlinks_event_request_success_message', '' );
 $form_header    = get_option( 'hostlinks_event_request_form_header', 'New Event Build Form' );
+$add_btn        = get_option( 'hostlinks_add_event_btn', 'disabled' );
 ?>
 <?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
@@ -40,6 +46,19 @@ $form_header    = get_option( 'hostlinks_event_request_form_header', 'New Event 
 	<?php wp_nonce_field( 'hl_event_request_settings' ); ?>
 
 	<table class="form-table" role="presentation">
+		<tr>
+			<th scope="row"><label for="hl_add_event_btn">"+ Event" Button</label></th>
+			<td>
+				<select id="hl_add_event_btn" name="hl_add_event_btn">
+					<option value="disabled" <?php selected( $add_btn, 'disabled' ); ?>>Disabled</option>
+					<option value="admin"    <?php selected( $add_btn, 'admin' ); ?>>Admin only</option>
+					<option value="all"      <?php selected( $add_btn, 'all' ); ?>>All Hostlinks users</option>
+				</select>
+				<p class="description">When enabled, a <strong>+ Event</strong> button appears to the right of the Reports button on the Upcoming Events calendar and links to the Event Request Form page.<br>
+				<em>Admin only</em> = visible to <code>manage_options</code> users. <em>All Hostlinks users</em> = visible to anyone with approved viewer access.<br>
+				The destination page is auto-detected from the page containing <code>[hostlinks_event_request_form]</code> (configure under <strong>Settings → General → Page Link Settings</strong>).</p>
+			</td>
+		</tr>
 		<tr>
 			<th scope="row"><label for="hl_form_header_text">Form Header Text</label></th>
 			<td>

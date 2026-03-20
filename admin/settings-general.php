@@ -27,11 +27,12 @@ $page_url_notice = '';
 if ( isset( $_POST['hostlinks_save_page_urls'] ) ) {
 	check_admin_referer( 'hostlinks_page_urls' );
 	Hostlinks_Page_URLs::save_overrides(
-		$_POST['hl_url_upcoming']          ?? '',
-		$_POST['hl_url_past_events']       ?? '',
-		$_POST['hl_url_reports']           ?? '',
-		$_POST['hl_url_public_event_list'] ?? '',
-		$_POST['hl_url_roster']            ?? ''
+		$_POST['hl_url_upcoming']             ?? '',
+		$_POST['hl_url_past_events']          ?? '',
+		$_POST['hl_url_reports']              ?? '',
+		$_POST['hl_url_public_event_list']    ?? '',
+		$_POST['hl_url_roster']               ?? '',
+		$_POST['hl_url_event_request_form']   ?? ''
 	);
 	$page_url_notice = '<div class="notice notice-success is-dismissible"><p>Page URLs saved. URL cache cleared.</p></div>';
 }
@@ -52,11 +53,12 @@ $source_labels = array(
 	'none'     => '<span style="color:#d63638;font-weight:600;">&#9679; Not found</span>',
 );
 $page_labels = array(
-	'upcoming'          => 'Upcoming Events <code>[eventlisto]</code>',
-	'past_events'       => 'Past Events <code>[oldeventlisto]</code>',
-	'reports'           => 'Reports <code>[hostlinks_reports]</code>',
-	'public_event_list' => 'Public Event List <code>[public_event_list]</code>',
-	'roster'            => 'Roster <code>[hostlinks_roster]</code>',
+	'upcoming'           => 'Upcoming Events <code>[eventlisto]</code>',
+	'past_events'        => 'Past Events <code>[oldeventlisto]</code>',
+	'reports'            => 'Reports <code>[hostlinks_reports]</code>',
+	'public_event_list'  => 'Public Event List <code>[public_event_list]</code>',
+	'roster'             => 'Roster <code>[hostlinks_roster]</code>',
+	'event_request_form' => 'Event Request Form <code>[hostlinks_event_request_form]</code>',
 );
 ?>
 <?php echo $maps_notice; ?>
@@ -172,6 +174,15 @@ $page_labels = array(
 					value="<?php echo esc_attr( $overrides['roster'] ?? '' ); ?>"
 					class="regular-text" placeholder="Leave blank to auto-detect" />
 				<p class="description">Page containing <code>[hostlinks_roster]</code>. This URL is auto-populated into new events when their Roster URL field is left blank.</p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="hl_url_event_request_form">Event Request Form URL override</label></th>
+			<td>
+				<input type="url" id="hl_url_event_request_form" name="hl_url_event_request_form"
+					value="<?php echo esc_attr( $overrides['event_request_form'] ?? '' ); ?>"
+					class="regular-text" placeholder="Leave blank to auto-detect" />
+				<p class="description">Page containing <code>[hostlinks_event_request_form]</code>. Used for the optional "+ Event" button on the calendar.</p>
 			</td>
 		</tr>
 	</table>

@@ -80,8 +80,9 @@ class Hostlinks_Assets {
 
 	public function enqueue_admin( $hook ) {
 		// Load WordPress media library on the Roster settings tab.
-		if ( $hook === 'booking-menu_page_hostlinks-settings'
-			&& ( sanitize_key( $_GET['tab'] ?? '' ) === 'roster' ) ) {
+		if ( is_admin()
+			&& ( sanitize_key( $_GET['page'] ?? '' ) === 'hostlinks-settings' )
+			&& ( sanitize_key( $_GET['tab']  ?? '' ) === 'roster' ) ) {
 			wp_enqueue_media();
 		}
 

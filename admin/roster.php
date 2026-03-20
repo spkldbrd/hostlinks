@@ -127,11 +127,31 @@ usort( $attendees, function( $a, $b ) {
 	return $cmp !== 0 ? $cmp : strcasecmp( $a['first'], $b['first'] );
 } );
 
-$count       = count( $attendees );
-$event_title = esc_html( $row['eve_location'] ?? 'Event #' . $eve_id );
-$start_date  = ! empty( $row['eve_start'] ) ? date( 'F j, Y', strtotime( $row['eve_start'] ) ) : '';
-$end_date    = ! empty( $row['eve_end'] ) && $row['eve_end'] !== $row['eve_start']
-               ? ' – ' . date( 'F j, Y', strtotime( $row['eve_end'] ) ) : '';
+$count      = count( $attendees );
+$start_date = ! empty( $row['eve_start'] ) ? date( 'F j, Y', strtotime( $row['eve_start'] ) ) : '';
+$end_date   = ! empty( $row['eve_end'] ) && $row['eve_end'] !== $row['eve_start']
+              ? ' – ' . date( 'F j, Y', strtotime( $row['eve_end'] ) ) : '';
+
+// ── Build header title: "Roster – {Location} – {Type label}" ─────────────────
+$type_name_raw = strtolower( trim( (string) $wpdb->get_var( $wpdb->prepare(
+	"SELECT event_type_name FROM `{$wpdb->prefix}event_type` WHERE event_type_id = %d",
+	(int) ( $row['eve_type'] ?? 0 )
+) ) ) );
+$is_zoom = ( strtolower( trim( $row['eve_zoom'] ?? '' ) ) === 'yes' );
+
+if ( $is_zoom ) {
+	$type_label = 'ZOOM';
+} elseif ( strpos( $type_name_raw, 'management' ) !== false ) {
+	$type_label = 'Management';
+} elseif ( strpos( $type_name_raw, 'writing' ) !== false ) {
+	$type_label = 'Writing';
+} else {
+	$type_label = ''; // Subaward and anything else get no label
+}
+
+$location    = $row['eve_location'] ?? 'Event #' . $eve_id;
+$header_parts = array_filter( array( 'Roster', $location, $type_label ) );
+$event_title  = implode( ' – ', $header_parts );
 
 $back_url    = admin_url( 'admin.php?page=booking-menu' );
 $refresh_url = admin_url( 'admin.php?page=hostlinks-roster&eve_id=' . $eve_id . '&refresh=1' );
@@ -273,7 +293,7 @@ body {
 
 	<div class="hl-roster-header">
 		<div>
-			<h1><?php echo $event_title; ?></h1>
+			<h1><?php echo esc_html( $event_title ); ?></h1>
 			<div class="hl-roster-meta">
 				<?php if ( $start_date ) echo esc_html( $start_date . $end_date ) . ' &nbsp;|&nbsp; '; ?>
 				<?php echo $count; ?> attendee<?php echo $count !== 1 ? 's' : ''; ?>

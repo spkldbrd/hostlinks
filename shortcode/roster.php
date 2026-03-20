@@ -99,11 +99,31 @@ usort( $attendees, function( $a, $b ) {
 	return $c !== 0 ? $c : strcasecmp( $a['first'], $b['first'] );
 } );
 
-$count       = count( $attendees );
-$event_title = $row['eve_location'] ?? 'Event #' . $eve_id;
-$start_date  = ! empty( $row['eve_start'] ) ? date( 'F j, Y', strtotime( $row['eve_start'] ) ) : '';
-$end_date    = ! empty( $row['eve_end'] ) && $row['eve_end'] !== $row['eve_start']
-               ? ' – ' . date( 'F j, Y', strtotime( $row['eve_end'] ) ) : '';
+$count      = count( $attendees );
+$start_date = ! empty( $row['eve_start'] ) ? date( 'F j, Y', strtotime( $row['eve_start'] ) ) : '';
+$end_date   = ! empty( $row['eve_end'] ) && $row['eve_end'] !== $row['eve_start']
+              ? ' – ' . date( 'F j, Y', strtotime( $row['eve_end'] ) ) : '';
+
+// ── Build header title: "Roster – {Location} – {Type label}" ─────────────────
+$type_name_raw = strtolower( trim( (string) $wpdb->get_var( $wpdb->prepare(
+	"SELECT event_type_name FROM `{$wpdb->prefix}event_type` WHERE event_type_id = %d",
+	(int) ( $row['eve_type'] ?? 0 )
+) ) ) );
+$is_zoom = ( strtolower( trim( $row['eve_zoom'] ?? '' ) ) === 'yes' );
+
+if ( $is_zoom ) {
+	$type_label = 'ZOOM';
+} elseif ( strpos( $type_name_raw, 'management' ) !== false ) {
+	$type_label = 'Management';
+} elseif ( strpos( $type_name_raw, 'writing' ) !== false ) {
+	$type_label = 'Writing';
+} else {
+	$type_label = ''; // Subaward and anything else get no label
+}
+
+$location     = $row['eve_location'] ?? 'Event #' . $eve_id;
+$header_parts = array_filter( array( 'Roster', $location, $type_label ) );
+$event_title  = implode( ' – ', $header_parts );
 
 $current_url = ( is_ssl() ? 'https' : 'http' ) . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 $refresh_url = add_query_arg( 'refresh', '1', remove_query_arg( 'refresh', $current_url ) );

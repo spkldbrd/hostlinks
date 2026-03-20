@@ -57,7 +57,7 @@ $attendees_raw = get_transient( $cache_key );
 $from_cache    = ( $attendees_raw !== false );
 
 if ( ! $from_cache ) {
-	$attendees_raw = Hostlinks_CVENT_API::get_attendees( $cvent_id );
+	$attendees_raw = Hostlinks_CVENT_API::get_roster_attendees( $cvent_id );
 	if ( is_wp_error( $attendees_raw ) ) {
 		wp_die( 'CVENT API error: ' . esc_html( $attendees_raw->get_error_message() ) );
 	}

@@ -421,6 +421,67 @@ class Hostlinks_CVENT_API {
 	}
 
 	/**
+	 * Fetch a single attendee record by UUID.
+	 * Endpoint: GET /ea/attendees/{uuid}
+	 *
+	 * @param string $attendee_id  CVENT attendee UUID.
+	 * @return array|WP_Error      Attendee record array, or WP_Error on failure.
+	 */
+	public static function get_attendee( $attendee_id ) {
+		return self::request( 'attendees/' . self::sanitize_uuid( $attendee_id ) );
+	}
+
+	/**
+	 * Build a roster for an event by:
+	 *   1. Fetching order items (known-working endpoint).
+	 *   2. Extracting unique attendee UUIDs from the items.
+	 *   3. Calling GET /ea/attendees/{uuid} for each UUID.
+	 *
+	 * This sidesteps the broken filter=eventId path entirely.
+	 * Results are NOT cached here — caching is handled by the caller (roster.php).
+	 *
+	 * @param string $event_id  CVENT event UUID.
+	 * @return array|WP_Error   Flat array of raw attendee records, or WP_Error on failure.
+	 */
+	public static function get_roster_attendees( $event_id ) {
+		$order_items = self::get_order_items( $event_id );
+		if ( is_wp_error( $order_items ) ) {
+			return $order_items;
+		}
+
+		// Collect unique attendee UUIDs from order items.
+		$uuids = array();
+		foreach ( $order_items as $item ) {
+			// The attendee field may be keyed 'attendee', 'attendeeId', or 'attendee.id'.
+			$uuid = $item['attendee'] ?? $item['attendeeId'] ?? $item['attendee']['id'] ?? '';
+			$uuid = self::sanitize_uuid( $uuid );
+			if ( $uuid !== '' ) {
+				$uuids[ $uuid ] = true;
+			}
+		}
+		$uuids = array_keys( $uuids );
+
+		if ( empty( $uuids ) ) {
+			return array();
+		}
+
+		$attendees = array();
+		foreach ( $uuids as $uuid ) {
+			$att = self::get_attendee( $uuid );
+			if ( is_wp_error( $att ) ) {
+				continue; // Skip individuals that 404/error; don't abort the whole roster.
+			}
+			// get_attendee returns the full JSON body; actual data may be top-level or in 'data'.
+			if ( isset( $att['data'] ) && is_array( $att['data'] ) ) {
+				$att = $att['data'];
+			}
+			$attendees[] = $att;
+		}
+
+		return $attendees;
+	}
+
+	/**
 	 * Retrieve attendees via the flat /attendees endpoint (no event filter supported).
 	 *
 	 * NOTE: /ea/events/{id}/attendees returns HTTP 404 — not a valid CVENT path.

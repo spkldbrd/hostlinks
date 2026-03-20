@@ -124,6 +124,15 @@ if ( isset( $_POST['hostlinks_cvent_add_event'] ) ) {
 
 		$new_eve_id = (int) $wpdb->insert_id;
 
+		// Auto-populate eve_roster_url if left blank.
+		if ( ! $eve_roster_url && $new_eve_id ) {
+			$roster_base = Hostlinks_Page_URLs::get_roster();
+			if ( $roster_base ) {
+				$auto_roster_url = rtrim( $roster_base, '/' ) . '/?eve_id=' . $new_eve_id;
+				$wpdb->update( $table, array( 'eve_roster_url' => $auto_roster_url ), array( 'eve_id' => $new_eve_id ), array( '%s' ), array( '%d' ) );
+			}
+		}
+
 		// Remove from transient cache.
 		if ( $cvent_uuid ) {
 			$cached = get_transient( 'hostlinks_cvent_new_events' );
@@ -447,7 +456,7 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 							<th style="padding:6px 10px;font-weight:600;"><label>Roster URL</label></th>
 							<td style="padding:6px 10px;">
 								<input type="url" name="eve_roster_url" value=""
-									style="width:360px;" placeholder="https://">
+								style="width:360px;" placeholder="Leave blank to auto-populate">
 							</td>
 						</tr>
 						<tr>

@@ -23,6 +23,7 @@ class Hostlinks_Access {
 		'eventlisto'        => 'Upcoming Events',
 		'oldeventlisto'     => 'Past Events',
 		'hostlinks_reports' => 'Reports',
+		'hostlinks_roster'  => 'Roster',
 	);
 
 	const MODES = array( 'public', 'logged_in', 'approved_viewers' );

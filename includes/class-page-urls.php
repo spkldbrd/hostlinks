@@ -43,6 +43,14 @@ class Hostlinks_Page_URLs {
 		return self::resolve( 'public_event_list', 'public_event_list', '' );
 	}
 
+	/**
+	 * Returns the Roster front-end page URL, or '' if not found.
+	 * Used to auto-populate eve_roster_url on new events.
+	 */
+	public static function get_roster() {
+		return self::resolve( 'roster', 'hostlinks_roster', '' );
+	}
+
 	// ── Settings helpers ───────────────────────────────────────────────────────
 
 	public static function get_overrides() {
@@ -51,15 +59,17 @@ class Hostlinks_Page_URLs {
 			'past_events'       => '',
 			'reports'           => '',
 			'public_event_list' => '',
+			'roster'            => '',
 		) );
 	}
 
-	public static function save_overrides( $upcoming, $past_events, $reports, $public_event_list = '' ) {
+	public static function save_overrides( $upcoming, $past_events, $reports, $public_event_list = '', $roster = '' ) {
 		update_option( self::OPTION_KEY, array(
 			'upcoming'          => esc_url_raw( trim( $upcoming ) ),
 			'past_events'       => esc_url_raw( trim( $past_events ) ),
 			'reports'           => esc_url_raw( trim( $reports ) ),
 			'public_event_list' => esc_url_raw( trim( $public_event_list ) ),
+			'roster'            => esc_url_raw( trim( $roster ) ),
 		) );
 		self::clear_cache();
 	}
@@ -71,6 +81,7 @@ class Hostlinks_Page_URLs {
 		delete_transient( 'hostlinks_page_url_past_events' );
 		delete_transient( 'hostlinks_page_url_reports' );
 		delete_transient( 'hostlinks_page_url_public_event_list' );
+		delete_transient( 'hostlinks_page_url_roster' );
 		// Remove the legacy transient used by Reports in earlier versions.
 		delete_transient( 'hostlinks_reports_page_url' );
 	}
@@ -138,6 +149,7 @@ class Hostlinks_Page_URLs {
 			'past_events'       => array( 'shortcode' => 'oldeventlisto',     'default_path' => '/old-event-list/' ),
 			'reports'           => array( 'shortcode' => 'hostlinks_reports', 'default_path' => '' ),
 			'public_event_list' => array( 'shortcode' => 'public_event_list', 'default_path' => '' ),
+			'roster'            => array( 'shortcode' => 'hostlinks_roster',  'default_path' => '' ),
 		);
 
 		$status = array();

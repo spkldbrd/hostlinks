@@ -30,7 +30,8 @@ if ( isset( $_POST['hostlinks_save_page_urls'] ) ) {
 		$_POST['hl_url_upcoming']          ?? '',
 		$_POST['hl_url_past_events']       ?? '',
 		$_POST['hl_url_reports']           ?? '',
-		$_POST['hl_url_public_event_list'] ?? ''
+		$_POST['hl_url_public_event_list'] ?? '',
+		$_POST['hl_url_roster']            ?? ''
 	);
 	$page_url_notice = '<div class="notice notice-success is-dismissible"><p>Page URLs saved. URL cache cleared.</p></div>';
 }
@@ -55,6 +56,7 @@ $page_labels = array(
 	'past_events'       => 'Past Events <code>[oldeventlisto]</code>',
 	'reports'           => 'Reports <code>[hostlinks_reports]</code>',
 	'public_event_list' => 'Public Event List <code>[public_event_list]</code>',
+	'roster'            => 'Roster <code>[hostlinks_roster]</code>',
 );
 ?>
 <?php echo $maps_notice; ?>
@@ -161,6 +163,15 @@ $page_labels = array(
 					value="<?php echo esc_attr( $overrides['public_event_list'] ?? '' ); ?>"
 					class="regular-text" placeholder="Leave blank to auto-detect" />
 				<p class="description">Page containing <code>[public_event_list]</code>.</p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="hl_url_roster">Roster URL override</label></th>
+			<td>
+				<input type="url" id="hl_url_roster" name="hl_url_roster"
+					value="<?php echo esc_attr( $overrides['roster'] ?? '' ); ?>"
+					class="regular-text" placeholder="Leave blank to auto-detect" />
+				<p class="description">Page containing <code>[hostlinks_roster]</code>. This URL is auto-populated into new events when their Roster URL field is left blank.</p>
 			</td>
 		</tr>
 	</table>

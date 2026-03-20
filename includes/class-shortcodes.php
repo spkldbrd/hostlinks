@@ -10,6 +10,7 @@ class Hostlinks_Shortcodes {
 		add_shortcode( 'oldeventlisto',       array( $this, 'render_old_eventlisto' ) );
 		add_shortcode( 'hostlinks_reports',   array( $this, 'render_reports' ) );
 		add_shortcode( 'public_event_list',   array( $this, 'render_public_event_list' ) );
+		add_shortcode( 'hostlinks_roster',    array( $this, 'render_roster' ) );
 	}
 
 	public function render_eventlisto() {
@@ -46,6 +47,16 @@ class Hostlinks_Shortcodes {
 		// Always public — no access control check.
 		include_once HOSTLINKS_PLUGIN_DIR . 'shortcode/public-event-list.php';
 		return hostlinks_public_event_list_shortcode( $atts );
+	}
+
+	public function render_roster() {
+		if ( ! Hostlinks_Access::can_view_shortcode( 'hostlinks_roster' ) ) {
+			return Hostlinks_Access::get_denial_message_html();
+		}
+		global $wpdb;
+		ob_start();
+		include HOSTLINKS_PLUGIN_DIR . 'shortcode/roster.php';
+		return ob_get_clean();
 	}
 }
 

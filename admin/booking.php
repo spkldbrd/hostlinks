@@ -53,6 +53,15 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 			),
 			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s','%d' )
 		);
+		$new_eve_id = (int) $wpdb->insert_id;
+		// Auto-populate eve_roster_url if left blank.
+		if ( ! $eve_roster_url && $new_eve_id ) {
+			$roster_base = Hostlinks_Page_URLs::get_roster();
+			if ( $roster_base ) {
+				$auto_roster_url = rtrim( $roster_base, '/' ) . '/?eve_id=' . $new_eve_id;
+				$wpdb->update( $table11, array( 'eve_roster_url' => $auto_roster_url ), array( 'eve_id' => $new_eve_id ), array( '%s' ), array( '%d' ) );
+			}
+		}
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Event Sucessfully added. <a href="admin.php?page=booking-menu">View Event</a></p></div>';
 	}
 
@@ -116,8 +125,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <td><input type="text" value="#" id="eve_host_url" name="eve_host_url" required></td>
       </tr>
       <tr class="form-field">
-        <th><label for="eve_roster_url">ROSTER URL <span class="description">(required)</span></label></th>
-        <td><input type="text" value="#" id="eve_roster_url" name="eve_roster_url" required></td>
+        <th><label for="eve_roster_url">ROSTER URL</label></th>
+        <td><input type="text" value="" id="eve_roster_url" name="eve_roster_url" placeholder="Leave blank to auto-populate"></td>
       </tr>
       <tr class="form-field">
         <th><label for="eve_trainer_url">REG URL</label></th>

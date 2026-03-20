@@ -112,6 +112,7 @@ $last_updated  = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->form
 $past_events_url  = Hostlinks_Page_URLs::get_past_events();
 $upcoming_url     = Hostlinks_Page_URLs::get_upcoming();
 $reports_page_url = Hostlinks_Page_URLs::get_reports();
+?>
 <?php if ( $hl_a1_on || $hl_a2_on ) : ?>
 <style>
 <?php if ( $hl_a1_on ) : ?>

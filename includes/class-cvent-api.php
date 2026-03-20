@@ -432,48 +432,82 @@ class Hostlinks_CVENT_API {
 	}
 
 	/**
-	 * Build a roster for an event by:
-	 *   1. Fetching order items (known-working endpoint).
-	 *   2. Extracting unique attendee UUIDs from the items.
-	 *   3. Calling GET /ea/attendees/{uuid} for each UUID.
+	 * Build a roster for an event.
 	 *
-	 * This sidesteps the broken filter=eventId path entirely.
+	 * Strategy (cheapest first):
+	 *   1. Fetch order items with expand=attendee — if CVENT returns name fields inline
+	 *      we are done in 1 API call (plus pagination calls for large events).
+	 *   2. If the attendee object in the first item has no firstName/lastName, CVENT does
+	 *      not support the expand; fall back to individual GET /ea/attendees/{uuid} calls
+	 *      (1 call per unique attendee).
+	 *
 	 * Results are NOT cached here — caching is handled by the caller (roster.php).
 	 *
-	 * @param string $event_id  CVENT event UUID.
-	 * @return array|WP_Error   Flat array of raw attendee records, or WP_Error on failure.
+	 * @param string $event_id   CVENT event UUID.
+	 * @return array|WP_Error    Flat array of raw attendee records, or WP_Error on failure.
 	 */
 	public static function get_roster_attendees( $event_id ) {
-		$order_items = self::get_order_items( $event_id );
-		if ( is_wp_error( $order_items ) ) {
-			return $order_items;
+		$event_id = self::sanitize_uuid( $event_id );
+
+		// ── Step 1: fetch order items with expand=attendee ──────────────────────
+		$all  = array();
+		$next = null;
+		$page = 0;
+
+		do {
+			$params = array( 'limit' => 200, 'expand' => 'attendee' );
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+			$result = self::request( 'events/' . $event_id . '/orders/items', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+			$all  = array_merge( $all, $result['data'] ?? array() );
+			$next = $result['paging']['nextToken'] ?? null;
+			$page++;
+		} while ( $next && $page < 20 );
+
+		if ( empty( $all ) ) {
+			return array();
 		}
 
-		// Collect unique attendee UUIDs from order items.
-		// CVENT returns attendee as a nested object: {"attendee": {"id": "uuid"}}.
+		// ── Step 2: check if expand worked (name fields present inline) ─────────
+		$sample_att   = $all[0]['attendee'] ?? array();
+		$expand_works = isset( $sample_att['firstName'] ) || isset( $sample_att['lastName'] )
+		                || isset( $sample_att['contact'] );
+
+		if ( $expand_works ) {
+			// Dedupe by attendee UUID and return the inline attendee objects.
+			$seen      = array();
+			$attendees = array();
+			foreach ( $all as $item ) {
+				$att  = $item['attendee'] ?? array();
+				$uuid = self::sanitize_uuid( (string) ( $att['id'] ?? '' ) );
+				if ( $uuid === '' || isset( $seen[ $uuid ] ) ) {
+					continue;
+				}
+				$seen[ $uuid ] = true;
+				$attendees[]   = $att;
+			}
+			return $attendees;
+		}
+
+		// ── Step 3: expand not supported — fall back to individual lookups ──────
 		$uuids = array();
-		foreach ( $order_items as $item ) {
-			$uuid = $item['attendee']['id']   // nested object (confirmed format)
-				??  $item['attendeeId']        // flat string fallback
-				??  '';
-			$uuid = self::sanitize_uuid( (string) $uuid );
+		foreach ( $all as $item ) {
+			$uuid = self::sanitize_uuid( (string) ( $item['attendee']['id'] ?? $item['attendeeId'] ?? '' ) );
 			if ( $uuid !== '' ) {
 				$uuids[ $uuid ] = true;
 			}
 		}
-		$uuids = array_keys( $uuids );
-
-		if ( empty( $uuids ) ) {
-			return array();
-		}
 
 		$attendees = array();
-		foreach ( $uuids as $uuid ) {
+		foreach ( array_keys( $uuids ) as $uuid ) {
 			$att = self::get_attendee( $uuid );
 			if ( is_wp_error( $att ) ) {
-				continue; // Skip individuals that 404/error; don't abort the whole roster.
+				continue;
 			}
-			// get_attendee returns the full JSON body; actual data may be top-level or in 'data'.
 			if ( isset( $att['data'] ) && is_array( $att['data'] ) ) {
 				$att = $att['data'];
 			}

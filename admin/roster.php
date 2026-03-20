@@ -316,7 +316,13 @@ body {
 			<pre><?php echo esc_html( wp_json_encode( $debug_order_items[0], JSON_PRETTY_PRINT ) ); ?></pre>
 		<?php endif; ?>
 
-		<br><strong>Attendee Records (<?php echo count( $attendees_raw ); ?> fetched, <?php echo count( $attendees ); ?> after status filter):</strong><br>
+		<br><strong>Attendee Records (<?php echo count( $attendees_raw ); ?> fetched, <?php echo count( $attendees ); ?> after status filter)
+		— strategy: <?php
+			$sample = $debug_order_items[0]['attendee'] ?? array();
+			echo ( isset( $sample['firstName'] ) || isset( $sample['lastName'] ) || isset( $sample['contact'] ) )
+				? '<span style="color:green;">expand=attendee worked ✓ (1 call)</span>'
+				: '<span style="color:#c00;">expand not supported — used individual lookups</span>';
+		?>:</strong><br>
 		<?php if ( ! empty( $attendees_raw ) ) : ?>
 			<strong>First raw attendee record:</strong>
 			<pre><?php echo esc_html( wp_json_encode( $attendees_raw[0], JSON_PRETTY_PRINT ) ); ?></pre>

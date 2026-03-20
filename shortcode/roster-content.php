@@ -192,7 +192,7 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
 .hl-fe-roster-title { font-size:1.3em; margin:0 0 4px; }
 .hl-fe-roster-meta { font-size:.85em; color:#666; margin:0; }
 .hl-fe-roster-actions { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
-.hl-fe-roster-logo { max-height:48px; max-width:180px; object-fit:contain; display:block; }
+.hl-fe-roster-logo { max-height:72px; max-width:240px; object-fit:contain; display:block; }
 .hl-fe-roster-btn { display:inline-block; padding:6px 14px; background:#0da2e7; color:#fff; border:none; border-radius:3px; font-size:13px; text-decoration:none; cursor:pointer; line-height:1.5; }
 .hl-fe-roster-btn:hover { background:#0b8fcf; color:#fff; }
 .hl-fe-roster-toggles { display:flex; gap:14px; align-items:center; font-size:13px; color:#555; padding:6px 0 10px; }

@@ -70,11 +70,18 @@ $nonce    = wp_create_nonce( 'hostlinks_user_access' );
 
 	<?php /* ── A. Per-shortcode access modes ───────────────────────────── */ ?>
 	<h2>Shortcode Access Modes</h2>
+	<?php
+	// Shortcodes that are always publicly accessible — no gate applied in code.
+	$fixed_public_shortcodes = array(
+		'public_event_list'            => array( 'label' => 'Public Event List',    'note' => 'Always public — no login required by design.' ),
+		'hostlinks_event_request_form' => array( 'label' => 'Event Request Form',   'note' => 'Always public — open intake form for all visitors.' ),
+	);
+	?>
 	<table class="widefat striped" style="max-width:720px;margin-bottom:24px;">
 		<thead>
 			<tr>
-				<th style="width:180px;">Shortcode</th>
-				<th style="width:200px;">Page</th>
+				<th style="width:220px;">Shortcode</th>
+				<th style="width:190px;">Page</th>
 				<th>Access Mode</th>
 			</tr>
 		</thead>
@@ -93,6 +100,16 @@ $nonce    = wp_create_nonce( 'hostlinks_user_access' );
 						</option>
 					<?php endforeach; ?>
 					</select>
+				</td>
+			</tr>
+		<?php endforeach; ?>
+		<?php foreach ( $fixed_public_shortcodes as $key => $info ) : ?>
+			<tr style="opacity:0.8;">
+				<td><code>[<?php echo esc_html( $key ); ?>]</code></td>
+				<td><?php echo esc_html( $info['label'] ); ?></td>
+				<td>
+					<span style="display:inline-block;padding:3px 10px;border-radius:4px;background:hsl(142 55% 90%);color:hsl(142 60% 28%);font-size:12px;font-weight:600;border:1px solid hsl(142 50% 75%);">&#x1F513; Always Public</span>
+					<p class="description" style="margin-top:4px;"><?php echo esc_html( $info['note'] ); ?></p>
 				</td>
 			</tr>
 		<?php endforeach; ?>

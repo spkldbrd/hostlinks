@@ -450,11 +450,13 @@ class Hostlinks_CVENT_API {
 		}
 
 		// Collect unique attendee UUIDs from order items.
+		// CVENT returns attendee as a nested object: {"attendee": {"id": "uuid"}}.
 		$uuids = array();
 		foreach ( $order_items as $item ) {
-			// The attendee field may be keyed 'attendee', 'attendeeId', or 'attendee.id'.
-			$uuid = $item['attendee'] ?? $item['attendeeId'] ?? $item['attendee']['id'] ?? '';
-			$uuid = self::sanitize_uuid( $uuid );
+			$uuid = $item['attendee']['id']   // nested object (confirmed format)
+				??  $item['attendeeId']        // flat string fallback
+				??  '';
+			$uuid = self::sanitize_uuid( (string) $uuid );
 			if ( $uuid !== '' ) {
 				$uuids[ $uuid ] = true;
 			}

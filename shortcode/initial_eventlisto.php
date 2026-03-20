@@ -261,9 +261,6 @@ $empty_msg = $focus_name
 	}
 	?>
 		<div class="hostlinks-card<?php echo $alert_class ? ' ' . esc_attr( $alert_class ) : ''; ?>">
-			<?php if ( $hl_badge_on && $alert_tip ) : ?>
-			<span class="hl-alert-badge" data-tip="<?php echo esc_attr( $alert_tip ); ?>" aria-label="<?php echo esc_attr( $alert_tip ); ?>">&#x26A0;&#xFE0E;</span>
-			<?php endif; ?>
 			<div class="hostlinks-card-inner">
 				<div class="hostlinks-card-top">
 					<span class="hostlinks-reg-count"><?php echo (int) $alldriver['eve_paid']; ?>+<?php echo (int) $alldriver['eve_free']; ?></span>
@@ -276,7 +273,7 @@ $empty_msg = $focus_name
 			<?php // TR and SI links intentionally omitted on Upcoming Events — only shown on Past Events. ?>
 				<div class="hostlinks-card-date"><?php echo $date_range; ?></div>
 				<div class="<?php echo esc_attr( $instructor_class ); ?>">Instructor: <?php echo esc_html( $instructor_name ); ?></div>
-				<div class="hostlinks-card-countdown"><?php echo esc_html( $days_label ); ?></div>
+				<div class="hostlinks-card-countdown"><?php echo esc_html( $days_label ); ?><?php if ( $hl_badge_on && $alert_tip ) : ?><span class="hl-alert-badge" data-tip="<?php echo esc_attr( $alert_tip ); ?>" aria-label="<?php echo esc_attr( $alert_tip ); ?>">&#x26A0;&#xFE0E;</span><?php endif; ?></div>
 			</div>
 		</div>
 

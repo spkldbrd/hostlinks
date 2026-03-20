@@ -211,14 +211,14 @@
 
 /* Registration alert badge (triangle + tooltip) */
 .hl-alert-badge {
-  position: absolute;
-  bottom: 9px;
-  right: 10px;
-  font-size: 17px;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 5px;
+  font-size: 14px;
   line-height: 1;
   cursor: help;
   user-select: none;
-  z-index: 1;
+  position: relative;
 }
 
 .hl-alert-badge::after {

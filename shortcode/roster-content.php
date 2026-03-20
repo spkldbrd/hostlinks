@@ -203,6 +203,7 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
 .hl-fe-col-email, .hl-fe-col-phone { display:none; }
 .hl-fe-error { color:#d63638; padding:20px 0; }
 @media print {
+	@page                           { size: landscape; margin: 0.5in; }
 	body *                          { visibility:hidden; }
 	body                            { background:#fff !important; margin:0 !important; padding:0 !important; }
 	.hl-fe-roster                   { visibility:visible; position:absolute; left:0; top:0; width:100%; padding:0 16px; box-sizing:border-box; }

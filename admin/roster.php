@@ -283,6 +283,7 @@ body {
 
 /* ── Print styles ── */
 @media print {
+	@page { size: landscape; margin: 0.5in; }
 	body { background: #fff; font-size: 11pt; }
 	.hl-roster-wrap { border: none; box-shadow: none; padding: 0; max-width: 100%; margin: 0; }
 	.hl-roster-controls,

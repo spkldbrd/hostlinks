@@ -190,11 +190,24 @@ $refresh_url = add_query_arg( 'refresh', '1', remove_query_arg( 'refresh', $curr
 .hl-fe-sign-in { width:130px; min-width:80px; }
 .hl-fe-col-email, .hl-fe-col-phone { display:none; }
 @media print {
-	.hl-fe-roster-actions, .hl-fe-roster-toggles { display:none !important; }
-	.hl-fe-roster-table th { background:#000 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-	.hl-fe-roster-table td, .hl-fe-roster-table th { border:1px solid #666 !important; }
-	.hl-fe-col-email.hl-fe-col-visible, .hl-fe-col-phone.hl-fe-col-visible { display:table-cell !important; }
-	.hl-fe-sign-in { width:100pt; }
+	/* Hide every element on the page, then reveal only the roster.
+	   visibility:hidden (not display:none) is used so parent→child
+	   inheritance can be overridden on the roster subtree. */
+	body *                          { visibility:hidden; }
+	body                            { background:#fff !important; margin:0 !important; padding:0 !important; }
+	.hl-fe-roster                   { visibility:visible; position:absolute; left:0; top:0; width:100%; padding:0 16px; box-sizing:border-box; }
+	.hl-fe-roster *                 { visibility:visible; }
+	/* Hide action bar and toggles even though they are inside .hl-fe-roster */
+	.hl-fe-roster-actions,
+	.hl-fe-roster-toggles           { display:none !important; }
+	/* Table */
+	.hl-fe-roster-table             { width:100%; border-collapse:collapse; }
+	.hl-fe-roster-table th          { background:#000 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+	.hl-fe-roster-table td,
+	.hl-fe-roster-table th          { border:1px solid #666 !important; padding:5px 8px; }
+	.hl-fe-col-email.hl-fe-col-visible,
+	.hl-fe-col-phone.hl-fe-col-visible { display:table-cell !important; }
+	.hl-fe-sign-in                  { width:100pt; }
 }
 </style>
 <script>

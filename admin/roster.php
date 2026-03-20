@@ -207,10 +207,11 @@ body {
 .hl-roster-meta { font-size: 13px; color: #666; }
 .hl-roster-controls {
 	display: flex;
-	gap: 8px;
+	gap: 10px;
 	align-items: center;
 	flex-wrap: wrap;
 }
+.hl-roster-logo { max-height: 48px; max-width: 180px; object-fit: contain; display: block; }
 .hl-roster-btn {
 	display: inline-block;
 	padding: 6px 14px;
@@ -286,10 +287,10 @@ body {
 	@page { size: landscape; margin: 0.5in; }
 	body { background: #fff; font-size: 11pt; }
 	.hl-roster-wrap { border: none; box-shadow: none; padding: 0; max-width: 100%; margin: 0; }
-	.hl-roster-controls,
-	.hl-col-toggles,
-	.hl-cache-note,
-	.hl-debug-box { display: none !important; }
+	.hl-roster-btn, .hl-col-toggles,
+	.hl-cache-note, .hl-debug-box { display: none !important; }
+	.hl-roster-controls { display: flex !important; justify-content: flex-end; gap: 0; }
+	.hl-roster-logo { display: block !important; max-height: 72px; max-width: 240px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 	.hl-roster-header { margin-bottom: 12px; }
 	.hl-roster-header h1 { font-size: 16pt; }
 	.hl-roster-table { width: 100%; }
@@ -323,6 +324,10 @@ body {
 			<?php endif; ?>
 		</div>
 		<div class="hl-roster-controls">
+			<?php $hl_roster_logo = get_option( 'hostlinks_roster_logo_url', '' ); ?>
+			<?php if ( $hl_roster_logo ) : ?>
+			<img src="<?php echo esc_url( $hl_roster_logo ); ?>" alt="" class="hl-roster-logo" />
+			<?php endif; ?>
 			<button class="hl-roster-btn" onclick="window.print()">&#x1F5A8; Print</button>
 			<a href="<?php echo esc_url( $refresh_url ); ?>" class="hl-roster-btn hl-roster-btn--secondary">&#x21BB; Refresh</a>
 			<?php if ( ! $do_debug ) : ?>

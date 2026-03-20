@@ -124,6 +124,7 @@ $_rc_start_date = ! empty( $_rc_row['eve_start'] ) ? date( 'F j, Y', strtotime( 
 $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc_row['eve_start']
                   ? ' – ' . date( 'F j, Y', strtotime( $_rc_row['eve_end'] ) ) : '';
 ?>
+<?php $_rc_logo = get_option( 'hostlinks_roster_logo_url', '' ); ?>
 <div class="hl-fe-roster">
 
 	<div class="hl-fe-roster-header">
@@ -135,6 +136,9 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
 			</p>
 		</div>
 		<div class="hl-fe-roster-actions">
+			<?php if ( $_rc_logo ) : ?>
+			<img src="<?php echo esc_url( $_rc_logo ); ?>" alt="" class="hl-fe-roster-logo" />
+			<?php endif; ?>
 			<button class="hl-fe-roster-btn" onclick="window.print()">&#x1F5A8; Print</button>
 		</div>
 	</div>
@@ -188,7 +192,8 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
 .hl-fe-roster-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
 .hl-fe-roster-title { font-size:1.3em; margin:0 0 4px; }
 .hl-fe-roster-meta { font-size:.85em; color:#666; margin:0; }
-.hl-fe-roster-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.hl-fe-roster-actions { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.hl-fe-roster-logo { max-height:48px; max-width:180px; object-fit:contain; display:block; }
 .hl-fe-roster-btn { display:inline-block; padding:6px 14px; background:#0da2e7; color:#fff; border:none; border-radius:3px; font-size:13px; text-decoration:none; cursor:pointer; line-height:1.5; }
 .hl-fe-roster-btn:hover { background:#0b8fcf; color:#fff; }
 .hl-fe-roster-toggles { display:flex; gap:14px; align-items:center; font-size:13px; color:#555; padding:6px 0 10px; }
@@ -208,8 +213,9 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
 	body                            { background:#fff !important; margin:0 !important; padding:0 !important; }
 	.hl-fe-roster                   { visibility:visible; position:absolute; left:0; top:0; width:100%; padding:0 16px; box-sizing:border-box; }
 	.hl-fe-roster *                 { visibility:visible; }
-	.hl-fe-roster-actions,
-	.hl-fe-roster-toggles           { display:none !important; }
+	.hl-fe-roster-actions           { display:flex !important; justify-content:flex-end; border-bottom:none !important; padding-bottom:0 !important; }
+	.hl-fe-roster-btn, .hl-fe-roster-toggles { display:none !important; }
+	.hl-fe-roster-logo              { display:block !important; max-height:72px; max-width:240px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 	.hl-fe-roster-table             { width:100%; border-collapse:collapse; }
 	.hl-fe-roster-table th          { background:#000 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 	.hl-fe-roster-table td,

@@ -14,6 +14,7 @@ $valid_tabs = array(
 	'import-export'     => 'Import / Export',
 	'type-settings'     => 'Type Settings',
 	'public-event-list' => 'Public Event List',
+	'roster'            => 'Roster',
 );
 
 $current_tab = sanitize_key( $_GET['tab'] ?? 'general' );
@@ -62,6 +63,9 @@ switch ( $current_tab ) {
 		break;
 	case 'public-event-list':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/public-event-list-settings.php';
+		break;
+	case 'roster':
+		include HOSTLINKS_PLUGIN_DIR . 'admin/settings-roster.php';
 		break;
 }
 ?>

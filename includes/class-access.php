@@ -20,10 +20,11 @@ class Hostlinks_Access {
 	// Add future Hostlinks shortcodes here to make them available on the
 	// User Access settings page automatically.
 	const SHORTCODES = array(
-		'eventlisto'        => 'Upcoming Events',
-		'oldeventlisto'     => 'Past Events',
-		'hostlinks_reports' => 'Reports',
-		'hostlinks_roster'  => 'Roster',
+		'eventlisto'                    => 'Upcoming Events',
+		'oldeventlisto'                 => 'Past Events',
+		'hostlinks_reports'             => 'Reports',
+		'hostlinks_roster'              => 'Roster',
+		'hostlinks_event_request_form'  => 'Event Request Form',
 	);
 
 	const MODES = array( 'public', 'logged_in', 'approved_viewers' );

@@ -73,8 +73,7 @@ $nonce    = wp_create_nonce( 'hostlinks_user_access' );
 	<?php
 	// Shortcodes that are always publicly accessible — no gate applied in code.
 	$fixed_public_shortcodes = array(
-		'public_event_list'            => array( 'label' => 'Public Event List',    'note' => 'Always public — no login required by design.' ),
-		'hostlinks_event_request_form' => array( 'label' => 'Event Request Form',   'note' => 'Always public — open intake form for all visitors.' ),
+		'public_event_list' => array( 'label' => 'Public Event List', 'note' => 'Always public — no login required by design.' ),
 	);
 	?>
 	<table class="widefat striped" style="max-width:720px;margin-bottom:24px;">

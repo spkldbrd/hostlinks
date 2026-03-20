@@ -88,6 +88,10 @@ class Hostlinks_Event_Request_Shortcode {
 	// ── Shortcode render ──────────────────────────────────────────────────────
 
 	public function render(): string {
+		if ( ! Hostlinks_Access::can_view_shortcode( 'hostlinks_event_request_form' ) ) {
+			return Hostlinks_Access::get_denial_message_html();
+		}
+
 		if ( ! empty( $this->inserted_ids ) ) {
 			$msg = get_option( 'hostlinks_event_request_success_message', '' );
 			$count = count( $this->inserted_ids );

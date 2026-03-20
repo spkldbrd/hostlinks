@@ -162,34 +162,57 @@ foreach ( $all_types as $t ) {
 }
 
 /**
+ * Return true if a string contains any subaward variant:
+ * "subaward", "sub-award", "sub award", "subawards", "sub-awards", "sub awards".
+ */
+function hostlinks_is_subaward_text( $text ) {
+	return (bool) preg_match( '/\bsub[-\s]?awards?\b/i', $text );
+}
+
+/**
  * Guess the most likely HL type ID from a CVENT event title.
- * Checks for keywords in priority order: writing, subaward (→ management), management.
+ * Checks for keywords in priority order: writing, subaward variants, management.
  *
  * @param string $title
  * @param array  $map  keyword => type_id
  * @return int  0 if no guess
  */
 function hostlinks_cvent_guess_type( $title, $map ) {
-	$lc       = strtolower( $title );
-	$priority = array( 'writing', 'subaward', 'management' );
-	foreach ( $priority as $kw ) {
-		if ( false !== strpos( $lc, $kw ) ) {
-			// Try to find an exact type match first (e.g. 'subaward' type).
-			foreach ( $map as $tname => $tid ) {
-				if ( false !== strpos( $tname, $kw ) ) {
-					return $tid;
-				}
-			}
-			// If 'subaward' type doesn't exist in HL yet, fall back to management.
-			if ( $kw === 'subaward' ) {
-				foreach ( $map as $tname => $tid ) {
-					if ( false !== strpos( $tname, 'management' ) ) {
-						return $tid;
-					}
-				}
+	$lc = strtolower( $title );
+
+	// Writing check first.
+	if ( false !== strpos( $lc, 'writing' ) ) {
+		foreach ( $map as $tname => $tid ) {
+			if ( false !== strpos( $tname, 'writing' ) ) {
+				return $tid;
 			}
 		}
 	}
+
+	// Subaward check — catches "subaward", "sub-award", "sub award", plurals.
+	if ( hostlinks_is_subaward_text( $title ) ) {
+		foreach ( $map as $tname => $tid ) {
+			if ( false !== strpos( $tname, 'subaward' ) ) {
+				return $tid;
+			}
+		}
+		// Subaward type not configured in HL — fall back to management.
+		foreach ( $map as $tname => $tid ) {
+			if ( false !== strpos( $tname, 'management' ) ) {
+				return $tid;
+			}
+		}
+	}
+
+	// Management check.
+	if ( false !== strpos( $lc, 'management' ) ) {
+		foreach ( $map as $tname => $tid ) {
+			if ( false !== strpos( $tname, 'management' ) ) {
+				return $tid;
+			}
+		}
+	}
+
 	return 0;
 }
 
@@ -266,8 +289,8 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 
 		// Pre-fill logic.
 		$prefilled_loc = Hostlinks_CVENT_Matcher::title_location_from_cvent( $title );
-		$is_subaward   = ( false !== stripos( $title, 'subaward' ) );
-		if ( $is_subaward && $prefilled_loc && false === strpos( $prefilled_loc, '| SUB' ) ) {
+		$is_subaward   = hostlinks_is_subaward_text( $title );
+		if ( $is_subaward && $prefilled_loc && false === stripos( $prefilled_loc, '| SUB' ) ) {
 			$prefilled_loc .= ' | SUB';
 		}
 		$is_zoom       = ( false !== stripos( $title, 'zoom' ) || false !== stripos( $title, 'webinar' ) );

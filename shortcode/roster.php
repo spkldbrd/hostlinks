@@ -45,6 +45,12 @@ $_sh_do_refresh = ! empty( $_GET['refresh'] ) && current_user_can( 'manage_optio
 $_sh_nonce      = wp_create_nonce( 'hostlinks_roster_fetch' );
 $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 ?>
+<?php if ( current_user_can( 'manage_options' ) ) : ?>
+<div id="hl-roster-admin-bar" style="display:none;text-align:right;margin-bottom:8px;">
+	<button id="hl-roster-refresh-btn" class="hl-roster-admin-btn">&#x21BB; Refresh Roster</button>
+</div>
+<?php endif; ?>
+
 <div id="hl-roster-loader">
 	<div class="hl-roster-spinner"></div>
 	<p>Updating the roster, this can take a moment. Please wait&hellip;</p>
@@ -74,6 +80,12 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 }
 @keyframes hl-spin { to { transform: rotate(360deg); } }
 #hl-roster-loader p { font-size: 15px; color: #555; margin: 0; }
+.hl-roster-admin-btn {
+	padding: 5px 14px; background: #f0f0f0; color: #333;
+	border: 1px solid #ccc; border-radius: 3px; font-size: 13px;
+	cursor: pointer; line-height: 1.5;
+}
+.hl-roster-admin-btn:hover { background: #e0e0e0; }
 </style>
 
 <script>
@@ -83,41 +95,59 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	var nonce    = <?php echo wp_json_encode( $_sh_nonce ); ?>;
 	var refresh  = <?php echo $_sh_do_refresh ? 'true' : 'false'; ?>;
 
-	var url = ajaxUrl + '?action=hostlinks_get_roster&eve_id=' + eveId + '&_nonce=' + encodeURIComponent( nonce );
-	if ( refresh ) url += '&refresh=1';
+	function buildUrl( withRefresh ) {
+		var u = ajaxUrl + '?action=hostlinks_get_roster&eve_id=' + eveId + '&_nonce=' + encodeURIComponent( nonce );
+		if ( withRefresh ) u += '&refresh=1';
+		return u;
+	}
 
-	fetch( url )
-		.then( function ( r ) { return r.json(); } )
-		.then( function ( data ) {
-			var loader = document.getElementById( 'hl-roster-loader' );
-			var output = document.getElementById( 'hl-roster-output' );
-			if ( loader ) loader.style.display = 'none';
-			if ( output ) {
-				if ( data.success ) {
-					output.innerHTML = data.data.html;
-					// Wire up the email/phone column toggles injected with the HTML.
-					(function () {
-						function tog( cls, show ) {
-							var els = output.querySelectorAll( '.' + cls );
-							for ( var i = 0; i < els.length; i++ ) {
-								els[i].style.display = show ? 'table-cell' : 'none';
-								els[i].classList[ show ? 'add' : 'remove' ]( 'hl-fe-col-visible' );
+	function loadRoster( withRefresh ) {
+		var loader   = document.getElementById( 'hl-roster-loader' );
+		var adminBar = document.getElementById( 'hl-roster-admin-bar' );
+		var output   = document.getElementById( 'hl-roster-output' );
+		if ( loader )   { loader.style.display = 'block'; loader.style.animation = 'none'; loader.style.opacity = '0'; setTimeout(function(){ loader.style.animation = 'hl-loader-fadein 0.4s ease 0.6s forwards'; }, 10); }
+		if ( adminBar ) adminBar.style.display = 'none';
+		if ( output )   output.innerHTML = '';
+
+		fetch( buildUrl( withRefresh ) )
+			.then( function ( r ) { return r.json(); } )
+			.then( function ( data ) {
+				if ( loader )   loader.style.display = 'none';
+				if ( adminBar ) adminBar.style.display = 'block';
+				if ( output ) {
+					if ( data.success ) {
+						output.innerHTML = data.data.html;
+						(function () {
+							function tog( cls, show ) {
+								var els = output.querySelectorAll( '.' + cls );
+								for ( var i = 0; i < els.length; i++ ) {
+									els[i].style.display = show ? 'table-cell' : 'none';
+									els[i].classList[ show ? 'add' : 'remove' ]( 'hl-fe-col-visible' );
+								}
 							}
-						}
-						var ec = output.querySelector( '#hl-fe-email' );
-						var pc = output.querySelector( '#hl-fe-phone' );
-						if ( ec ) ec.addEventListener( 'change', function () { tog( 'hl-fe-col-email', this.checked ); } );
-						if ( pc ) pc.addEventListener( 'change', function () { tog( 'hl-fe-col-phone', this.checked ); } );
-					})();
-				} else {
-					output.innerHTML = '<p style="color:#d63638;padding:20px 0;">' +
-						( data.data || 'Could not load roster. Please try again.' ) + '</p>';
+							var ec = output.querySelector( '#hl-fe-email' );
+							var pc = output.querySelector( '#hl-fe-phone' );
+							if ( ec ) ec.addEventListener( 'change', function () { tog( 'hl-fe-col-email', this.checked ); } );
+							if ( pc ) pc.addEventListener( 'change', function () { tog( 'hl-fe-col-phone', this.checked ); } );
+						})();
+					} else {
+						output.innerHTML = '<p style="color:#d63638;padding:20px 0;">' +
+							( data.data || 'Could not load roster. Please try again.' ) + '</p>';
+					}
 				}
-			}
-		} )
-		.catch( function () {
-			var loader = document.getElementById( 'hl-roster-loader' );
-			if ( loader ) loader.innerHTML = '<p style="color:#d63638;">Could not load roster. Please try again.</p>';
-		} );
+			} )
+			.catch( function () {
+				if ( loader ) loader.innerHTML = '<p style="color:#d63638;">Could not load roster. Please try again.</p>';
+			} );
+	}
+
+	// Initial load.
+	loadRoster( refresh );
+
+	// Refresh button (admin only — button may not exist for non-admins).
+	var refreshBtn = document.getElementById( 'hl-roster-refresh-btn' );
+	if ( refreshBtn ) {
+		refreshBtn.addEventListener( 'click', function () { loadRoster( true ); } );
+	}
 })();
 </script>

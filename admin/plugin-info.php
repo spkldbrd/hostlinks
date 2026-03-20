@@ -125,6 +125,26 @@ $github_url = 'https://github.com/' . HOSTLINKS_GITHUB_USER . '/' . HOSTLINKS_GI
 				</td>
 			</tr>
 			<tr>
+				<td><code>[public_event_list]</code></td>
+				<td><strong>Public Event List</strong></td>
+				<td>
+					A simplified, publicly accessible listing of upcoming events — no login or access control required.
+					Suitable for embedding on a public-facing page where you want to show event dates and locations
+					without exposing the full calendar.
+				</td>
+			</tr>
+			<tr>
+				<td><code>[hostlinks_roster]</code></td>
+				<td><strong>Event Roster</strong></td>
+				<td>
+					Displays a print-ready attendee roster for a specific event linked to a CVENT ID.
+					Loads via AJAX with a loading spinner. Admins see a <em>Refresh Roster</em> button to bypass the cache.
+					A <em>Print</em> button triggers landscape layout with the company logo (set under <strong>Settings → Roster</strong>).
+					Optional Email and Phone columns can be toggled on for admins.
+					<br><small style="color:#888;">URL parameter: <code>?eve_id=EVENT_ID</code> — auto-populated on new events when the Roster URL field is left blank.</small>
+				</td>
+			</tr>
+			<tr>
 				<td><code>[hostlinks_event_request_form]</code></td>
 				<td><strong>Event Request Form</strong></td>
 				<td>
@@ -132,7 +152,7 @@ $github_url = 'https://github.com/' . HOSTLINKS_GITHUB_USER . '/' . HOSTLINKS_GI
 					including dates, venue details, hotel recommendations, and host contacts.
 					Submissions are stored in a separate <em>Event Requests</em> table and reviewed under
 					<strong>Hostlinks → Event Requests</strong> — they are not published immediately.
-					<br><small style="color:#888;">Configure notification email and success message under <strong>Settings → Event Settings</strong>.</small>
+					<br><small style="color:#888;">Configure notification email and success message under <strong>Settings → Build Request Form</strong>.</small>
 				</td>
 			</tr>
 		</tbody>

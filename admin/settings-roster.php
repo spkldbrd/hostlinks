@@ -12,9 +12,6 @@ if ( ! current_user_can( 'manage_options' ) ) {
 	wp_die( 'Unauthorized' );
 }
 
-// Ensure WordPress media library scripts are loaded for the logo picker.
-wp_enqueue_media();
-
 $notice = '';
 if ( isset( $_POST['hostlinks_save_roster_settings'] ) ) {
 	check_admin_referer( 'hostlinks_roster_settings' );

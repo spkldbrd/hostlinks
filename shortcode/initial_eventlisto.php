@@ -253,10 +253,10 @@ $empty_msg = $focus_name
 		// Alert 2 takes priority when both thresholds are met.
 		if ( $hl_a2_on && $days_away <= $hl_a2_days && $paid < $hl_a2_regs ) {
 			$alert_class = 'hostlinks-card--alert-2';
-			$alert_tip   = $paid . ' paid registration' . ( 1 === $paid ? '' : 's' ) . ' — ' . $days_away . ' days to event';
+			$alert_tip   = $paid . ' paid registration' . ( 1 === $paid ? '' : 's' ) . ' — ' . $days_away . " days to event\nAlert 2: < " . $hl_a2_regs . ' paid within ' . $hl_a2_days . ' days';
 		} elseif ( $hl_a1_on && $days_away <= $hl_a1_days && $paid < $hl_a1_regs ) {
 			$alert_class = 'hostlinks-card--alert-1';
-			$alert_tip   = $paid . ' paid registration' . ( 1 === $paid ? '' : 's' ) . ' — ' . $days_away . ' days to event';
+			$alert_tip   = $paid . ' paid registration' . ( 1 === $paid ? '' : 's' ) . ' — ' . $days_away . " days to event\nAlert 1: < " . $hl_a1_regs . ' paid within ' . $hl_a1_days . ' days';
 		}
 	}
 	?>

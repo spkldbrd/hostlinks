@@ -213,7 +213,7 @@
 .hl-alert-badge {
   display: inline-block;
   vertical-align: middle;
-  margin-left: 5px;
+  margin-left: 8px;
   font-size: 14px;
   line-height: 1;
   cursor: help;
@@ -232,7 +232,8 @@
   font-weight: 400;
   padding: 6px 10px;
   border-radius: 6px;
-  white-space: nowrap;
+  white-space: pre-line;
+  min-width: 200px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;

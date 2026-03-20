@@ -143,7 +143,7 @@ Alerts only apply to <strong>future</strong> events. If both alert conditions ar
 					<input type="checkbox" name="hostlinks_alert_badge_enabled" value="1" <?php checked( $badge_on, 1 ); ?>>
 					Display a colored triangle on alerted cards
 				</label>
-				<p class="description">The triangle appears in the bottom-right corner of the card. Hovering over it shows the specific registration count and days remaining that triggered the alert.</p>
+				<p class="description">The triangle appears inline with the days-to-event text at the bottom of the card. Hovering over it shows the current registration count, days remaining, and the threshold that triggered the alert.</p>
 			</td>
 		</tr>
 	</table>

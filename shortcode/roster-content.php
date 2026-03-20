@@ -142,14 +142,6 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
 		<?php endif; ?>
 	</div>
 
-	<?php if ( ! empty( $_rc_attendees ) ) : ?>
-	<div class="hl-fe-roster-toggles">
-		<span>Show columns:</span>
-		<label><input type="checkbox" id="hl-fe-email"> Email</label>
-		<label><input type="checkbox" id="hl-fe-phone"> Phone</label>
-		<em style="color:#aaa;font-size:11px;margin-left:4px;">(not for public view)</em>
-	</div>
-	<?php endif; ?>
 
 	<?php if ( empty( $_rc_attendees ) ) : ?>
 	<p style="color:#888;padding:20px 0;">No registered attendees found for this event.</p>
@@ -195,9 +187,6 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
 .hl-fe-roster-logo { max-height:72px; max-width:240px; object-fit:contain; display:block; }
 .hl-fe-roster-btn { display:inline-block; padding:6px 14px; background:#0da2e7; color:#fff; border:none; border-radius:3px; font-size:13px; text-decoration:none; cursor:pointer; line-height:1.5; }
 .hl-fe-roster-btn:hover { background:#0b8fcf; color:#fff; }
-.hl-fe-roster-toggles { display:flex; gap:14px; align-items:center; font-size:13px; color:#555; padding:6px 0 10px; }
-.hl-fe-roster-toggles label { cursor:pointer; display:flex; align-items:center; gap:4px; }
-.hl-fe-roster-toggles input[type=checkbox] { width:14px; height:14px; }
 .hl-fe-roster-table { width:100%; border-collapse:collapse; font-size:13px; }
 .hl-fe-roster-table th { background:#1d2327; color:#fff; padding:7px 10px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; border:1px solid #3c434a; }
 .hl-fe-roster-table td { padding:6px 10px; border:1px solid #ddd; vertical-align:top; }

@@ -45,11 +45,19 @@ $_sh_do_refresh = ! empty( $_GET['refresh'] ) && current_user_can( 'manage_optio
 $_sh_nonce      = wp_create_nonce( 'hostlinks_roster_fetch' );
 $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 ?>
-<div id="hl-roster-admin-bar" style="display:none;text-align:right;margin-bottom:8px;">
-	<button id="hl-roster-print-btn" class="hl-roster-admin-btn hl-roster-admin-btn--primary" onclick="window.print()">&#x1F5A8; Print</button>
-	<?php if ( current_user_can( 'manage_options' ) ) : ?>
-	<button id="hl-roster-refresh-btn" class="hl-roster-admin-btn">&#x21BB; Refresh Roster</button>
-	<?php endif; ?>
+<div id="hl-roster-admin-bar" style="display:none;margin-bottom:12px;">
+	<div style="display:flex;justify-content:flex-end;gap:6px;align-items:center;flex-wrap:wrap;">
+		<button id="hl-roster-print-btn" class="hl-roster-admin-btn hl-roster-admin-btn--primary" onclick="window.print()">&#x1F5A8; Print</button>
+		<?php if ( current_user_can( 'manage_options' ) ) : ?>
+		<button id="hl-roster-refresh-btn" class="hl-roster-admin-btn">&#x21BB; Refresh Roster</button>
+		<?php endif; ?>
+	</div>
+	<div id="hl-roster-col-toggles" style="display:none;justify-content:flex-end;align-items:center;gap:14px;font-size:13px;color:#555;padding-top:6px;flex-wrap:wrap;">
+		<span>Show columns:</span>
+		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-email" style="width:14px;height:14px;"> Email</label>
+		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-phone" style="width:14px;height:14px;"> Phone</label>
+		<em style="color:#aaa;font-size:11px;">(not for public view)</em>
+	</div>
 </div>
 
 <div id="hl-roster-loader">
@@ -109,9 +117,11 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 		var loader   = document.getElementById( 'hl-roster-loader' );
 		var adminBar = document.getElementById( 'hl-roster-admin-bar' );
 		var output   = document.getElementById( 'hl-roster-output' );
-		if ( loader )   { loader.style.display = 'block'; loader.style.animation = 'none'; loader.style.opacity = '0'; setTimeout(function(){ loader.style.animation = 'hl-loader-fadein 0.4s ease 0.6s forwards'; }, 10); }
-		if ( adminBar ) adminBar.style.display = 'none';
-		if ( output )   output.innerHTML = '';
+			if ( loader )   { loader.style.display = 'block'; loader.style.animation = 'none'; loader.style.opacity = '0'; setTimeout(function(){ loader.style.animation = 'hl-loader-fadein 0.4s ease 0.6s forwards'; }, 10); }
+			if ( adminBar ) adminBar.style.display = 'none';
+			var colToggles = document.getElementById( 'hl-roster-col-toggles' );
+			if ( colToggles ) colToggles.style.display = 'none';
+			if ( output )   output.innerHTML = '';
 
 		fetch( buildUrl( withRefresh ) )
 			.then( function ( r ) { return r.json(); } )
@@ -121,6 +131,11 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 				if ( output ) {
 					if ( data.success ) {
 						output.innerHTML = data.data.html;
+						// Show the column toggles if there are attendee rows.
+						var colToggles = document.getElementById( 'hl-roster-col-toggles' );
+						if ( colToggles && output.querySelector( '.hl-fe-roster-table' ) ) {
+							colToggles.style.display = 'flex';
+						}
 						(function () {
 							function tog( cls, show ) {
 								var els = output.querySelectorAll( '.' + cls );
@@ -129,10 +144,11 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 									els[i].classList[ show ? 'add' : 'remove' ]( 'hl-fe-col-visible' );
 								}
 							}
-							var ec = output.querySelector( '#hl-fe-email' );
-							var pc = output.querySelector( '#hl-fe-phone' );
-							if ( ec ) ec.addEventListener( 'change', function () { tog( 'hl-fe-col-email', this.checked ); } );
-							if ( pc ) pc.addEventListener( 'change', function () { tog( 'hl-fe-col-phone', this.checked ); } );
+							// Checkboxes now live in the shell, not the injected content.
+							var ec = document.getElementById( 'hl-fe-email' );
+							var pc = document.getElementById( 'hl-fe-phone' );
+							if ( ec ) { ec.checked = false; ec.addEventListener( 'change', function () { tog( 'hl-fe-col-email', this.checked ); } ); }
+							if ( pc ) { pc.checked = false; pc.addEventListener( 'change', function () { tog( 'hl-fe-col-phone', this.checked ); } ); }
 						})();
 					} else {
 						output.innerHTML = '<p style="color:#d63638;padding:20px 0;">' +

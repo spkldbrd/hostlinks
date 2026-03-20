@@ -88,15 +88,17 @@ foreach ( $all_pending_bookings as $ev ) {
 }
 
 // ── Alert settings (loaded once before render) ────────────────────────────
-$hl_a1_on    = (int) get_option( 'hostlinks_alert_1_enabled', 1 );
-$hl_a1_days  = (int) get_option( 'hostlinks_alert_1_days',    30 );
-$hl_a1_regs  = (int) get_option( 'hostlinks_alert_1_regs',    15 );
-$hl_a1_color =       get_option( 'hostlinks_alert_1_color',   '#f59e0b' );
+$hl_a1_on      = (int) get_option( 'hostlinks_alert_1_enabled', 1 );
+$hl_a1_days    = (int) get_option( 'hostlinks_alert_1_days',    30 );
+$hl_a1_regs    = (int) get_option( 'hostlinks_alert_1_regs',    15 );
+$hl_a1_color   =       get_option( 'hostlinks_alert_1_color',   '#f59e0b' );
+$hl_a1_message =       get_option( 'hostlinks_alert_1_message', '' );
 
-$hl_a2_on    = (int) get_option( 'hostlinks_alert_2_enabled', 1 );
-$hl_a2_days  = (int) get_option( 'hostlinks_alert_2_days',    20 );
-$hl_a2_regs  = (int) get_option( 'hostlinks_alert_2_regs',    20 );
-$hl_a2_color =       get_option( 'hostlinks_alert_2_color',   '#dc2626' );
+$hl_a2_on      = (int) get_option( 'hostlinks_alert_2_enabled', 1 );
+$hl_a2_days    = (int) get_option( 'hostlinks_alert_2_days',    20 );
+$hl_a2_regs    = (int) get_option( 'hostlinks_alert_2_regs',    20 );
+$hl_a2_color   =       get_option( 'hostlinks_alert_2_color',   '#dc2626' );
+$hl_a2_message =       get_option( 'hostlinks_alert_2_message', '' );
 
 $hl_badge_on = (int) get_option( 'hostlinks_alert_badge_enabled', 1 );
 
@@ -253,10 +255,16 @@ $empty_msg = $focus_name
 		// Alert 2 takes priority when both thresholds are met.
 		if ( $hl_a2_on && $days_away <= $hl_a2_days && $paid < $hl_a2_regs ) {
 			$alert_class = 'hostlinks-card--alert-2';
-			$alert_tip   = $paid . ' paid registration' . ( 1 === $paid ? '' : 's' ) . ' — ' . $days_away . " days to event\nAlert 2: < " . $hl_a2_regs . ' paid within ' . $hl_a2_days . ' days';
+			$alert_tip   = 'Red Alert: ' . $paid . ' paid with ' . $days_away . ' days to event.';
+			if ( $hl_a2_message ) {
+				$alert_tip .= "\n" . $hl_a2_message;
+			}
 		} elseif ( $hl_a1_on && $days_away <= $hl_a1_days && $paid < $hl_a1_regs ) {
 			$alert_class = 'hostlinks-card--alert-1';
-			$alert_tip   = $paid . ' paid registration' . ( 1 === $paid ? '' : 's' ) . ' — ' . $days_away . " days to event\nAlert 1: < " . $hl_a1_regs . ' paid within ' . $hl_a1_days . ' days';
+			$alert_tip   = 'Warning: ' . $paid . ' paid with ' . $days_away . ' days to event.';
+			if ( $hl_a1_message ) {
+				$alert_tip .= "\n" . $hl_a1_message;
+			}
 		}
 	}
 	?>

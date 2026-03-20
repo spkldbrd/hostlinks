@@ -22,12 +22,14 @@ if ( isset( $_POST['hostlinks_save_alerts'] ) ) {
 	update_option( 'hostlinks_alert_1_regs',    max( 1, (int) ( $_POST['hostlinks_alert_1_regs']  ?? 15 ) ) );
 	$c1 = sanitize_hex_color( $_POST['hostlinks_alert_1_color'] ?? '#f59e0b' );
 	update_option( 'hostlinks_alert_1_color',   $c1 ?: '#f59e0b' );
+	update_option( 'hostlinks_alert_1_message', sanitize_text_field( wp_unslash( $_POST['hostlinks_alert_1_message'] ?? '' ) ) );
 
 	update_option( 'hostlinks_alert_2_enabled', isset( $_POST['hostlinks_alert_2_enabled'] ) ? 1 : 0 );
 	update_option( 'hostlinks_alert_2_days',    max( 1, (int) ( $_POST['hostlinks_alert_2_days']  ?? 20 ) ) );
 	update_option( 'hostlinks_alert_2_regs',    max( 1, (int) ( $_POST['hostlinks_alert_2_regs']  ?? 20 ) ) );
 	$c2 = sanitize_hex_color( $_POST['hostlinks_alert_2_color'] ?? '#dc2626' );
 	update_option( 'hostlinks_alert_2_color',   $c2 ?: '#dc2626' );
+	update_option( 'hostlinks_alert_2_message', sanitize_text_field( wp_unslash( $_POST['hostlinks_alert_2_message'] ?? '' ) ) );
 
 	update_option( 'hostlinks_alert_badge_enabled', isset( $_POST['hostlinks_alert_badge_enabled'] ) ? 1 : 0 );
 
@@ -38,11 +40,13 @@ $a1_enabled = (int) get_option( 'hostlinks_alert_1_enabled', 1 );
 $a1_days    = (int) get_option( 'hostlinks_alert_1_days',    30 );
 $a1_regs    = (int) get_option( 'hostlinks_alert_1_regs',    15 );
 $a1_color   =       get_option( 'hostlinks_alert_1_color',   '#f59e0b' );
+$a1_message =       get_option( 'hostlinks_alert_1_message', '' );
 
 $a2_enabled = (int) get_option( 'hostlinks_alert_2_enabled', 1 );
 $a2_days    = (int) get_option( 'hostlinks_alert_2_days',    20 );
 $a2_regs    = (int) get_option( 'hostlinks_alert_2_regs',    20 );
 $a2_color   =       get_option( 'hostlinks_alert_2_color',   '#dc2626' );
+$a2_message =       get_option( 'hostlinks_alert_2_message', '' );
 
 $badge_on   = (int) get_option( 'hostlinks_alert_badge_enabled', 1 );
 ?>
@@ -92,6 +96,14 @@ Alerts only apply to <strong>future</strong> events. If both alert conditions ar
 				<span class="description" style="margin-left:6px;">Used for the card border and glow</span>
 			</td>
 		</tr>
+		<tr>
+			<th scope="row">Tooltip second line</th>
+			<td>
+				<input type="text" name="hostlinks_alert_1_message" value="<?php echo esc_attr( $a1_message ); ?>"
+					class="regular-text" placeholder="Optional — leave blank to omit">
+				<p class="description">Appears as a second line in the hover tooltip. Leave blank to show only the registration count and days.</p>
+			</td>
+		</tr>
 	</table>
 
 	<!-- ── Alert 2 ─────────────────────────────────────────────────────────── -->
@@ -129,6 +141,14 @@ Alerts only apply to <strong>future</strong> events. If both alert conditions ar
 					value="<?php echo esc_attr( $a2_color ); ?>"
 					style="width:52px;height:36px;padding:2px;border:1px solid #ddd;border-radius:4px;cursor:pointer;">
 				<span class="description" style="margin-left:6px;">Used for the card border and glow</span>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row">Tooltip second line</th>
+			<td>
+				<input type="text" name="hostlinks_alert_2_message" value="<?php echo esc_attr( $a2_message ); ?>"
+					class="regular-text" placeholder="Optional — leave blank to omit">
+				<p class="description">Appears as a second line in the hover tooltip. Leave blank to show only the registration count and days.</p>
 			</td>
 		</tr>
 	</table>

@@ -1,15 +1,14 @@
 <?php
 /**
- * [hostlinks_roster] shortcode template.
+ * [hostlinks_roster] shortcode shell.
  *
- * Reads ?eve_id=N from the URL, fetches the roster from CVENT (same
- * cache as the admin roster page), and renders a print-ready table.
+ * Renders an immediate loading screen, then fetches the roster HTML
+ * via AJAX (wp_ajax_hostlinks_get_roster) so the loader is visible
+ * while the CVENT API call is in progress.
  *
- * Access is controlled by Hostlinks_Access::can_view_shortcode('hostlinks_roster').
- * Defaults to 'approved_viewers' — configure in Hostlinks → Settings → User Access.
- *
- * Included via ob_start() from Hostlinks_Shortcodes::render_roster().
- * $wpdb is available; no admin-only functions used.
+ * When the result is already cached the AJAX round-trip is fast (~200 ms)
+ * and the loader fades in only after a 600 ms CSS delay, so it never
+ * visually appears on cached loads.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -17,264 +16,108 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 global $wpdb;
 
-$eve_id     = isset( $_GET['eve_id'] ) ? (int) $_GET['eve_id'] : 0;
-$do_refresh = ! empty( $_GET['refresh'] ) && current_user_can( 'manage_options' );
+$eve_id = isset( $_GET['eve_id'] ) ? (int) $_GET['eve_id'] : 0;
 
 if ( ! $eve_id ) {
 	echo '<div class="hostlinks-access-denied"><p>No event specified.</p></div>';
 	return;
 }
 
-// ── Load HL event row ─────────────────────────────────────────────────────────
+// Quick validation — two fast DB queries, no API calls.
 $table11 = $wpdb->prefix . 'event_details_list';
-$row = $wpdb->get_row(
-	$wpdb->prepare( "SELECT * FROM {$table11} WHERE eve_id = %d AND eve_status = '1' LIMIT 1", $eve_id ),
+$_sh_row = $wpdb->get_row(
+	$wpdb->prepare( "SELECT eve_id, cvent_event_id FROM {$table11} WHERE eve_id = %d AND eve_status = '1' LIMIT 1", $eve_id ),
 	ARRAY_A
 );
 
-if ( ! $row ) {
+if ( ! $_sh_row ) {
 	echo '<div class="hostlinks-access-denied"><p>Event not found.</p></div>';
 	return;
 }
 
-$cvent_id = Hostlinks_CVENT_API::sanitize_uuid( $row['cvent_event_id'] ?? '' );
-if ( ! $cvent_id ) {
+$_sh_cvent_id = Hostlinks_CVENT_API::sanitize_uuid( $_sh_row['cvent_event_id'] ?? '' );
+if ( ! $_sh_cvent_id ) {
 	echo '<div class="hostlinks-access-denied"><p>This event does not have a linked registration system ID yet.</p></div>';
 	return;
 }
 
-// ── Cache (same key as admin roster so both share the same warm cache) ────────
-$event_end_ts  = ! empty( $row['eve_end'] ) ? strtotime( $row['eve_end'] ) : 0;
-$is_past_event = $event_end_ts > 0 && $event_end_ts < strtotime( 'today midnight' );
-$cache_ttl     = $is_past_event ? 0 : 24 * HOUR_IN_SECONDS;
-$cache_key     = 'hostlinks_roster_' . md5( $cvent_id );
-
-if ( $do_refresh ) {
-	delete_transient( $cache_key );
-}
-
-$attendees_raw = get_transient( $cache_key );
-$from_cache    = ( $attendees_raw !== false );
-
-if ( ! $from_cache ) {
-	$attendees_raw = Hostlinks_CVENT_API::get_roster_attendees( $cvent_id );
-	if ( is_wp_error( $attendees_raw ) ) {
-		echo '<div class="hostlinks-access-denied"><p>Could not load roster. Please try again later.</p></div>';
-		return;
-	}
-	set_transient( $cache_key, $attendees_raw, $cache_ttl );
-
-	// Schedule 5-day finalize cron for recently-ended events.
-	if ( $is_past_event && $event_end_ts > strtotime( '-5 days' ) ) {
-		$cron_args = array( $cvent_id, $eve_id );
-		if ( ! wp_next_scheduled( 'hostlinks_roster_finalize', $cron_args ) ) {
-			wp_schedule_single_event( $event_end_ts + ( 5 * DAY_IN_SECONDS ), 'hostlinks_roster_finalize', $cron_args );
-		}
-	}
-}
-
-// ── Phone number formatter ────────────────────────────────────────────────────
-if ( ! function_exists( 'hl_roster_format_phone' ) ) {
-	function hl_roster_format_phone( $raw ) {
-		$digits = preg_replace( '/\D/', '', $raw );
-		if ( strlen( $digits ) === 11 && $digits[0] === '1' ) {
-			$digits = substr( $digits, 1 );
-		}
-		if ( strlen( $digits ) === 10 ) {
-			return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6 );
-		}
-		return $raw;
-	}
-}
-
-// ── Filter non-attending statuses ─────────────────────────────────────────────
-$skip_statuses = array( 'Cancelled', 'Declined', 'Deleted', 'TestAttendee', 'Waitlisted',
-                        'cancelled', 'declined', 'deleted', 'testattendee', 'waitlisted' );
-
-$attendees = array();
-foreach ( $attendees_raw as $att ) {
-	$status = $att['status'] ?? $att['attendeeStatus'] ?? '';
-	if ( in_array( $status, $skip_statuses, true ) ) {
-		continue;
-	}
-	$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-	$attendees[] = array(
-		'last'    => $att['lastName']    ?? $contact['lastName']    ?? '',
-		'first'   => $att['firstName']   ?? $contact['firstName']   ?? '',
-		'company' => $att['companyName'] ?? $contact['company']     ?? $contact['companyName'] ?? '',
-		'title'   => $att['title']       ?? $contact['title']       ?? '',
-		'email'   => $att['email']       ?? $contact['email']       ?? '',
-		'phone'   => hl_roster_format_phone( $att['workPhone'] ?? $contact['workPhone'] ?? $att['phone'] ?? $contact['phone'] ?? '' ),
-	);
-}
-
-usort( $attendees, function( $a, $b ) {
-	$c = strcasecmp( $a['last'], $b['last'] );
-	return $c !== 0 ? $c : strcasecmp( $a['first'], $b['first'] );
-} );
-
-$count      = count( $attendees );
-$start_date = ! empty( $row['eve_start'] ) ? date( 'F j, Y', strtotime( $row['eve_start'] ) ) : '';
-$end_date   = ! empty( $row['eve_end'] ) && $row['eve_end'] !== $row['eve_start']
-              ? ' – ' . date( 'F j, Y', strtotime( $row['eve_end'] ) ) : '';
-
-// ── Build header title: "Roster – {Location} – {Type label}" ─────────────────
-$type_name_raw = strtolower( trim( (string) $wpdb->get_var( $wpdb->prepare(
-	"SELECT event_type_name FROM `{$wpdb->prefix}event_type` WHERE event_type_id = %d",
-	(int) ( $row['eve_type'] ?? 0 )
-) ) ) );
-$is_zoom = ( strtolower( trim( $row['eve_zoom'] ?? '' ) ) === 'yes' );
-
-if ( $is_zoom ) {
-	$type_label = 'ZOOM';
-} elseif ( strpos( $type_name_raw, 'management' ) !== false ) {
-	$type_label = 'Management';
-} elseif ( strpos( $type_name_raw, 'writing' ) !== false ) {
-	$type_label = 'Writing';
-} else {
-	$type_label = ''; // Subaward and anything else get no label
-}
-
-$location     = $row['eve_location'] ?? 'Event #' . $eve_id;
-$header_parts = array_filter( array( 'Roster', $location, $type_label ) );
-$event_title  = implode( ' – ', $header_parts );
-
-$current_url = ( is_ssl() ? 'https' : 'http' ) . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-$refresh_url = add_query_arg( 'refresh', '1', remove_query_arg( 'refresh', $current_url ) );
+$_sh_do_refresh = ! empty( $_GET['refresh'] ) && current_user_can( 'manage_options' );
+$_sh_nonce      = wp_create_nonce( 'hostlinks_roster_fetch' );
+$_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 ?>
-<?php if ( ! $from_cache ) : ?>
-<div id="hl-roster-loader" style="text-align:center;padding:60px 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-	<div style="font-size:36px;margin-bottom:16px;animation:hl-spin 1.2s linear infinite;display:inline-block;">&#9696;</div>
-	<p style="font-size:15px;color:#555;margin:0;">Updating the roster, this can take a moment. Please wait&hellip;</p>
-	<style>@keyframes hl-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+<div id="hl-roster-loader">
+	<div class="hl-roster-spinner"></div>
+	<p>Updating the roster, this can take a moment. Please wait&hellip;</p>
 </div>
-<div id="hl-roster-content" style="display:none;">
-<?php endif; ?>
-<div class="hl-fe-roster">
 
-	<div class="hl-fe-roster-header">
-		<div>
-			<h2 class="hl-fe-roster-title"><?php echo esc_html( $event_title ); ?></h2>
-			<p class="hl-fe-roster-meta">
-				<?php if ( $start_date ) echo esc_html( $start_date . $end_date ) . ' &nbsp;|&nbsp; '; ?>
-				<?php echo $count; ?> attendee<?php echo $count !== 1 ? 's' : ''; ?>
-			</p>
-		</div>
-		<div class="hl-fe-roster-actions">
-			<button class="hl-fe-roster-btn" onclick="window.print()">&#x1F5A8; Print</button>
-			<?php if ( current_user_can( 'manage_options' ) ) : ?>
-			<a href="<?php echo esc_url( $refresh_url ); ?>" class="hl-fe-roster-btn hl-fe-roster-btn--sec">&#x21BB; Refresh</a>
-			<?php endif; ?>
-		</div>
-	</div>
-
-	<?php if ( ! empty( $attendees ) ) : ?>
-	<div class="hl-fe-roster-toggles">
-		<span>Show columns:</span>
-		<label><input type="checkbox" id="hl-fe-email"> Email</label>
-		<label><input type="checkbox" id="hl-fe-phone"> Phone</label>
-		<em style="color:#aaa;font-size:11px;margin-left:4px;">(not for public view)</em>
-	</div>
-	<?php endif; ?>
-
-	<?php if ( empty( $attendees ) ) : ?>
-	<p style="color:#888;padding:20px 0;">No registered attendees found for this event.</p>
-	<?php else : ?>
-	<table class="hl-fe-roster-table">
-		<thead>
-			<tr>
-				<th>#</th>
-				<th>Last Name</th>
-				<th>First Name</th>
-				<th>Company / Agency</th>
-				<th>Title</th>
-				<th class="hl-fe-col-email">Email</th>
-				<th class="hl-fe-col-phone">Phone</th>
-				<th class="hl-fe-sign-in">Sign In</th>
-			</tr>
-		</thead>
-		<tbody>
-		<?php foreach ( $attendees as $i => $att ) : ?>
-			<tr>
-				<td class="hl-fe-num"><?php echo $i + 1; ?></td>
-				<td><?php echo esc_html( $att['last'] ); ?></td>
-				<td><?php echo esc_html( $att['first'] ); ?></td>
-				<td><?php echo esc_html( $att['company'] ); ?></td>
-				<td><?php echo esc_html( $att['title'] ); ?></td>
-				<td class="hl-fe-col-email"><?php echo esc_html( $att['email'] ); ?></td>
-				<td class="hl-fe-col-phone"><?php echo esc_html( $att['phone'] ); ?></td>
-				<td class="hl-fe-sign-in">&nbsp;</td>
-			</tr>
-		<?php endforeach; ?>
-		</tbody>
-	</table>
-	<?php endif; ?>
-
-</div><!-- .hl-fe-roster -->
+<div id="hl-roster-output"></div>
 
 <style>
-.hl-fe-roster { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-.hl-fe-roster-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
-.hl-fe-roster-title { font-size:1.3em; margin:0 0 4px; }
-.hl-fe-roster-meta { font-size:.85em; color:#666; margin:0; }
-.hl-fe-roster-actions { display:flex; gap:8px; flex-wrap:wrap; }
-.hl-fe-roster-btn { display:inline-block; padding:6px 14px; background:#0da2e7; color:#fff; border:none; border-radius:3px; font-size:13px; text-decoration:none; cursor:pointer; line-height:1.5; }
-.hl-fe-roster-btn:hover { background:#0b8fcf; color:#fff; }
-.hl-fe-roster-btn--sec { background:#f0f0f0; color:#333; border:1px solid #ccc; }
-.hl-fe-roster-btn--sec:hover { background:#e0e0e0; color:#333; }
-.hl-fe-roster-toggles { display:flex; gap:14px; align-items:center; font-size:13px; color:#555; padding:6px 0 10px; }
-.hl-fe-roster-toggles label { cursor:pointer; display:flex; align-items:center; gap:4px; }
-.hl-fe-roster-toggles input[type=checkbox] { width:14px; height:14px; }
-.hl-fe-roster-table { width:100%; border-collapse:collapse; font-size:13px; }
-.hl-fe-roster-table th { background:#1d2327; color:#fff; padding:7px 10px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; border:1px solid #3c434a; }
-.hl-fe-roster-table td { padding:6px 10px; border:1px solid #ddd; vertical-align:top; }
-.hl-fe-roster-table tr:nth-child(even) td { background:#f9f9f9; }
-.hl-fe-num { color:#aaa; font-size:11px; width:30px; }
-.hl-fe-sign-in { width:260px; min-width:160px; }
-.hl-fe-col-email, .hl-fe-col-phone { display:none; }
-@media print {
-	/* Hide every element on the page, then reveal only the roster.
-	   visibility:hidden (not display:none) is used so parent→child
-	   inheritance can be overridden on the roster subtree. */
-	body *                          { visibility:hidden; }
-	body                            { background:#fff !important; margin:0 !important; padding:0 !important; }
-	.hl-fe-roster                   { visibility:visible; position:absolute; left:0; top:0; width:100%; padding:0 16px; box-sizing:border-box; }
-	.hl-fe-roster *                 { visibility:visible; }
-	/* Hide action bar and toggles even though they are inside .hl-fe-roster */
-	.hl-fe-roster-actions,
-	.hl-fe-roster-toggles           { display:none !important; }
-	/* Table */
-	.hl-fe-roster-table             { width:100%; border-collapse:collapse; }
-	.hl-fe-roster-table th          { background:#000 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-	.hl-fe-roster-table td,
-	.hl-fe-roster-table th          { border:1px solid #666 !important; padding:5px 8px; }
-	.hl-fe-col-email.hl-fe-col-visible,
-	.hl-fe-col-phone.hl-fe-col-visible { display:table-cell !important; }
-	.hl-fe-sign-in                  { width:200pt; }
+#hl-roster-loader {
+	text-align: center;
+	padding: 60px 20px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	/* Fade in after 600 ms — cached loads return before this and the loader
+	   never becomes visible. */
+	opacity: 0;
+	animation: hl-loader-fadein 0.4s ease 0.6s forwards;
 }
+@keyframes hl-loader-fadein { to { opacity: 1; } }
+.hl-roster-spinner {
+	width: 44px;
+	height: 44px;
+	border: 4px solid #e0e0e0;
+	border-top-color: #0da2e7;
+	border-radius: 50%;
+	animation: hl-spin 0.9s linear infinite;
+	margin: 0 auto 18px;
+}
+@keyframes hl-spin { to { transform: rotate(360deg); } }
+#hl-roster-loader p { font-size: 15px; color: #555; margin: 0; }
 </style>
+
 <script>
-(function(){
-	function tog(cls,show){
-		var els=document.querySelectorAll('.'+cls);
-		for(var i=0;i<els.length;i++){
-			els[i].style.display=show?'table-cell':'none';
-			els[i].classList[show?'add':'remove']('hl-fe-col-visible');
-		}
-	}
-	var ec=document.getElementById('hl-fe-email');
-	var pc=document.getElementById('hl-fe-phone');
-	if(ec) ec.addEventListener('change',function(){tog('hl-fe-col-email',this.checked);});
-	if(pc) pc.addEventListener('change',function(){tog('hl-fe-col-phone',this.checked);});
+(function () {
+	var ajaxUrl  = <?php echo wp_json_encode( esc_url_raw( $_sh_ajax_url ) ); ?>;
+	var eveId    = <?php echo (int) $eve_id; ?>;
+	var nonce    = <?php echo wp_json_encode( $_sh_nonce ); ?>;
+	var refresh  = <?php echo $_sh_do_refresh ? 'true' : 'false'; ?>;
+
+	var url = ajaxUrl + '?action=hostlinks_get_roster&eve_id=' + eveId + '&_nonce=' + encodeURIComponent( nonce );
+	if ( refresh ) url += '&refresh=1';
+
+	fetch( url )
+		.then( function ( r ) { return r.json(); } )
+		.then( function ( data ) {
+			var loader = document.getElementById( 'hl-roster-loader' );
+			var output = document.getElementById( 'hl-roster-output' );
+			if ( loader ) loader.style.display = 'none';
+			if ( output ) {
+				if ( data.success ) {
+					output.innerHTML = data.data.html;
+					// Wire up the email/phone column toggles injected with the HTML.
+					(function () {
+						function tog( cls, show ) {
+							var els = output.querySelectorAll( '.' + cls );
+							for ( var i = 0; i < els.length; i++ ) {
+								els[i].style.display = show ? 'table-cell' : 'none';
+								els[i].classList[ show ? 'add' : 'remove' ]( 'hl-fe-col-visible' );
+							}
+						}
+						var ec = output.querySelector( '#hl-fe-email' );
+						var pc = output.querySelector( '#hl-fe-phone' );
+						if ( ec ) ec.addEventListener( 'change', function () { tog( 'hl-fe-col-email', this.checked ); } );
+						if ( pc ) pc.addEventListener( 'change', function () { tog( 'hl-fe-col-phone', this.checked ); } );
+					})();
+				} else {
+					output.innerHTML = '<p style="color:#d63638;padding:20px 0;">' +
+						( data.data || 'Could not load roster. Please try again.' ) + '</p>';
+				}
+			}
+		} )
+		.catch( function () {
+			var loader = document.getElementById( 'hl-roster-loader' );
+			if ( loader ) loader.innerHTML = '<p style="color:#d63638;">Could not load roster. Please try again.</p>';
+		} );
 })();
-<?php if ( ! $from_cache ) : ?>
-// Swap loader → content once the page has fully rendered.
-document.addEventListener('DOMContentLoaded',function(){
-	var loader=document.getElementById('hl-roster-loader');
-	var content=document.getElementById('hl-roster-content');
-	if(loader) loader.style.display='none';
-	if(content) content.style.display='block';
-});
-<?php endif; ?>
 </script>
-<?php if ( ! $from_cache ) : ?></div><!-- #hl-roster-content --><?php endif; ?>

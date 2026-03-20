@@ -11,6 +11,8 @@ class Hostlinks_Shortcodes {
 		add_shortcode( 'hostlinks_reports',   array( $this, 'render_reports' ) );
 		add_shortcode( 'public_event_list',   array( $this, 'render_public_event_list' ) );
 		add_shortcode( 'hostlinks_roster',    array( $this, 'render_roster' ) );
+		add_action( 'wp_ajax_hostlinks_get_roster',        array( $this, 'ajax_get_roster' ) );
+		add_action( 'wp_ajax_nopriv_hostlinks_get_roster', array( $this, 'ajax_get_roster' ) );
 	}
 
 	public function render_eventlisto() {
@@ -57,6 +59,29 @@ class Hostlinks_Shortcodes {
 		ob_start();
 		include HOSTLINKS_PLUGIN_DIR . 'shortcode/roster.php';
 		return ob_get_clean();
+	}
+
+	public function ajax_get_roster() {
+		// Verify nonce.
+		if ( empty( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_nonce'] ) ), 'hostlinks_roster_fetch' ) ) {
+			wp_send_json_error( 'Invalid request.' );
+		}
+		// Check access.
+		if ( ! Hostlinks_Access::can_view_shortcode( 'hostlinks_roster' ) ) {
+			wp_send_json_error( 'Access denied.' );
+		}
+
+		$eve_id = isset( $_GET['eve_id'] ) ? (int) $_GET['eve_id'] : 0;
+		if ( ! $eve_id ) {
+			wp_send_json_error( 'No event specified.' );
+		}
+
+		global $wpdb;
+		ob_start();
+		include HOSTLINKS_PLUGIN_DIR . 'shortcode/roster-content.php';
+		$html = ob_get_clean();
+
+		wp_send_json_success( array( 'html' => $html ) );
 	}
 }
 

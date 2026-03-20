@@ -382,22 +382,22 @@
 }
 
 /* ── Dark mode ────────────────────────────────────────────────────────────── */
-.dark .hl-form-section,
+.wp-dark-mode-active .hl-form-section,
 .darklooks-mode-changer-enabled .hl-form-section {
   background: hsl(215 25% 13%);
   border-color: hsl(215 20% 20%);
 }
-.dark .hl-section-title,
+.wp-dark-mode-active .hl-section-title,
 .darklooks-mode-changer-enabled .hl-section-title {
   color: hsl(210 25% 85%);
 }
-.dark .hl-field-group label,
+.wp-dark-mode-active .hl-field-group label,
 .darklooks-mode-changer-enabled .hl-field-group label {
   color: hsl(215 15% 65%);
 }
-.dark .hl-event-request-wrap input,
-.dark .hl-event-request-wrap select,
-.dark .hl-event-request-wrap textarea,
+.wp-dark-mode-active .hl-event-request-wrap input,
+.wp-dark-mode-active .hl-event-request-wrap select,
+.wp-dark-mode-active .hl-event-request-wrap textarea,
 .darklooks-mode-changer-enabled .hl-event-request-wrap input,
 .darklooks-mode-changer-enabled .hl-event-request-wrap select,
 .darklooks-mode-changer-enabled .hl-event-request-wrap textarea {
@@ -405,15 +405,15 @@
   border-color: hsl(215 20% 28%);
   color: hsl(210 25% 85%);
 }
-.dark .hl-event-request-wrap input:focus,
-.dark .hl-event-request-wrap select:focus,
-.dark .hl-event-request-wrap textarea:focus,
+.wp-dark-mode-active .hl-event-request-wrap input:focus,
+.wp-dark-mode-active .hl-event-request-wrap select:focus,
+.wp-dark-mode-active .hl-event-request-wrap textarea:focus,
 .darklooks-mode-changer-enabled .hl-event-request-wrap input:focus,
 .darklooks-mode-changer-enabled .hl-event-request-wrap select:focus,
 .darklooks-mode-changer-enabled .hl-event-request-wrap textarea:focus {
   border-color: #0da2e7;
 }
-.dark .hl-request-success,
+.wp-dark-mode-active .hl-request-success,
 .darklooks-mode-changer-enabled .hl-request-success {
   background: hsl(140 30% 10%);
   border-color: hsl(140 40% 25%);

@@ -321,61 +321,78 @@
 }
 
 /* ============================================
-   Dark mode (add class "dark" to <html> or <body>)
+   Dark mode — WP Dark Mode A11y adds "wp-dark-mode-active" to <html>
    ============================================ */
-.dark .hostlinks-page {
+.wp-dark-mode-active .hostlinks-page {
   background: linear-gradient(180deg, hsl(215 28% 10%), hsl(215 20% 12%));
   color: hsl(210 25% 95%);
 }
 
-.dark .hostlinks-header {
+.wp-dark-mode-active .hostlinks-header {
   border-color: hsl(215 20% 20%);
   background: hsl(215 25% 13% / 0.5);
 }
 
-.dark .hostlinks-card {
+.wp-dark-mode-active .hostlinks-card {
   background: hsl(215 25% 13%);
   border-color: hsl(215 20% 20%);
 }
 
-.dark .hostlinks-card-title--virtual {
+.wp-dark-mode-active .hostlinks-card-title--virtual {
   background: hsl(217 91% 20% / 0.3);
 }
 
-.dark .hostlinks-card-instructor--management {
+.wp-dark-mode-active .hostlinks-card-instructor--management {
   background: hsl(142 76% 15% / 0.3);
 }
 
-.dark .hostlinks-marketer,
-.dark .hostlinks-card-countdown {
+.wp-dark-mode-active .hostlinks-marketer,
+.wp-dark-mode-active .hostlinks-card-countdown {
   color: hsl(215 15% 60%);
 }
 
-.dark .hostlinks-empty {
+.wp-dark-mode-active .hostlinks-empty {
   background: hsl(215 25% 13%);
   border-color: hsl(215 20% 20%);
   color: hsl(215 15% 60%);
 }
 
-.dark .hostlinks-btn {
+.wp-dark-mode-active .hostlinks-btn {
   background: hsl(215 20% 22%);
   border-color: hsl(215 20% 28%);
   color: hsl(210 25% 95%);
 }
 
-.dark .hostlinks-btn:hover {
+.wp-dark-mode-active .hostlinks-btn:hover {
   background: hsl(215 20% 28%);
   border-color: hsl(215 20% 34%);
 }
 
-.dark .hostlinks-year-filter {
+.wp-dark-mode-active .hostlinks-year-filter {
   background: hsl(215 25% 13%);
   border-color: hsl(215 20% 20%);
   color: hsl(210 25% 95%);
 }
 
-.dark .hostlinks-month-header {
+.wp-dark-mode-active .hostlinks-month-header {
   background: hsl(199 89% 35%);
+}
+
+/* Alert glows — boosted for dark backgrounds */
+.wp-dark-mode-active .hostlinks-card--alert-1 {
+  box-shadow: 0 0 0 4px #f59e0b99 !important;
+}
+.wp-dark-mode-active .hostlinks-card--alert-2 {
+  box-shadow: 0 0 0 6px #ff3333cc !important;
+  background: hsl(0 84% 12%) !important;
+}
+
+/* Alert tooltip — lighter grey bubble in dark mode */
+.wp-dark-mode-active .hl-alert-badge::after {
+  background: rgba(75, 75, 85, 0.95);
+}
+.wp-dark-mode-active .hl-alert-badge::before {
+  border-top-color: rgba(75, 75, 85, 0.95);
 }
 
 /* ─── Reports page ──────────────────────────────────────────────────────────── */
@@ -475,7 +492,7 @@
   border-top: 1px solid hsl(215 15% 92%);
 }
 
-.dark .hl-chart-controls,
+.wp-dark-mode-active .hl-chart-controls,
 .darklooks-mode-changer-enabled .hl-chart-controls {
   border-color: hsl(215 20% 22%);
 }
@@ -504,48 +521,48 @@
 
 /* ─── Reports dark mode ─────────────────────────────────────────────────────── */
 
-.dark .hl-stat-card,
+.wp-dark-mode-active .hl-stat-card,
 .darklooks-mode-changer-enabled .hl-stat-card {
   background: #0b8ec8;
   box-shadow: 0 2px 8px rgba(0,0,0,.3);
 }
-.dark .hl-stat-label,
+.wp-dark-mode-active .hl-stat-label,
 .darklooks-mode-changer-enabled .hl-stat-label {
   color: rgba(255,255,255,.8);
 }
 
-.dark .hl-reports-card,
+.wp-dark-mode-active .hl-reports-card,
 .darklooks-mode-changer-enabled .hl-reports-card {
   background: hsl(215 20% 16%);
 }
-.dark .hl-reports-title,
+.wp-dark-mode-active .hl-reports-title,
 .darklooks-mode-changer-enabled .hl-reports-title {
   color: hsl(210 25% 90%);
 }
-.dark .hl-toggle-btn,
+.wp-dark-mode-active .hl-toggle-btn,
 .darklooks-mode-changer-enabled .hl-toggle-btn {
   background: hsl(215 20% 22%);
   border-color: hsl(215 20% 30%);
   color: hsl(210 25% 75%);
 }
-.dark .hl-toggle-btn--active,
+.wp-dark-mode-active .hl-toggle-btn--active,
 .darklooks-mode-changer-enabled .hl-toggle-btn--active {
   background: hsl(210 100% 42%);
   border-color: hsl(210 100% 42%);
   color: #fff;
 }
-.dark .hl-summary-table th,
+.wp-dark-mode-active .hl-summary-table th,
 .darklooks-mode-changer-enabled .hl-summary-table th {
   background: hsl(215 20% 20%);
   color: hsl(215 15% 55%);
 }
-.dark .hl-summary-table th,
-.dark .hl-summary-table td,
+.wp-dark-mode-active .hl-summary-table th,
+.wp-dark-mode-active .hl-summary-table td,
 .darklooks-mode-changer-enabled .hl-summary-table th,
 .darklooks-mode-changer-enabled .hl-summary-table td {
   border-color: hsl(215 20% 22%);
 }
-.dark .hl-summary-table tbody tr:hover,
+.wp-dark-mode-active .hl-summary-table tbody tr:hover,
 .darklooks-mode-changer-enabled .hl-summary-table tbody tr:hover {
   background: hsl(215 20% 20%);
 }
@@ -566,7 +583,7 @@
   font-size: 1rem;
   line-height: 1.6;
 }
-.dark .hostlinks-access-denied,
+.wp-dark-mode-active .hostlinks-access-denied,
 .darklooks-mode-changer-enabled .hostlinks-access-denied {
   background: hsl(215 25% 13%);
   border-color: hsl(215 20% 20%);

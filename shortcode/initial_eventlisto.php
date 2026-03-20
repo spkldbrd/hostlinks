@@ -124,6 +124,9 @@ $reports_page_url = Hostlinks_Page_URLs::get_reports();
 	border-color: <?php echo esc_attr( $hl_a1_color ); ?> !important;
 	box-shadow: 0 0 0 3px <?php echo esc_attr( $hl_a1_color ); ?>59 !important;
 }
+.wp-dark-mode-active .hostlinks-card--alert-1 {
+	box-shadow: 0 0 0 4px <?php echo esc_attr( $hl_a1_color ); ?>99 !important;
+}
 <?php if ( $hl_badge_on ) : ?>
 .hostlinks-card--alert-1 .hl-alert-badge { color: <?php echo esc_attr( $hl_a1_color ); ?>; }
 <?php endif; ?>
@@ -132,6 +135,11 @@ $reports_page_url = Hostlinks_Page_URLs::get_reports();
 .hostlinks-card--alert-2 {
 	border-color: <?php echo esc_attr( $hl_a2_color ); ?> !important;
 	box-shadow: 0 0 0 3px <?php echo esc_attr( $hl_a2_color ); ?>59 !important;
+}
+.wp-dark-mode-active .hostlinks-card--alert-2 {
+	border-color: <?php echo esc_attr( $hl_a2_color ); ?> !important;
+	box-shadow: 0 0 0 6px #ff3333cc !important;
+	background: hsl(0 84% 12%) !important;
 }
 <?php if ( $hl_badge_on ) : ?>
 .hostlinks-card--alert-2 .hl-alert-badge { color: <?php echo esc_attr( $hl_a2_color ); ?>; }

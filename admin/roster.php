@@ -323,6 +323,7 @@ body {
 		<span style="color:#888;font-size:12px;">Show columns:</span>
 		<label><input type="checkbox" id="hl-toggle-email"> Email</label>
 		<label><input type="checkbox" id="hl-toggle-phone"> Phone</label>
+		<em style="color:#aaa;font-size:11px;margin-left:4px;">(not for public view)</em>
 	</div>
 	<?php endif; ?>
 

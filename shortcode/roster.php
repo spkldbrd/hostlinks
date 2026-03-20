@@ -151,6 +151,7 @@ $refresh_url = add_query_arg( 'refresh', '1', remove_query_arg( 'refresh', $curr
 		<span>Show columns:</span>
 		<label><input type="checkbox" id="hl-fe-email"> Email</label>
 		<label><input type="checkbox" id="hl-fe-phone"> Phone</label>
+		<em style="color:#aaa;font-size:11px;margin-left:4px;">(not for public view)</em>
 	</div>
 	<?php endif; ?>
 

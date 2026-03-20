@@ -234,6 +234,7 @@
   border-radius: 6px;
   white-space: pre-line;
   min-width: 200px;
+  line-height: 1.8;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s ease;

@@ -255,13 +255,13 @@ $empty_msg = $focus_name
 		// Alert 2 takes priority when both thresholds are met.
 		if ( $hl_a2_on && $days_away <= $hl_a2_days && $paid < $hl_a2_regs ) {
 			$alert_class = 'hostlinks-card--alert-2';
-			$alert_tip   = 'Red Alert: ' . $paid . ' paid with ' . $days_away . ' days to event.';
+			$alert_tip   = "Red Alert:\n" . $paid . ' paid with ' . $days_away . ' days to event.';
 			if ( $hl_a2_message ) {
 				$alert_tip .= "\n" . $hl_a2_message;
 			}
 		} elseif ( $hl_a1_on && $days_away <= $hl_a1_days && $paid < $hl_a1_regs ) {
 			$alert_class = 'hostlinks-card--alert-1';
-			$alert_tip   = 'Warning: ' . $paid . ' paid with ' . $days_away . ' days to event.';
+			$alert_tip   = "Warning:\n" . $paid . ' paid with ' . $days_away . ' days to event.';
 			if ( $hl_a1_message ) {
 				$alert_tip .= "\n" . $hl_a1_message;
 			}

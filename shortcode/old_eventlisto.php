@@ -233,8 +233,10 @@ $empty_msg = $focus_name
 				</div>
 				<a href="<?php echo esc_url( $alldriver['eve_host_url'] ); ?>" class="<?php echo esc_attr( $title_class ); ?>" target="_blank"><?php echo esc_html( $alldriver['eve_location'] ); ?></a>
 				<div class="hostlinks-card-links">
-					<a href="<?php echo esc_url( $alldriver['eve_roster_url'] ); ?>" class="hostlinks-roster-link" target="_blank">Roster</a>
-					<?php if ( ! empty( $alldriver['eve_trainer_url'] ) ) : ?>
+				<?php if ( ! empty( $alldriver['eve_roster_url'] ) ) : ?>
+				<a href="<?php echo esc_url( $alldriver['eve_roster_url'] ); ?>" class="hostlinks-roster-link" target="_blank">Roster</a>
+				<?php endif; ?>
+				<?php if ( ! empty( $alldriver['eve_trainer_url'] ) ) : ?>
 					&nbsp;|&nbsp;<a href="<?php echo esc_url( $alldriver['eve_trainer_url'] ); ?>" class="hostlinks-roster-link" target="_blank">Reg</a>
 					<?php endif; ?>
 					<?php if ( ! empty( $alldriver['eve_web_url'] ) ) : ?>

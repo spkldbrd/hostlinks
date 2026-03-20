@@ -403,6 +403,13 @@ jQuery(function() {
 						$hide_ids         = isset( $_POST['eve_public_hide_ids'] ) ? (array) $_POST['eve_public_hide_ids'] : array();
 						$eve_public_hide  = in_array( (string) $user, $hide_ids ) ? 1 : 0;
 						$eve_instructor   = intval( $_POST['eve_instructor'][ $key ] );
+						// Auto-fill blank roster URL on update if roster page is configured.
+						if ( ! $eve_roster_url ) {
+							$roster_base = Hostlinks_Page_URLs::get_roster();
+							if ( $roster_base ) {
+								$eve_roster_url = rtrim( $roster_base, '/' ) . '/?eve_id=' . $userid;
+							}
+						}
 						$wpdb->update(
 							$table11,
 							array(

@@ -247,7 +247,7 @@ $empty_msg = $focus_name
 	// ── Registration alert class ──────────────────────────────────────────
 	$alert_class = '';
 	$alert_tip   = '';
-	if ( $today < $dt_start ) {
+	if ( $today < $dt_start && stripos( $marketer_name, 'PRIVATE' ) === false ) {
 		$days_away = $today->diff( $dt_start )->days + 1;
 		$paid      = (int) $alldriver['eve_paid'];
 		// Alert 2 takes priority when both thresholds are met.

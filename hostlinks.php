@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.5.84
+ * Version:     2.5.85
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.5.84' );
+define( 'HOSTLINKS_VERSION',    '2.5.85' );
 define( 'HOSTLINKS_DB_VERSION', '1.7' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -56,3 +56,13 @@ new Hostlinks_Event_Request_Shortcode();
 
 // CVENT daily sync scheduler
 Hostlinks_CVENT_Scheduler::init();
+
+// Roster finalize cron: re-fetch and permanently cache attendees 5 days after event end.
+add_action( 'hostlinks_roster_finalize', function( $cvent_id, $eve_id ) {
+	$cache_key     = 'hostlinks_roster_' . md5( $cvent_id );
+	delete_transient( $cache_key );
+	$attendees_raw = Hostlinks_CVENT_API::get_roster_attendees( $cvent_id );
+	if ( ! is_wp_error( $attendees_raw ) ) {
+		set_transient( $cache_key, $attendees_raw, 0 ); // 0 = permanent
+	}
+}, 10, 2 );

@@ -44,7 +44,14 @@ if ( ! $cvent_id ) {
 	wp_die( 'Event #' . $eve_id . ' does not have a linked CVENT ID. Link it via CVENT Sync first.' );
 }
 
-// ── Attendee fetch (cached 24 hours) ─────────────────────────────────────────
+// ── Determine cache TTL based on whether event is in the past ────────────────
+// Past events: cache permanently (TTL = 0) — roster won't change.
+// Future / today: cache 24 hours.
+$event_end_ts  = ! empty( $row['eve_end'] ) ? strtotime( $row['eve_end'] ) : 0;
+$is_past_event = $event_end_ts > 0 && $event_end_ts < strtotime( 'today midnight' );
+$cache_ttl     = $is_past_event ? 0 : 24 * HOUR_IN_SECONDS;
+
+// ── Attendee fetch ────────────────────────────────────────────────────────────
 $cache_key = 'hostlinks_roster_' . md5( $cvent_id );
 
 if ( $do_refresh ) {
@@ -60,7 +67,19 @@ if ( ! $from_cache ) {
 	if ( is_wp_error( $attendees_raw ) ) {
 		wp_die( 'CVENT API error: ' . esc_html( $attendees_raw->get_error_message() ) );
 	}
-	set_transient( $cache_key, $attendees_raw, 24 * HOUR_IN_SECONDS );
+	set_transient( $cache_key, $attendees_raw, $cache_ttl );
+
+	// ── Schedule the 5-day auto-pull for events that just ended ──────────────
+	// Fires once, 5 days after eve_end, to capture final cancellations.
+	// Only schedule if: event has ended AND 5-day window hasn't passed AND not yet scheduled.
+	if ( $is_past_event && $event_end_ts > strtotime( '-5 days' ) ) {
+		$cron_hook = 'hostlinks_roster_finalize';
+		$cron_args = array( $cvent_id, $eve_id );
+		if ( ! wp_next_scheduled( $cron_hook, $cron_args ) ) {
+			$fire_at = $event_end_ts + ( 5 * DAY_IN_SECONDS );
+			wp_schedule_single_event( $fire_at, $cron_hook, $cron_args );
+		}
+	}
 }
 
 // In debug mode, fetch raw order items for inspection.
@@ -263,7 +282,10 @@ body {
 				<?php endif; ?>
 			</div>
 			<?php if ( $from_cache && ! $do_refresh ) : ?>
-			<div class="hl-cache-note">Data cached for up to 24 hours. <a href="<?php echo esc_url( $refresh_url ); ?>">Refresh now</a></div>
+			<div class="hl-cache-note">
+				<?php echo $is_past_event ? 'Permanently cached (past event).' : 'Cached for up to 24 hours.'; ?>
+				<a href="<?php echo esc_url( $refresh_url ); ?>">Refresh now</a>
+			</div>
 			<?php endif; ?>
 		</div>
 		<div class="hl-roster-controls">

@@ -419,3 +419,56 @@
   border-color: hsl(140 40% 25%);
   color: hsl(140 35% 75%);
 }
+
+/* ── Shipping Details (collapsible toggle row + expandable section) ─────── */
+
+/* Slim checkbox row that acts as the expand trigger */
+.hl-shipping-toggle-row {
+  padding: 0.6rem 1.25rem !important;
+  background: hsl(210 30% 97%);
+  border: 1px solid hsl(215 15% 88%);
+  border-radius: 0.5rem;
+  margin-bottom: 0 !important;
+}
+
+.hl-shipping-toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: #1a2533;
+}
+
+.hl-shipping-toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* The shipping fields section: connected visually to the toggle row above */
+.hl-shipping-section {
+  border-top: none !important;
+  border-radius: 0 0 0.5rem 0.5rem !important;
+  border: 1px solid hsl(215 15% 88%);
+  background: hsl(210 30% 99%);
+  margin-top: 0 !important;
+  padding-top: 1.25rem;
+}
+
+/* Dark mode overrides */
+.wp-dark-mode-active .hl-shipping-toggle-row,
+.darklooks-mode-changer-enabled .hl-shipping-toggle-row {
+  background: hsl(215 20% 15%);
+  border-color: hsl(215 20% 24%);
+}
+.wp-dark-mode-active .hl-shipping-toggle-label,
+.darklooks-mode-changer-enabled .hl-shipping-toggle-label {
+  color: hsl(210 25% 85%);
+}
+.wp-dark-mode-active .hl-shipping-section,
+.darklooks-mode-changer-enabled .hl-shipping-section {
+  background: hsl(215 20% 13%);
+  border-color: hsl(215 20% 24%);
+}

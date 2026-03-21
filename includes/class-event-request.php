@@ -160,6 +160,10 @@ class Hostlinks_Event_Request {
 
 		$max_raw = trim( $raw['hl_max_attendees'] ?? '' );
 
+		// Shipping details (optional collapsed section)
+		$has_shipping  = ! empty( $raw['hl_add_shipping'] );
+		$ship_workbooks_raw = trim( $raw['ship_workbooks'] ?? '' );
+
 		$shared = array(
 			'submission_group'    => $submission_group,
 			'request_status'      => self::STATUS_NEW,
@@ -190,6 +194,18 @@ class Hostlinks_Event_Request {
 			'end_time'            => '',
 			'hotels'              => wp_json_encode( $hotels ),
 			'host_contacts'       => wp_json_encode( $host_contacts ),
+			// Shipping
+			'ship_name'      => $has_shipping ? sanitize_text_field( $raw['ship_name']      ?? '' ) : '',
+			'ship_email'     => $has_shipping ? sanitize_email(      $raw['ship_email']     ?? '' ) : '',
+			'ship_phone'     => $has_shipping ? self::normalize_phone( sanitize_text_field( $raw['ship_phone'] ?? '' ) ) : '',
+			'ship_address_1' => $has_shipping ? sanitize_text_field( $raw['ship_address_1'] ?? '' ) : '',
+			'ship_address_2' => $has_shipping ? sanitize_text_field( $raw['ship_address_2'] ?? '' ) : '',
+			'ship_address_3' => $has_shipping ? sanitize_text_field( $raw['ship_address_3'] ?? '' ) : '',
+			'ship_city'      => $has_shipping ? sanitize_text_field( $raw['ship_city']      ?? '' ) : '',
+			'ship_state'     => $has_shipping ? sanitize_text_field( $raw['ship_state']     ?? '' ) : '',
+			'ship_zip'       => $has_shipping ? sanitize_text_field( $raw['ship_zip']       ?? '' ) : '',
+			'ship_workbooks' => ( $has_shipping && $ship_workbooks_raw !== '' ) ? (int) $ship_workbooks_raw : null,
+			'ship_notes'     => $has_shipping ? sanitize_textarea_field( $raw['ship_notes']  ?? '' ) : '',
 		);
 
 		// ── Per-event-row records ───────────────────────────────────────────

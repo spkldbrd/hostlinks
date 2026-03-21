@@ -66,6 +66,34 @@ class Hostlinks_DB {
 			}
 		}
 
+		// v1.9 — add shipping detail columns to both event_details_list and hostlinks_event_requests.
+		if ( version_compare( $installed, '1.9', '<' ) ) {
+			$ship_cols = array(
+				'ship_name'      => "varchar(255) NOT NULL DEFAULT ''",
+				'ship_email'     => "varchar(255) NOT NULL DEFAULT ''",
+				'ship_phone'     => "varchar(50)  NOT NULL DEFAULT ''",
+				'ship_address_1' => "varchar(255) NOT NULL DEFAULT ''",
+				'ship_address_2' => "varchar(255) NOT NULL DEFAULT ''",
+				'ship_address_3' => "varchar(255) NOT NULL DEFAULT ''",
+				'ship_city'      => "varchar(100) NOT NULL DEFAULT ''",
+				'ship_state'     => "varchar(100) NOT NULL DEFAULT ''",
+				'ship_zip'       => "varchar(20)  NOT NULL DEFAULT ''",
+				'ship_workbooks' => 'int(11) DEFAULT NULL',
+				'ship_notes'     => "text NOT NULL DEFAULT ''",
+			);
+			foreach ( array(
+				$wpdb->prefix . 'event_details_list',
+				$wpdb->prefix . 'hostlinks_event_requests',
+			) as $tbl ) {
+				$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+				foreach ( $ship_cols as $col => $definition ) {
+					if ( ! in_array( $col, $existing, true ) ) {
+						$wpdb->query( "ALTER TABLE `{$tbl}` ADD `{$col}` {$definition}" );
+					}
+				}
+			}
+		}
+
 		// v1.8 — add eve_created_at to event_details_list to track when each event was added.
 		if ( version_compare( $installed, '1.8', '<' ) ) {
 			$table = $wpdb->prefix . 'event_details_list';
@@ -140,6 +168,17 @@ class Hostlinks_DB {
 			cvent_staleness_hash varchar(64) DEFAULT NULL,
 			cvent_prev_paid int(11) DEFAULT NULL,
 			cvent_prev_free int(11) DEFAULT NULL,
+			ship_name      varchar(255) NOT NULL DEFAULT '',
+			ship_email     varchar(255) NOT NULL DEFAULT '',
+			ship_phone     varchar(50)  NOT NULL DEFAULT '',
+			ship_address_1 varchar(255) NOT NULL DEFAULT '',
+			ship_address_2 varchar(255) NOT NULL DEFAULT '',
+			ship_address_3 varchar(255) NOT NULL DEFAULT '',
+			ship_city      varchar(100) NOT NULL DEFAULT '',
+			ship_state     varchar(100) NOT NULL DEFAULT '',
+			ship_zip       varchar(20)  NOT NULL DEFAULT '',
+			ship_workbooks int(11) DEFAULT NULL,
+			ship_notes     text NOT NULL DEFAULT '',
 			PRIMARY KEY  (eve_id)
 		) $charset_collate;";
 		dbDelta( $sql );
@@ -206,6 +245,17 @@ class Hostlinks_DB {
 			cc_emails text NOT NULL DEFAULT '',
 			hotels text NOT NULL DEFAULT '',
 			host_contacts text NOT NULL DEFAULT '',
+			ship_name      varchar(255) NOT NULL DEFAULT '',
+			ship_email     varchar(255) NOT NULL DEFAULT '',
+			ship_phone     varchar(50)  NOT NULL DEFAULT '',
+			ship_address_1 varchar(255) NOT NULL DEFAULT '',
+			ship_address_2 varchar(255) NOT NULL DEFAULT '',
+			ship_address_3 varchar(255) NOT NULL DEFAULT '',
+			ship_city      varchar(100) NOT NULL DEFAULT '',
+			ship_state     varchar(100) NOT NULL DEFAULT '',
+			ship_zip       varchar(20)  NOT NULL DEFAULT '',
+			ship_workbooks int(11) DEFAULT NULL,
+			ship_notes     text NOT NULL DEFAULT '',
 			PRIMARY KEY  (id)
 		) $charset_collate;";
 		dbDelta( $sql );

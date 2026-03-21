@@ -153,6 +153,30 @@ if ( ! empty( $req['submission_group'] ) ) {
 		</div>
 		<?php endif; ?>
 
+		<?php
+		$has_shipping = ! empty( $req['ship_name'] ) || ! empty( $req['ship_email'] ) || ! empty( $req['ship_address_1'] ) || ! empty( $req['ship_notes'] );
+		if ( $has_shipping ) :
+		?>
+		<h2 style="font-size:15px;margin:20px 0 8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Shipping Details</h2>
+		<table style="width:100%;border-collapse:collapse;">
+			<?php
+			hl_detail_row( 'Name',       $req['ship_name']      ?? '' );
+			hl_detail_row( 'Email',      $req['ship_email']     ?? '' );
+			hl_detail_row( 'Phone',      $req['ship_phone']     ?? '' );
+			hl_detail_row( 'Address 1',  $req['ship_address_1'] ?? '' );
+			hl_detail_row( 'Address 2',  $req['ship_address_2'] ?? '' );
+			hl_detail_row( 'Address 3',  $req['ship_address_3'] ?? '' );
+			hl_detail_row( 'City',       $req['ship_city']      ?? '' );
+			hl_detail_row( 'State',      $req['ship_state']     ?? '' );
+			hl_detail_row( 'ZIP Code',   $req['ship_zip']       ?? '' );
+			if ( isset( $req['ship_workbooks'] ) && $req['ship_workbooks'] !== null ) {
+				hl_detail_row( '# Workbooks', (string) $req['ship_workbooks'] );
+			}
+			hl_detail_row( 'Notes',      $req['ship_notes']     ?? '' );
+			?>
+		</table>
+		<?php endif; ?>
+
 		<!-- Submission metadata -->
 		<h2 style="font-size:15px;margin:20px 0 8px;border-bottom:2px solid #0da2e7;padding-bottom:4px;">Submission Info</h2>
 		<table style="width:100%;border-collapse:collapse;">

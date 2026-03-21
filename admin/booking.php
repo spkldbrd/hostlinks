@@ -7,6 +7,12 @@ $table12 = $wpdb->prefix . 'event_type';
 $table13 = $wpdb->prefix . 'event_marketer';
 $table14 = $wpdb->prefix . 'event_instructor';
 
+// ── Full edit page ────────────────────────────────────────────────────────────
+if ( isset( $_GET['edit_event'] ) ) {
+	require_once __DIR__ . '/edit-event.php';
+	return;
+}
+
 if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 
 	$sucessmsg = '';
@@ -537,7 +543,7 @@ jQuery(function() {
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
             <th>Location</th><th>Paid</th><th>Free</th><th>Date</th>
             <th>Type</th><th>Zoom</th><th>Marketer</th>
-            <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
+            <th style="width:40px;"></th><th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
           </tr>
         </thead>
         <tbody id="the-list">
@@ -576,6 +582,10 @@ jQuery(function() {
                 <?php } ?>
               </select>
               <p class="hidder"><?php echo esc_html( $alldriver['event_marketer_name'] ?? '' ); ?></p>
+            </td>
+            <td style="text-align:center;white-space:nowrap;">
+              <a href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&edit_event=' . (int) $alldriver['eve_id'] ) ); ?>"
+                title="Full Edit" class="button button-small" style="padding:2px 8px;font-size:11px;">&#9998; Edit</a>
             </td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" style="width:140px;"></td>

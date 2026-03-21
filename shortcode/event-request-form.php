@@ -300,6 +300,104 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 	</div>
 
 	<!-- ═══════════════════════════════════════════════════════════════════════
+	     SECTION 6b: Shipping Details (collapsible)
+	════════════════════════════════════════════════════════════════════════ -->
+	<?php $shipping_checked = ! empty( $old['hl_add_shipping'] ); ?>
+	<div class="hl-form-section hl-shipping-toggle-row">
+		<label class="hl-shipping-toggle-label">
+			<input type="checkbox" id="hl_add_shipping" name="hl_add_shipping" value="1"
+				<?php checked( $shipping_checked ); ?>>
+			Add Shipping Details
+		</label>
+	</div>
+
+	<div class="hl-form-section hl-shipping-section" id="hl-shipping-fields"
+		<?php if ( ! $shipping_checked ) echo 'style="display:none;"'; ?>>
+		<h3 class="hl-section-title">Shipping Details</h3>
+
+		<!-- Name / Email / Phone -->
+		<div class="hl-field-row hl-col-3">
+			<div class="hl-field-group">
+				<label for="ship_name">Name</label>
+				<input type="text" id="ship_name" name="ship_name"
+					value="<?php echo $o('ship_name'); ?>" placeholder="Recipient name" />
+			</div>
+			<div class="hl-field-group">
+				<label for="ship_email">Email</label>
+				<input type="email" id="ship_email" name="ship_email"
+					value="<?php echo $o('ship_email'); ?>" placeholder="recipient@example.com" />
+			</div>
+			<div class="hl-field-group">
+				<label for="ship_phone">Phone</label>
+				<input type="tel" id="ship_phone" name="ship_phone"
+					value="<?php echo $o('ship_phone'); ?>" placeholder="123-456-7890" class="hl-phone-field" />
+			</div>
+		</div>
+
+		<!-- Address with Google Places on Address 1 -->
+		<div class="hl-field-group hl-col-1">
+			<label for="ship_address_1">Address Line 1</label>
+			<input type="text" id="ship_address_1" name="ship_address_1"
+				value="<?php echo $o('ship_address_1'); ?>" placeholder="Street address" autocomplete="off" />
+		</div>
+		<div class="hl-field-row hl-col-2">
+			<div class="hl-field-group">
+				<label for="ship_address_2">Address Line 2 <span class="hl-optional">(Optional)</span></label>
+				<input type="text" id="ship_address_2" name="ship_address_2"
+					value="<?php echo $o('ship_address_2'); ?>" placeholder="Suite, floor, etc." />
+			</div>
+			<div class="hl-field-group">
+				<label for="ship_address_3">Address Line 3 <span class="hl-optional">(Optional)</span></label>
+				<input type="text" id="ship_address_3" name="ship_address_3"
+					value="<?php echo $o('ship_address_3'); ?>" placeholder="Additional address info" />
+			</div>
+		</div>
+		<div class="hl-field-row hl-col-3">
+			<div class="hl-field-group">
+				<label for="ship_city">City</label>
+				<input type="text" id="ship_city" name="ship_city"
+					value="<?php echo $o('ship_city'); ?>" placeholder="City" />
+			</div>
+			<div class="hl-field-group">
+				<label for="ship_state">State</label>
+				<select id="ship_state" name="ship_state">
+					<option value="">— select —</option>
+					<?php
+					$us_states_ship = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC' ];
+					foreach ( $us_states_ship as $abbr ) :
+					?>
+					<option value="<?php echo esc_attr( $abbr ); ?>"
+						<?php selected( $o('ship_state'), $abbr ); ?>>
+						<?php echo esc_html( $abbr ); ?>
+					</option>
+					<?php endforeach; ?>
+				</select>
+			</div>
+			<div class="hl-field-group">
+				<label for="ship_zip">ZIP Code</label>
+				<input type="text" id="ship_zip" name="ship_zip"
+					value="<?php echo $o('ship_zip'); ?>" placeholder="12345" maxlength="10" />
+			</div>
+		</div>
+
+		<!-- Workbooks + Notes -->
+		<div class="hl-field-row hl-col-2">
+			<div class="hl-field-group">
+				<label for="ship_workbooks"># of Workbooks to Ship <span class="hl-optional">(Optional)</span></label>
+				<input type="number" id="ship_workbooks" name="ship_workbooks" min="0"
+					value="<?php echo esc_attr( $old['ship_workbooks'] ?? '' ); ?>" placeholder="0" />
+			</div>
+			<div class="hl-field-group">
+				<label for="ship_notes">Additional Materials / Notes <span class="hl-optional">(Optional)</span></label>
+				<textarea id="ship_notes" name="ship_notes" rows="3"
+					placeholder="Any other items to ship or special instructions."><?php
+					echo esc_textarea( $old['ship_notes'] ?? '' );
+				?></textarea>
+			</div>
+		</div>
+	</div>
+
+	<!-- ═══════════════════════════════════════════════════════════════════════
 	     SECTION 7: Host Contacts
 	════════════════════════════════════════════════════════════════════════ -->
 	<div class="hl-form-section">
@@ -691,6 +789,9 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		});
 	}
 	document.querySelectorAll('input[name="hl_contact_phone[]"], input[name="hl_contact_phone2[]"]').forEach(formatPhone);
+	// Also format the shipping phone field.
+	var shipPhoneField = document.getElementById('ship_phone');
+	if (shipPhoneField) formatPhone(shipPhoneField);
 
 	// ── Repeatable rows ────────────────────────────────────────────────────
 	var contactIdx = <?php echo max( 1, count( $c_names ?? array(1) ) ); ?>;
@@ -744,7 +845,53 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 	});
 });
 
+// ── Shipping toggle ───────────────────────────────────────────────────────
+var shippingCheckbox = document.getElementById('hl_add_shipping');
+var shippingFields   = document.getElementById('hl-shipping-fields');
+if (shippingCheckbox && shippingFields) {
+	shippingCheckbox.addEventListener('change', function() {
+		shippingFields.style.display = this.checked ? '' : 'none';
+	});
+}
+
 <?php if ( ! empty( $maps_api_key ) ) : ?>
+// ── Shipping address autocomplete ─────────────────────────────────────────
+function initShippingAutocomplete() {
+	if (typeof google === 'undefined' || !google.maps || !google.maps.places) return;
+	var shipAddr1 = document.getElementById('ship_address_1');
+	if (!shipAddr1) return;
+	var ac = new google.maps.places.Autocomplete(shipAddr1, {
+		types: ['address'],
+		componentRestrictions: { country: 'us' },
+		fields: ['address_components']
+	});
+	ac.addListener('place_changed', function() {
+		var place = ac.getPlace();
+		if (!place || !place.address_components) return;
+		var streetNum = '', route = '', city = '', state = '', zip = '';
+		place.address_components.forEach(function(c) {
+			var t = c.types[0];
+			if      ( t === 'street_number' )               streetNum = c.long_name;
+			else if ( t === 'route' )                       route     = c.short_name;
+			else if ( t === 'locality' )                    city      = c.long_name;
+			else if ( t === 'administrative_area_level_1' ) state     = c.short_name;
+			else if ( t === 'postal_code' )                 zip       = c.long_name;
+		});
+		shipAddr1.value = (streetNum + ' ' + route).trim();
+		var cityField  = document.getElementById('ship_city');
+		var stateField = document.getElementById('ship_state');
+		var zipField   = document.getElementById('ship_zip');
+		if (cityField)  cityField.value  = city;
+		if (stateField) stateField.value = state;
+		if (zipField)   zipField.value   = zip;
+	});
+}
+if (typeof google !== 'undefined' && google.maps && google.maps.places) {
+	initShippingAutocomplete();
+} else {
+	window.addEventListener('load', initShippingAutocomplete);
+}
+
 // ── Hotel name autocomplete with city/state bias ───────────────────────
 // Geocode is deferred to first focus so City/State are already filled.
 function geocodeVenueBounds(callback) {

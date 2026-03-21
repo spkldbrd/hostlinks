@@ -50,8 +50,9 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 				'eve_instructor' => $eve_instructor,
 				'eve_tot_date'   => $eve_tot_date,
 				'eve_status'     => 1,
+				'eve_created_at' => current_time( 'mysql' ),
 			),
-			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s','%d' )
+			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s','%d','%s' )
 		);
 		$new_eve_id = (int) $wpdb->insert_id;
 		// Auto-populate eve_roster_url if left blank.

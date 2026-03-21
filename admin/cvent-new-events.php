@@ -118,8 +118,9 @@ if ( isset( $_POST['hostlinks_cvent_add_event'] ) ) {
 				'cvent_event_start_utc' => $cvent_start_utc ? gmdate( 'Y-m-d H:i:s', strtotime( $cvent_start_utc ) ) : null,
 				'cvent_match_status'    => 'manual',
 				'cvent_last_synced'     => null,
+				'eve_created_at'        => current_time( 'mysql' ),
 			),
-			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s' )
+			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%s' )
 		);
 
 		$new_eve_id = (int) $wpdb->insert_id;

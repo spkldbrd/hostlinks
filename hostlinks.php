@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 define( 'HOSTLINKS_VERSION',    '2.5.92' );
-define( 'HOSTLINKS_DB_VERSION', '1.7' );
+define( 'HOSTLINKS_DB_VERSION', '1.8' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

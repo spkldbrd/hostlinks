@@ -66,6 +66,14 @@ class Hostlinks_DB {
 			}
 		}
 
+		// v1.8 — add eve_created_at to event_details_list to track when each event was added.
+		if ( version_compare( $installed, '1.8', '<' ) ) {
+			$table = $wpdb->prefix . 'event_details_list';
+			if ( empty( $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'eve_created_at' ) ) ) ) {
+				$wpdb->query( "ALTER TABLE `{$table}` ADD `eve_created_at` datetime DEFAULT NULL AFTER `eve_status`" );
+			}
+		}
+
 		// v1.7 — add new event request columns for form redesign.
 		if ( version_compare( $installed, '1.7', '<' ) ) {
 			$table = $wpdb->prefix . 'hostlinks_event_requests';
@@ -122,6 +130,7 @@ class Hostlinks_DB {
 			eve_instructor int(11) NOT NULL DEFAULT 0,
 			eve_tot_date varchar(100) NOT NULL DEFAULT '',
 			eve_status tinyint(1) NOT NULL DEFAULT 1,
+			eve_created_at datetime DEFAULT NULL,
 			cvent_event_id varchar(100) DEFAULT NULL,
 			cvent_event_title varchar(500) DEFAULT NULL,
 			cvent_event_start_utc datetime DEFAULT NULL,

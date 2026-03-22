@@ -41,6 +41,30 @@ $upcoming_url    = Hostlinks_Page_URLs::get_upcoming();
 $past_events_url = Hostlinks_Page_URLs::get_past_events();
 $reports_url     = get_permalink();
 
+// Marketing Ops button
+$mktops_btn_mode = get_option( 'hostlinks_mktops_btn', 'disabled' );
+$mktops_url      = ( $mktops_btn_mode !== 'disabled' ) ? Hostlinks_Page_URLs::get_mktops_hub() : '';
+$show_mktops_btn = false;
+if ( $mktops_url ) {
+	if ( $mktops_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
+		$show_mktops_btn = true;
+	} elseif ( $mktops_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'hostlinks_reports' ) ) {
+		$show_mktops_btn = true;
+	}
+}
+
+// + Event button
+$add_event_btn_mode = get_option( 'hostlinks_add_event_btn', 'disabled' );
+$event_request_url  = ( $add_event_btn_mode !== 'disabled' ) ? Hostlinks_Page_URLs::get_event_request_form() : '';
+$show_add_event_btn = false;
+if ( $event_request_url ) {
+	if ( $add_event_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
+		$show_add_event_btn = true;
+	} elseif ( $add_event_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'hostlinks_reports' ) ) {
+		$show_add_event_btn = true;
+	}
+}
+
 // ── Resolve cutoff / end dates from mode ──────────────────────────────────────
 if ( $range_mode === 'current_year' ) {
 	$cutoff   = gmdate( 'Y' ) . '-01-01';
@@ -216,6 +240,12 @@ $chart_data = array(
 		</span>
 
 		<a href="<?php echo esc_url( $reports_url ); ?>" class="hostlinks-btn hostlinks-btn--active">&#x1F4CA; Reports</a>
+		<?php if ( $show_mktops_btn ) : ?>
+		<a href="<?php echo esc_url( $mktops_url ); ?>" class="hostlinks-btn hostlinks-btn--mktops">&#x1F4CB; Marketing Ops</a>
+		<?php endif; ?>
+		<?php if ( $show_add_event_btn ) : ?>
+		<a href="<?php echo esc_url( $event_request_url ); ?>" class="hostlinks-btn hostlinks-btn--add-event">&#x2B; Event</a>
+		<?php endif; ?>
 		<script>
 		(function(){
 			var sel      = document.getElementById('hl-reports-range');

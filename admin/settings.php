@@ -16,6 +16,7 @@ $valid_tabs = array(
 	'public-event-list' => 'Public Event List',
 	'roster'            => 'Roster',
 	'alerts'            => 'Alerts',
+	'marketing-ops'     => 'Marketing Ops',
 );
 
 $current_tab = sanitize_key( $_GET['tab'] ?? 'general' );
@@ -70,6 +71,9 @@ switch ( $current_tab ) {
 		break;
 	case 'alerts':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/settings-alerts.php';
+		break;
+	case 'marketing-ops':
+		include HOSTLINKS_PLUGIN_DIR . 'admin/settings-marketing-ops.php';
 		break;
 }
 ?>

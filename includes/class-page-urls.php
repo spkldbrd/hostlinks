@@ -59,6 +59,14 @@ class Hostlinks_Page_URLs {
 		return self::resolve( 'event_request_form', 'hostlinks_event_request_form', '' );
 	}
 
+	/**
+	 * Returns the Marketing Hub page URL (page containing [hmo_dashboard_selector]), or '' if not found.
+	 * Used to power the optional "Marketing Ops" button on the upcoming events calendar.
+	 */
+	public static function get_mktops_hub(): string {
+		return self::resolve( 'mktops_hub', 'hmo_dashboard_selector', '' );
+	}
+
 	// ── Settings helpers ───────────────────────────────────────────────────────
 
 	public static function get_overrides() {
@@ -69,10 +77,11 @@ class Hostlinks_Page_URLs {
 			'public_event_list'   => '',
 			'roster'              => '',
 			'event_request_form'  => '',
+			'mktops_hub'          => '',
 		) );
 	}
 
-	public static function save_overrides( $upcoming, $past_events, $reports, $public_event_list = '', $roster = '', $event_request_form = '' ) {
+	public static function save_overrides( $upcoming, $past_events, $reports, $public_event_list = '', $roster = '', $event_request_form = '', $mktops_hub = '' ) {
 		update_option( self::OPTION_KEY, array(
 			'upcoming'           => esc_url_raw( trim( $upcoming ) ),
 			'past_events'        => esc_url_raw( trim( $past_events ) ),
@@ -80,6 +89,7 @@ class Hostlinks_Page_URLs {
 			'public_event_list'  => esc_url_raw( trim( $public_event_list ) ),
 			'roster'             => esc_url_raw( trim( $roster ) ),
 			'event_request_form' => esc_url_raw( trim( $event_request_form ) ),
+			'mktops_hub'         => esc_url_raw( trim( $mktops_hub ) ),
 		) );
 		self::clear_cache();
 	}
@@ -93,6 +103,7 @@ class Hostlinks_Page_URLs {
 		delete_transient( 'hostlinks_page_url_public_event_list' );
 		delete_transient( 'hostlinks_page_url_roster' );
 		delete_transient( 'hostlinks_page_url_event_request_form' );
+		delete_transient( 'hostlinks_page_url_mktops_hub' );
 		// Remove the legacy transient used by Reports in earlier versions.
 		delete_transient( 'hostlinks_reports_page_url' );
 	}
@@ -162,6 +173,7 @@ class Hostlinks_Page_URLs {
 			'public_event_list'  => array( 'shortcode' => 'public_event_list',             'default_path' => '' ),
 			'roster'             => array( 'shortcode' => 'hostlinks_roster',              'default_path' => '' ),
 			'event_request_form' => array( 'shortcode' => 'hostlinks_event_request_form',  'default_path' => '' ),
+			'mktops_hub'         => array( 'shortcode' => 'hmo_dashboard_selector',        'default_path' => '' ),
 		);
 
 		$status = array();

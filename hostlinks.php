@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.5.93
+ * Version:     2.5.94
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.5.93' );
+define( 'HOSTLINKS_VERSION',    '2.5.94' );
 define( 'HOSTLINKS_DB_VERSION', '1.9' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -56,6 +56,51 @@ new Hostlinks_Event_Request_Shortcode();
 
 // CVENT daily sync scheduler
 Hostlinks_CVENT_Scheduler::init();
+
+// Marketing Ops integration: one-time detection notice + dismiss handler.
+add_action( 'admin_init',    'hostlinks_handle_mktops_dismiss' );
+add_action( 'admin_notices', 'hostlinks_mktops_detection_notice' );
+
+function hostlinks_handle_mktops_dismiss() {
+	if ( empty( $_GET['hl_mktops_action'] ) ) {
+		return;
+	}
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	check_admin_referer( 'hostlinks_mktops_notice' );
+
+	$action = sanitize_key( $_GET['hl_mktops_action'] );
+	update_option( 'hostlinks_mktops_prompt_dismissed', '1' );
+
+	$redirect = remove_query_arg( array( 'hl_mktops_action', '_wpnonce' ) );
+	if ( $action === 'yes' ) {
+		$redirect = admin_url( 'admin.php?page=hostlinks-settings&tab=marketing-ops' );
+	}
+	wp_safe_redirect( $redirect );
+	exit;
+}
+
+function hostlinks_mktops_detection_notice() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	if ( get_option( 'hostlinks_mktops_prompt_dismissed' ) === '1' ) {
+		return;
+	}
+	if ( ! Hostlinks_Page_URLs::get_mktops_hub() ) {
+		return;
+	}
+	$yes_url     = wp_nonce_url( add_query_arg( 'hl_mktops_action', 'yes' ),     'hostlinks_mktops_notice' );
+	$dismiss_url = wp_nonce_url( add_query_arg( 'hl_mktops_action', 'dismiss' ), 'hostlinks_mktops_notice' );
+	?>
+	<div class="notice notice-info" style="display:flex;align-items:center;gap:16px;padding:12px 16px;flex-wrap:wrap;">
+		<p style="margin:0;flex:1 1 auto;"><strong>Hostlinks:</strong> A <strong>Marketing Hub</strong> page was detected on your site. Would you like to enable the <strong>&#x1F4CB; Marketing Ops</strong> button on the Hostlinks calendar?</p>
+		<a href="<?php echo esc_url( $yes_url ); ?>" class="button button-primary" style="white-space:nowrap;">Yes, enable it</a>
+		<a href="<?php echo esc_url( $dismiss_url ); ?>" class="button button-secondary" style="white-space:nowrap;">Not Now</a>
+	</div>
+	<?php
+}
 
 // Roster finalize cron: re-fetch and permanently cache attendees 5 days after event end.
 add_action( 'hostlinks_roster_finalize', function( $cvent_id, $eve_id ) {

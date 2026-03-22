@@ -128,6 +128,18 @@ if ( $event_request_url ) {
 		$show_add_event_btn = true;
 	}
 }
+
+// Determine if the current user should see the "Marketing Ops" button.
+$mktops_btn_mode = get_option( 'hostlinks_mktops_btn', 'disabled' );
+$mktops_url      = ( $mktops_btn_mode !== 'disabled' ) ? Hostlinks_Page_URLs::get_mktops_hub() : '';
+$show_mktops_btn = false;
+if ( $mktops_url ) {
+	if ( $mktops_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
+		$show_mktops_btn = true;
+	} elseif ( $mktops_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'eventlisto' ) ) {
+		$show_mktops_btn = true;
+	}
+}
 ?>
 <?php if ( $hl_a1_on || $hl_a2_on ) : ?>
 <style>
@@ -183,10 +195,14 @@ if ( $event_request_url ) {
 		});
 		</script>
 
-		<?php if ( $reports_page_url ) : ?>
-		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
-		<?php elseif ( $show_add_event_btn ) : ?>
+		<?php if ( $reports_page_url || $show_mktops_btn || $show_add_event_btn ) : ?>
 		<span style="margin-left:auto;"></span>
+		<?php endif; ?>
+		<?php if ( $reports_page_url ) : ?>
+		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn">&#x1F4CA; Reports</a>
+		<?php endif; ?>
+		<?php if ( $show_mktops_btn ) : ?>
+		<a href="<?php echo esc_url( $mktops_url ); ?>" class="hostlinks-btn hostlinks-btn--mktops">&#x1F4CB; Marketing Ops</a>
 		<?php endif; ?>
 		<?php if ( $show_add_event_btn ) : ?>
 		<a href="<?php echo esc_url( $event_request_url ); ?>" class="hostlinks-btn hostlinks-btn--add-event">&#x2B; Event</a>

@@ -95,6 +95,19 @@
   color: #fff;
 }
 
+.hostlinks-btn--mktops {
+  background: hsl(262 60% 52%);
+  border-color: hsl(262 60% 44%);
+  color: #fff;
+  font-weight: 600;
+}
+
+.hostlinks-btn--mktops:hover {
+  background: hsl(262 60% 44%);
+  border-color: hsl(262 60% 36%);
+  color: #fff;
+}
+
 /* Month header banner */
 .hostlinks-month-header {
   background: hsl(199 89% 48%);
@@ -390,6 +403,18 @@
 .wp-dark-mode-active .hostlinks-btn--add-event:hover {
   background: hsl(142 60% 25%);
   border-color: hsl(142 60% 20%);
+  color: #fff;
+}
+
+.wp-dark-mode-active .hostlinks-btn--mktops {
+  background: hsl(262 45% 38%);
+  border-color: hsl(262 45% 30%);
+  color: #fff;
+}
+
+.wp-dark-mode-active .hostlinks-btn--mktops:hover {
+  background: hsl(262 45% 30%);
+  border-color: hsl(262 45% 24%);
   color: #fff;
 }
 

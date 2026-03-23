@@ -89,7 +89,7 @@ if ( isset( $_POST['hostlinks_cvent_add_event'] ) ) {
 	$eve_web_url = esc_url_raw( trim( $_POST['eve_web_url'] ?? '' ) );
 	$eve_start       = sanitize_text_field( $_POST['eve_start'] ?? '' );
 	$eve_end         = sanitize_text_field( $_POST['eve_end'] ?? '' );
-	$eve_tot_date    = $eve_start . '-' . $eve_end;
+	$eve_tot_date    = str_replace( '-', '/', $eve_start ) . ' - ' . str_replace( '-', '/', $eve_end );
 
 	if ( ! $eve_location || ! $eve_type || ! $eve_marketer || ! $eve_start || ! $eve_end ) {
 		$action_msg  = 'Please fill in all required fields: Location, Type, Marketer, Start Date, End Date.';

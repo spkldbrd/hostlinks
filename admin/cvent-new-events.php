@@ -352,9 +352,26 @@ function hostlinks_cvent_zoom_location( $title ) {
 		if ( $is_zoom ) {
 			// ZOOM/webinar: derive location from timezone abbreviation + type in the CVENT title.
 			$prefilled_loc = hostlinks_cvent_zoom_location( $title );
+			// Pre-select "Zoom" marketer and "Ericka" instructor for ZOOM events.
+			$zoom_marketer_id   = 0;
+			$ericka_instructor_id = 0;
+			foreach ( $all_marketers as $m ) {
+				if ( strcasecmp( trim( $m['event_marketer_name'] ), 'zoom' ) === 0 ) {
+					$zoom_marketer_id = (int) $m['event_marketer_id'];
+					break;
+				}
+			}
+			foreach ( $all_instructors as $i ) {
+				if ( stripos( trim( $i['event_instructor_name'] ), 'ericka' ) !== false ) {
+					$ericka_instructor_id = (int) $i['event_instructor_id'];
+					break;
+				}
+			}
 		} else {
 			// In-person: extract city/state from title as before.
-			$prefilled_loc = Hostlinks_CVENT_Matcher::title_location_from_cvent( $title );
+			$prefilled_loc        = Hostlinks_CVENT_Matcher::title_location_from_cvent( $title );
+			$zoom_marketer_id     = 0;
+			$ericka_instructor_id = 0;
 			if ( $is_subaward && $prefilled_loc && false === stripos( $prefilled_loc, '| SUB' ) ) {
 				$prefilled_loc .= ' | SUB';
 			}
@@ -481,11 +498,15 @@ function hostlinks_cvent_zoom_location( $title ) {
 								<select name="eve_marketer" required>
 									<option value="">— select marketer —</option>
 									<?php foreach ( $all_marketers as $m ) : ?>
-										<option value="<?php echo esc_attr( $m['event_marketer_id'] ); ?>">
+										<option value="<?php echo esc_attr( $m['event_marketer_id'] ); ?>"
+											<?php selected( $zoom_marketer_id, (int) $m['event_marketer_id'] ); ?>>
 											<?php echo esc_html( $m['event_marketer_name'] ); ?>
 										</option>
 									<?php endforeach; ?>
 								</select>
+								<?php if ( $zoom_marketer_id ) : ?>
+									<span style="color:#2271b1;font-size:11px;margin-left:8px;">✓ pre-filled for Zoom</span>
+								<?php endif; ?>
 							</td>
 						</tr>
 						<tr>
@@ -494,11 +515,15 @@ function hostlinks_cvent_zoom_location( $title ) {
 								<select name="eve_instructor">
 									<option value="0">— none / TBA —</option>
 									<?php foreach ( $all_instructors as $i ) : ?>
-										<option value="<?php echo esc_attr( $i['event_instructor_id'] ); ?>">
+										<option value="<?php echo esc_attr( $i['event_instructor_id'] ); ?>"
+											<?php selected( $ericka_instructor_id, (int) $i['event_instructor_id'] ); ?>>
 											<?php echo esc_html( $i['event_instructor_name'] ); ?>
 										</option>
 									<?php endforeach; ?>
 								</select>
+								<?php if ( $ericka_instructor_id ) : ?>
+									<span style="color:#2271b1;font-size:11px;margin-left:8px;">✓ pre-filled for Zoom</span>
+								<?php endif; ?>
 							</td>
 						</tr>
 						<tr>

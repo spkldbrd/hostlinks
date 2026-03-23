@@ -226,6 +226,54 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 	return 0;
 }
 
+/**
+ * Build the Hostlinks location string for a ZOOM / webinar event from its CVENT title.
+ *
+ * Timezone abbreviation → Region:
+ *   EST / ET  → East
+ *   PST / PT  → West
+ *   CST / CT  → Central
+ *   MST / MT  → Mountain
+ *
+ * Type → suffix:
+ *   Subaward variant → "Management | SUB"
+ *   Writing          → "Writing"
+ *   Everything else  → "Management"
+ *
+ * Examples: "East Writing", "West Management", "Central Management | SUB"
+ */
+function hostlinks_cvent_zoom_location( $title ) {
+	// Longer abbreviations first so "EST" matches before "ET", etc.
+	$tz_map = array(
+		'EST' => 'East',
+		'ET'  => 'East',
+		'PST' => 'West',
+		'PT'  => 'West',
+		'CST' => 'Central',
+		'CT'  => 'Central',
+		'MST' => 'Mountain',
+		'MT'  => 'Mountain',
+	);
+	$region = '';
+	foreach ( $tz_map as $abbr => $label ) {
+		if ( preg_match( '/\b' . preg_quote( $abbr, '/' ) . '\b/i', $title ) ) {
+			$region = $label;
+			break;
+		}
+	}
+
+	// Subaward takes priority over everything else.
+	if ( hostlinks_is_subaward_text( $title ) ) {
+		$type_suffix = 'Management | SUB';
+	} elseif ( false !== stripos( $title, 'writing' ) ) {
+		$type_suffix = 'Writing';
+	} else {
+		$type_suffix = 'Management';
+	}
+
+	return $region ? ( $region . ' ' . $type_suffix ) : $type_suffix;
+}
+
 ?>
 <div class="wrap">
 <h1>New CVENT Events</h1>
@@ -298,12 +346,19 @@ function hostlinks_cvent_guess_type( $title, $map ) {
 			$end_val    = $end_dt    ? $end_dt->format( 'Y-m-d' )    : '';
 
 		// Pre-fill logic.
-		$prefilled_loc = Hostlinks_CVENT_Matcher::title_location_from_cvent( $title );
-		$is_subaward   = hostlinks_is_subaward_text( $title );
-		if ( $is_subaward && $prefilled_loc && false === stripos( $prefilled_loc, '| SUB' ) ) {
-			$prefilled_loc .= ' | SUB';
+		$is_zoom     = ( false !== stripos( $title, 'zoom' ) || false !== stripos( $title, 'webinar' ) );
+		$is_subaward = hostlinks_is_subaward_text( $title );
+
+		if ( $is_zoom ) {
+			// ZOOM/webinar: derive location from timezone abbreviation + type in the CVENT title.
+			$prefilled_loc = hostlinks_cvent_zoom_location( $title );
+		} else {
+			// In-person: extract city/state from title as before.
+			$prefilled_loc = Hostlinks_CVENT_Matcher::title_location_from_cvent( $title );
+			if ( $is_subaward && $prefilled_loc && false === stripos( $prefilled_loc, '| SUB' ) ) {
+				$prefilled_loc .= ' | SUB';
+			}
 		}
-		$is_zoom       = ( false !== stripos( $title, 'zoom' ) || false !== stripos( $title, 'webinar' ) );
 		$guessed_type  = hostlinks_cvent_guess_type( $title, $type_keyword_map );
 		$reg_url       = $ev['registrationUrl'] ?? $ev['publicRegistrationUrl'] ?? $ev['websiteLink'] ?? '';
 		$form_id       = 'cvent-add-form-' . $idx;

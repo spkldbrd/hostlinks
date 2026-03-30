@@ -66,9 +66,37 @@ class Hostlinks_DB {
 			}
 		}
 
-		// v1.9 — add shipping detail columns to both event_details_list and hostlinks_event_requests.
-		// v2.0 — add contact detail columns to event_marketer.
-		if ( version_compare( $installed, '2.0', '<' ) ) {
+	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
+	if ( version_compare( $installed, '2.1', '<' ) ) {
+		$tbl      = $wpdb->prefix . 'event_details_list';
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+		$v21_cols = array(
+			'host_name'            => "varchar(255) NOT NULL DEFAULT ''",
+			'displayed_as'         => "varchar(500) NOT NULL DEFAULT ''",
+			'location_name'        => "varchar(255) NOT NULL DEFAULT ''",
+			'street_address_1'     => "varchar(255) NOT NULL DEFAULT ''",
+			'street_address_2'     => "varchar(255) NOT NULL DEFAULT ''",
+			'street_address_3'     => "varchar(255) NOT NULL DEFAULT ''",
+			'city'                 => "varchar(100) NOT NULL DEFAULT ''",
+			'state'                => "varchar(100) NOT NULL DEFAULT ''",
+			'zip_code'             => "varchar(20)  NOT NULL DEFAULT ''",
+			'special_instructions' => "text NOT NULL DEFAULT ''",
+			'parking_file_url'     => "varchar(1000) NOT NULL DEFAULT ''",
+			'custom_email_intro'   => "text NOT NULL DEFAULT ''",
+			'host_contacts'        => "text NOT NULL DEFAULT ''",
+			'hotels'               => "text NOT NULL DEFAULT ''",
+			'max_attendees'        => 'int(11) DEFAULT NULL',
+		);
+		foreach ( $v21_cols as $col => $definition ) {
+			if ( ! in_array( $col, $existing, true ) ) {
+				$wpdb->query( "ALTER TABLE `{$tbl}` ADD `{$col}` {$definition}" );
+			}
+		}
+	}
+
+	// v1.9 — add shipping detail columns to both event_details_list and hostlinks_event_requests.
+	// v2.0 — add contact detail columns to event_marketer.
+	if ( version_compare( $installed, '2.0', '<' ) ) {
 			$tbl        = $wpdb->prefix . 'event_marketer';
 			$existing   = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
 			$mkt_cols   = array(
@@ -196,6 +224,21 @@ class Hostlinks_DB {
 			ship_zip       varchar(20)  NOT NULL DEFAULT '',
 			ship_workbooks int(11) DEFAULT NULL,
 			ship_notes     text NOT NULL DEFAULT '',
+			host_name            varchar(255) NOT NULL DEFAULT '',
+			displayed_as         varchar(500) NOT NULL DEFAULT '',
+			location_name        varchar(255) NOT NULL DEFAULT '',
+			street_address_1     varchar(255) NOT NULL DEFAULT '',
+			street_address_2     varchar(255) NOT NULL DEFAULT '',
+			street_address_3     varchar(255) NOT NULL DEFAULT '',
+			city                 varchar(100) NOT NULL DEFAULT '',
+			state                varchar(100) NOT NULL DEFAULT '',
+			zip_code             varchar(20)  NOT NULL DEFAULT '',
+			special_instructions text NOT NULL DEFAULT '',
+			parking_file_url     varchar(1000) NOT NULL DEFAULT '',
+			custom_email_intro   text NOT NULL DEFAULT '',
+			host_contacts        text NOT NULL DEFAULT '',
+			hotels               text NOT NULL DEFAULT '',
+			max_attendees        int(11) DEFAULT NULL,
 			PRIMARY KEY  (eve_id)
 		) $charset_collate;";
 		dbDelta( $sql );

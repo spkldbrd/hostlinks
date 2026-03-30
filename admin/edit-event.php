@@ -68,6 +68,7 @@ if ( isset( $_POST['hl_edit_full_event'] ) ) {
 	$eve_roster_url  = esc_url_raw( trim( $_POST['eve_roster_url']  ?? '' ) );
 	$eve_trainer_url = esc_url_raw( trim( $_POST['eve_trainer_url'] ?? '' ) );
 	$eve_web_url     = esc_url_raw( trim( $_POST['eve_web_url']     ?? '' ) );
+	$eve_email_url   = esc_url_raw( trim( $_POST['eve_email_url']   ?? '' ) );
 
 	// Shipping
 	$ship_workbooks_raw = trim( $_POST['ship_workbooks'] ?? '' );
@@ -142,6 +143,7 @@ if ( isset( $_POST['hl_edit_full_event'] ) ) {
 		'eve_roster_url'  => $eve_roster_url,
 		'eve_trainer_url' => $eve_trainer_url,
 		'eve_web_url'     => $eve_web_url,
+		'eve_email_url'   => $eve_email_url,
 		// Shipping
 		'ship_name'      => $has_shipping ? sanitize_text_field( $_POST['ship_name']      ?? '' ) : '',
 		'ship_email'     => $has_shipping ? sanitize_email(      $_POST['ship_email']     ?? '' ) : '',
@@ -467,6 +469,13 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 				<th style="padding:8px 12px;">Web / Sign-in URL</th>
 				<td style="padding:8px 12px;">
 					<input type="url" name="eve_web_url" value="<?php echo esc_attr( $ev['eve_web_url'] ?? '' ); ?>"
+						class="large-text" placeholder="https://" />
+				</td>
+			</tr>
+			<tr>
+				<th style="padding:8px 12px;">Email URL</th>
+				<td style="padding:8px 12px;">
+					<input type="url" name="eve_email_url" value="<?php echo esc_attr( $ev['eve_email_url'] ?? '' ); ?>"
 						class="large-text" placeholder="https://" />
 				</td>
 			</tr>

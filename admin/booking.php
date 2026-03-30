@@ -32,6 +32,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'] ) );
 		$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'] ) );
 		$eve_web_url      = esc_url_raw( trim( $_POST['eve_web_url'] ) );
+		$eve_email_url    = esc_url_raw( trim( $_POST['eve_email_url'] ?? '' ) );
 		$eve_zoom_time    = sanitize_text_field( $_POST['eve_zoom_time'] ?? '' );
 		$eve_public_hide  = isset( $_POST['eve_public_hide'] ) ? 1 : 0;
 		$eve_instructor   = intval( $_POST['eve_instructor'] );
@@ -51,6 +52,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 				'eve_roster_url' => $eve_roster_url,
 				'eve_trainer_url'=> $eve_trainer_url,
 				'eve_web_url'    => $eve_web_url,
+				'eve_email_url'  => $eve_email_url,
 				'eve_zoom_time'  => $eve_zoom_time,
 				'eve_public_hide'=> $eve_public_hide,
 				'eve_instructor' => $eve_instructor,
@@ -58,7 +60,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 				'eve_status'     => 1,
 				'eve_created_at' => current_time( 'mysql' ),
 			),
-			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s','%d','%s' )
+			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%s','%d','%d','%s','%d','%s' )
 		);
 		$new_eve_id = (int) $wpdb->insert_id;
 		// Auto-populate eve_roster_url if left blank.
@@ -143,6 +145,10 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
         <th><label for="eve_web_url">WEB URL</label></th>
         <td><input type="text" value="" id="eve_web_url" name="eve_web_url"></td>
       </tr>
+      <tr class="form-field">
+        <th><label for="eve_email_url">EMAIL URL</label></th>
+        <td><input type="text" value="" id="eve_email_url" name="eve_email_url" placeholder="https://"></td>
+      </tr>
       <tr class="form-field hl-zoom-time-row" style="display:none;">
         <th><label for="eve_zoom_time">ZOOM Time</label></th>
         <td>
@@ -209,6 +215,7 @@ jQuery(function() {
 		$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'] ) );
 		$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'] ) );
 		$eve_web_url      = esc_url_raw( trim( $_POST['eve_web_url'] ) );
+		$eve_email_url    = esc_url_raw( trim( $_POST['eve_email_url'] ?? '' ) );
 		$eve_zoom_time    = sanitize_text_field( $_POST['eve_zoom_time'] ?? '' );
 		$eve_public_hide  = isset( $_POST['eve_public_hide'] ) ? 1 : 0;
 		$eve_instructor   = intval( $_POST['eve_instructor'] );
@@ -228,13 +235,14 @@ jQuery(function() {
 				'eve_roster_url'  => $eve_roster_url,
 				'eve_trainer_url' => $eve_trainer_url,
 				'eve_web_url'     => $eve_web_url,
+				'eve_email_url'   => $eve_email_url,
 				'eve_zoom_time'   => $eve_zoom_time,
 				'eve_public_hide' => $eve_public_hide,
 				'eve_instructor'  => $eve_instructor,
 				'eve_tot_date'    => $eve_tot_date,
 			),
 			array( 'eve_id' => $userid ),
-			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s' ),
+			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%s','%d','%d','%s' ),
 			array( '%d' )
 		);
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event Sucessfully Updated. <a href="admin.php?page=booking-menu">View Event</a></p></div>';
@@ -309,6 +317,10 @@ jQuery(function() {
       <tr class="form-field">
         <th><label for="eve_web_url">WEB URL</label></th>
         <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_web_url ?? '' ); ?>" id="eve_web_url" name="eve_web_url"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="eve_email_url">EMAIL URL</label></th>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->eve_email_url ?? '' ); ?>" id="eve_email_url" name="eve_email_url" placeholder="https://"></td>
       </tr>
       <tr class="form-field hl-zoom-time-row" style="<?php echo ( ( $bokdetsx->eve_zoom ?? '' ) === 'yes' ) ? '' : 'display:none;'; ?>">
         <th><label for="eve_zoom_time">ZOOM Time</label></th>
@@ -405,8 +417,9 @@ jQuery(function() {
 						$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'][ $key ] ) );
 						$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'][ $key ] ) );
 						$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'][ $key ] ) );
-						$eve_web_url      = esc_url_raw( trim( $_POST['eve_web_url'][ $key ] ) );
-						$eve_zoom_time    = sanitize_text_field( $_POST['eve_zoom_time'][ $key ] ?? '' );
+					$eve_web_url      = esc_url_raw( trim( $_POST['eve_web_url'][ $key ] ) );
+					$eve_email_url    = esc_url_raw( trim( $_POST['eve_email_url'][ $key ] ?? '' ) );
+					$eve_zoom_time    = sanitize_text_field( $_POST['eve_zoom_time'][ $key ] ?? '' );
 						$hide_ids         = isset( $_POST['eve_public_hide_ids'] ) ? (array) $_POST['eve_public_hide_ids'] : array();
 						$eve_public_hide  = in_array( (string) $user, $hide_ids ) ? 1 : 0;
 						$eve_instructor   = intval( $_POST['eve_instructor'][ $key ] );
@@ -431,16 +444,17 @@ jQuery(function() {
 								'eve_host_url'    => $eve_host_url,
 								'eve_roster_url'  => $eve_roster_url,
 								'eve_trainer_url' => $eve_trainer_url,
-								'eve_web_url'     => $eve_web_url,
-								'eve_zoom_time'   => $eve_zoom_time,
-								'eve_public_hide' => $eve_public_hide,
-								'eve_instructor'  => $eve_instructor,
-								'eve_tot_date'    => $eve_tot_date,
-							),
-							array( 'eve_id' => $userid ),
-							array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%d','%d','%s' ),
-							array( '%d' )
-						);
+							'eve_web_url'     => $eve_web_url,
+							'eve_email_url'   => $eve_email_url,
+							'eve_zoom_time'   => $eve_zoom_time,
+							'eve_public_hide' => $eve_public_hide,
+							'eve_instructor'  => $eve_instructor,
+							'eve_tot_date'    => $eve_tot_date,
+						),
+						array( 'eve_id' => $userid ),
+						array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%s','%d','%d','%s' ),
+						array( '%d' )
+					);
 					}
 				}
 				update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
@@ -543,7 +557,7 @@ jQuery(function() {
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
             <th>Location</th><th>Paid</th><th>Free</th><th>Date</th>
             <th>Type</th><th>Zoom</th><th>Marketer</th>
-            <th style="width:40px;"></th><th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
+            <th style="width:40px;"></th><th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
           </tr>
         </thead>
         <tbody id="the-list">
@@ -591,6 +605,7 @@ jQuery(function() {
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>" name="eve_trainer_url[]" style="width:140px;"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_web_url'] ?? '' ); ?>" name="eve_web_url[]" style="width:140px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_email_url'] ?? '' ); ?>" name="eve_email_url[]" style="width:140px;" placeholder="https://"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_zoom_time'] ?? '' ); ?>" name="eve_zoom_time[]" placeholder="e.g. 9:30-4:30 EST" style="width:110px;"></td>
             <td style="text-align:center;"><input type="checkbox" name="eve_public_hide_ids[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" <?php checked( 1, intval( $alldriver['eve_public_hide'] ?? 0 ) ); ?>></td>
             <td>
@@ -629,12 +644,12 @@ jQuery(function() {
 <script type="text/javascript">
 jQuery(document).ready(function(){
   jQuery('#myTable').dataTable({
-    "aoColumns": [null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null],
+    "aoColumns": [null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null,null],
     "order": [[4,"asc"]],
     "bPaginate": true, "bLengthChange": true, "bFilter": true, "bSort": true,
     "bInfo": true, "bAutoWidth": true, "stateSave": true, "searching": true,
     "dom": 'lfrtip', "pageLength": 25, "lengthChange": true,
-    "columnDefs": [{"targets":[0,2,3,5,6,7,8,9,10,11,12],"orderable":false}]
+    "columnDefs": [{"targets":[0,2,3,5,6,7,8,9,10,11,12,13],"orderable":false}]
   });
   jQuery.extend(jQuery.fn.dataTableExt.oSort, {
     "date-uk-pre": function(a) { var d=a.split('/'); return (d[2]+d[1]+d[0])*1; },

@@ -66,6 +66,15 @@ class Hostlinks_DB {
 			}
 		}
 
+	// v2.2 — add eve_email_url column to event_details_list.
+	if ( version_compare( $installed, '2.2', '<' ) ) {
+		$tbl      = $wpdb->prefix . 'event_details_list';
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+		if ( ! in_array( 'eve_email_url', $existing, true ) ) {
+			$wpdb->query( "ALTER TABLE `{$tbl}` ADD `eve_email_url` text NOT NULL DEFAULT ''" );
+		}
+	}
+
 	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
 	if ( version_compare( $installed, '2.1', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'event_details_list';
@@ -224,6 +233,7 @@ class Hostlinks_DB {
 			ship_zip       varchar(20)  NOT NULL DEFAULT '',
 			ship_workbooks int(11) DEFAULT NULL,
 			ship_notes     text NOT NULL DEFAULT '',
+			eve_email_url  text NOT NULL DEFAULT '',
 			host_name            varchar(255) NOT NULL DEFAULT '',
 			displayed_as         varchar(500) NOT NULL DEFAULT '',
 			location_name        varchar(255) NOT NULL DEFAULT '',

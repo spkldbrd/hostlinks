@@ -67,6 +67,23 @@ class Hostlinks_DB {
 		}
 
 		// v1.9 — add shipping detail columns to both event_details_list and hostlinks_event_requests.
+		// v2.0 — add contact detail columns to event_marketer.
+		if ( version_compare( $installed, '2.0', '<' ) ) {
+			$tbl        = $wpdb->prefix . 'event_marketer';
+			$existing   = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+			$mkt_cols   = array(
+				'marketer_full_name' => "varchar(255) NOT NULL DEFAULT ''",
+				'marketer_company'   => "varchar(255) NOT NULL DEFAULT ''",
+				'marketer_phone'     => "varchar(50)  NOT NULL DEFAULT ''",
+				'marketer_email'     => "varchar(255) NOT NULL DEFAULT ''",
+			);
+			foreach ( $mkt_cols as $col => $definition ) {
+				if ( ! in_array( $col, $existing, true ) ) {
+					$wpdb->query( "ALTER TABLE `{$tbl}` ADD `{$col}` {$definition}" );
+				}
+			}
+		}
+
 		if ( version_compare( $installed, '1.9', '<' ) ) {
 			$ship_cols = array(
 				'ship_name'      => "varchar(255) NOT NULL DEFAULT ''",
@@ -196,6 +213,10 @@ class Hostlinks_DB {
 			event_marketer_id bigint(20) NOT NULL AUTO_INCREMENT,
 			event_marketer_name varchar(255) NOT NULL DEFAULT '',
 			event_marketer_status tinyint(1) NOT NULL DEFAULT 1,
+			marketer_full_name varchar(255) NOT NULL DEFAULT '',
+			marketer_company varchar(255) NOT NULL DEFAULT '',
+			marketer_phone varchar(50) NOT NULL DEFAULT '',
+			marketer_email varchar(255) NOT NULL DEFAULT '',
 			PRIMARY KEY  (event_marketer_id)
 		) $charset_collate;";
 		dbDelta( $sql );

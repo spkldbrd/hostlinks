@@ -12,8 +12,15 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		$postcodename = sanitize_text_field( $_POST['first_name'] );
 		$wpdb->insert(
 			$table11,
-			array( 'event_marketer_name' => $postcodename, 'event_marketer_status' => 1 ),
-			array( '%s', '%d' )
+			array(
+				'event_marketer_name'   => $postcodename,
+				'event_marketer_status' => 1,
+				'marketer_full_name'    => sanitize_text_field( $_POST['marketer_full_name'] ?? '' ),
+				'marketer_company'      => sanitize_text_field( $_POST['marketer_company']   ?? '' ),
+				'marketer_phone'        => sanitize_text_field( $_POST['marketer_phone']     ?? '' ),
+				'marketer_email'        => sanitize_email(      $_POST['marketer_email']     ?? '' ),
+			),
+			array( '%s', '%d', '%s', '%s', '%s', '%s' )
 		);
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Marketer successfully added. <a href="admin.php?page=marketer-menu">View Marketers</a></p></div>';
 	}
@@ -25,8 +32,27 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
     <?php wp_nonce_field( 'hostlinks_add_marketer' ); ?>
     <table class="form-table"><tbody>
       <tr class="form-field">
-        <th><label for="first_name">Name of the Marketer <span class="description">(required)</span></label></th>
-        <td><input type="text" value="" id="first_name" name="first_name" required onkeypress="return alphabetssonly(event)"></td>
+        <th><label for="first_name">Short Name <span class="description">(required)</span></label></th>
+        <td>
+          <input type="text" value="" id="first_name" name="first_name" required onkeypress="return alphabetssonly(event)">
+          <p class="description">Single word used in dropdowns and displays (e.g. "Maddux").</p>
+        </td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="marketer_full_name">Full Name</label></th>
+        <td><input type="text" value="" id="marketer_full_name" name="marketer_full_name" style="width:260px;" placeholder="e.g. Maddux Ballenger"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="marketer_company">Company</label></th>
+        <td><input type="text" value="" id="marketer_company" name="marketer_company" style="width:260px;" placeholder="e.g. Grant Writing USA"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="marketer_phone">Phone</label></th>
+        <td><input type="text" value="" id="marketer_phone" name="marketer_phone" style="width:180px;" placeholder="e.g. 702.677.0402"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="marketer_email">Email</label></th>
+        <td><input type="email" value="" id="marketer_email" name="marketer_email" style="width:260px;" placeholder="e.g. maddux@grantwritingusa.net"></td>
       </tr>
     </tbody></table>
     <p class="submit">
@@ -50,9 +76,13 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 			array(
 				'event_marketer_name'   => $postcodename,
 				'event_marketer_status' => $poststatus,
+				'marketer_full_name'    => sanitize_text_field( $_POST['marketer_full_name'] ?? '' ),
+				'marketer_company'      => sanitize_text_field( $_POST['marketer_company']   ?? '' ),
+				'marketer_phone'        => sanitize_text_field( $_POST['marketer_phone']     ?? '' ),
+				'marketer_email'        => sanitize_email(      $_POST['marketer_email']     ?? '' ),
 			),
 			array( 'event_marketer_id' => $userid ),
-			array( '%s', '%d' ),
+			array( '%s', '%d', '%s', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Marketer successfully updated. <a href="admin.php?page=marketer-menu">View Marketers</a></p></div>';
@@ -66,8 +96,27 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
     <?php wp_nonce_field( 'hostlinks_edit_marketer' ); ?>
     <table class="form-table"><tbody>
       <tr class="form-field">
-        <th><label for="first_name">Name of the Marketer <span class="description">(required)</span></label></th>
-        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->event_marketer_name ?? '' ); ?>" id="first_name" name="first_name" required onkeypress="return alphabetssonly(event)"></td>
+        <th><label for="first_name">Short Name <span class="description">(required)</span></label></th>
+        <td>
+          <input type="text" value="<?php echo esc_attr( $bokdetsx->event_marketer_name ?? '' ); ?>" id="first_name" name="first_name" required onkeypress="return alphabetssonly(event)">
+          <p class="description">Single word used in dropdowns and displays.</p>
+        </td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="marketer_full_name">Full Name</label></th>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->marketer_full_name ?? '' ); ?>" id="marketer_full_name" name="marketer_full_name" style="width:260px;" placeholder="e.g. Maddux Ballenger"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="marketer_company">Company</label></th>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->marketer_company ?? '' ); ?>" id="marketer_company" name="marketer_company" style="width:260px;" placeholder="e.g. Grant Writing USA"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="marketer_phone">Phone</label></th>
+        <td><input type="text" value="<?php echo esc_attr( $bokdetsx->marketer_phone ?? '' ); ?>" id="marketer_phone" name="marketer_phone" style="width:180px;" placeholder="e.g. 702.677.0402"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="marketer_email">Email</label></th>
+        <td><input type="email" value="<?php echo esc_attr( $bokdetsx->marketer_email ?? '' ); ?>" id="marketer_email" name="marketer_email" style="width:260px;" placeholder="e.g. maddux@grantwritingusa.net"></td>
       </tr>
       <tr class="form-field">
         <th><label for="marketer_status">Status</label></th>
@@ -159,7 +208,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
           <thead>
             <tr>
               <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
-              <th>Marketer Name</th>
+              <th>Marketer</th>
+              <th>Contact Details</th>
               <th style="width:80px;">Status</th>
             </tr>
           </thead>
@@ -185,13 +235,19 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
                   </span>
                 </div>
               </td>
+              <td style="font-size:12px;color:#444;line-height:1.7;">
+                <?php if ( ! empty( $mk['marketer_full_name'] ) ) echo esc_html( $mk['marketer_full_name'] ) . '<br>'; ?>
+                <?php if ( ! empty( $mk['marketer_company'] ) )   echo esc_html( $mk['marketer_company'] )   . '<br>'; ?>
+                <?php if ( ! empty( $mk['marketer_phone'] ) )     echo esc_html( $mk['marketer_phone'] )     . '<br>'; ?>
+                <?php if ( ! empty( $mk['marketer_email'] ) )     echo '<a href="mailto:' . esc_attr( $mk['marketer_email'] ) . '">' . esc_html( $mk['marketer_email'] ) . '</a>'; ?>
+              </td>
               <td><span style="color:#1a8a1a;font-weight:600;">&#10003; Active</span></td>
             </tr>
             <?php endforeach; ?>
 
             <?php if ( ! empty( $all_inactive ) ) : ?>
             <tr>
-              <td colspan="3" style="background:#f5f5f5;padding:6px 10px;font-weight:600;color:#666;border-top:2px solid #ddd;">
+              <td colspan="4" style="background:#f5f5f5;padding:6px 10px;font-weight:600;color:#666;border-top:2px solid #ddd;">
                 Inactive Marketers &mdash; not shown in any dropdown; past event names are preserved
               </td>
             </tr>
@@ -212,6 +268,12 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
                     </form>
                   </span>
                 </div>
+              </td>
+              <td style="font-size:12px;color:#444;line-height:1.7;">
+                <?php if ( ! empty( $mk['marketer_full_name'] ) ) echo esc_html( $mk['marketer_full_name'] ) . '<br>'; ?>
+                <?php if ( ! empty( $mk['marketer_company'] ) )   echo esc_html( $mk['marketer_company'] )   . '<br>'; ?>
+                <?php if ( ! empty( $mk['marketer_phone'] ) )     echo esc_html( $mk['marketer_phone'] )     . '<br>'; ?>
+                <?php if ( ! empty( $mk['marketer_email'] ) )     echo '<a href="mailto:' . esc_attr( $mk['marketer_email'] ) . '">' . esc_html( $mk['marketer_email'] ) . '</a>'; ?>
               </td>
               <td><span style="color:#a00;">&#8212; Inactive</span></td>
             </tr>

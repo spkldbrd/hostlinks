@@ -124,6 +124,11 @@ $show_add_event_btn = false;
 if ( $event_request_url ) {
 	if ( $add_event_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
 		$show_add_event_btn = true;
+	} elseif ( $add_event_btn_mode === 'custom' ) {
+		$custom_btn_users = get_option( 'hostlinks_add_event_btn_users', array() );
+		if ( current_user_can( 'manage_options' ) || in_array( get_current_user_id(), array_map( 'intval', (array) $custom_btn_users ), true ) ) {
+			$show_add_event_btn = true;
+		}
 	} elseif ( $add_event_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'eventlisto' ) ) {
 		$show_add_event_btn = true;
 	}

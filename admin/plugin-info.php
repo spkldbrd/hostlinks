@@ -14,6 +14,20 @@ $update_available = $latest_version && version_compare( $latest_version, $curren
 
 $update_url = admin_url( 'update-core.php' );
 $github_url = 'https://github.com/' . HOSTLINKS_GITHUB_USER . '/' . HOSTLINKS_GITHUB_REPO;
+
+// Marketing Ops companion plugin status
+$mktops_installed = Hostlinks_MktOps_Installer::is_installed();
+$mktops_active    = $mktops_installed && Hostlinks_MktOps_Installer::is_active();
+$mktops_version   = $mktops_installed ? Hostlinks_MktOps_Installer::installed_version() : null;
+
+// Install result notice (from redirect after admin-post handler)
+$hl_mktops_result = isset( $_GET['hl_mktops'] ) ? sanitize_key( $_GET['hl_mktops'] ) : '';
+$install_notices  = array(
+	'installed'        => array( 'success', 'Marketing Ops installed successfully. You can now activate it on the Plugins page.' ),
+	'already_installed'=> array( 'info',    'Marketing Ops is already installed.' ),
+	'github_fail'      => array( 'error',   'Could not reach GitHub to fetch the latest release. Check your server\'s outbound connectivity.' ),
+	'install_fail'     => array( 'error',   'Installation failed. WordPress could not extract or save the plugin files. Check file permissions.' ),
+);
 ?>
 <div class="wrap">
 	<h1>Hostlinks — Plugin Info</h1>
@@ -76,6 +90,75 @@ $github_url = 'https://github.com/' . HOSTLINKS_GITHUB_USER . '/' . HOSTLINKS_GI
 	<p style="color:#999;font-size:12px;margin-top:12px;">
 		The latest GitHub release is checked live each time this page loads.
 	</p>
+
+	<?php /* ── Companion Plugin: Marketing Ops ─────────────────────────── */ ?>
+	<h2 style="margin-top:2.5rem;">Companion Plugin — Marketing Ops</h2>
+
+	<?php if ( $hl_mktops_result && isset( $install_notices[ $hl_mktops_result ] ) ) :
+		[ $notice_type, $notice_msg ] = $install_notices[ $hl_mktops_result ];
+		$notice_colors = array(
+			'success' => array( 'border:#00a32a;background:#f0f9f0;color:#0a4e22' ),
+			'info'    => array( 'border:#72aee6;background:#f0f5fb;color:#1d3557' ),
+			'error'   => array( 'border:#d63638;background:#fdf0f0;color:#6e2020' ),
+		);
+		$notice_style = $notice_colors[ $notice_type ][0] ?? '';
+	?>
+	<div style="<?php echo esc_attr( $notice_style ); ?>;border-left:4px solid;padding:10px 16px;margin-bottom:16px;border-radius:2px;">
+		<?php echo esc_html( $notice_msg ); ?>
+	</div>
+	<?php endif; ?>
+
+	<table class="widefat striped" style="max-width:680px;">
+		<tbody>
+			<tr>
+				<th style="width:200px;">Plugin Name</th>
+				<td>Hostlinks Marketing Ops</td>
+			</tr>
+			<tr>
+				<th>Status</th>
+				<td>
+					<?php if ( $mktops_active ) : ?>
+						<span style="color:#00a32a;font-weight:600;">&#10003; Active</span>
+						<?php if ( $mktops_version ) : ?>
+							&nbsp;<span style="color:#666;">(v<?php echo esc_html( $mktops_version ); ?>)</span>
+						<?php endif; ?>
+					<?php elseif ( $mktops_installed ) : ?>
+						<span style="color:#996800;font-weight:600;">&#9888; Installed — not activated</span>
+						&nbsp;&nbsp;
+						<a href="<?php echo esc_url( Hostlinks_MktOps_Installer::activate_url() ); ?>"
+						   class="button button-small button-primary">Activate</a>
+					<?php else : ?>
+						<span style="color:#999;font-weight:600;">&#10007; Not installed</span>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th>GitHub Repository</th>
+				<td>
+					<?php
+					$mktops_url = 'https://github.com/' . Hostlinks_MktOps_Installer::GITHUB_USER . '/' . Hostlinks_MktOps_Installer::GITHUB_REPO;
+					?>
+					<a href="<?php echo esc_url( $mktops_url ); ?>" target="_blank" rel="noopener"><?php echo esc_html( $mktops_url ); ?></a>
+				</td>
+			</tr>
+			<tr>
+				<th>Description</th>
+				<td>Adds a marketing analytics hub, manager-level access roles, and the &#x1F4CB; Marketing Ops button to the Hostlinks calendar.</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<?php if ( ! $mktops_installed ) : ?>
+	<p style="margin-top:14px;">
+		<a href="<?php echo esc_url( Hostlinks_MktOps_Installer::install_url() ); ?>"
+		   class="button button-primary"
+		   onclick="return confirm('This will download and install the Marketing Ops plugin from GitHub. Continue?');">
+			&#11015; Install Marketing Ops Now
+		</a>
+		&nbsp;
+		<span style="color:#999;font-size:12px;">Downloads the latest release directly from GitHub.</span>
+	</p>
+	<?php endif; ?>
 
 	<?php /* ── Shortcode Reference ─────────────────────────────────────── */ ?>
 	<h2 style="margin-top:2rem;">Shortcode Reference</h2>

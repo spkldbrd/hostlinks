@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.6.2
+ * Version:     2.6.3
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.6.2' );
+define( 'HOSTLINKS_VERSION',    '2.6.3' );
 define( 'HOSTLINKS_DB_VERSION', '2.3' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -37,6 +37,7 @@ require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-api.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-matcher.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-sync.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-scheduler.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-mktops-installer.php';
 
 // Activation: create DB tables + detect theme conflict in one hook
 register_activation_hook( __FILE__, array( 'Hostlinks_Activation', 'on_activate' ) );
@@ -56,6 +57,9 @@ new Hostlinks_Event_Request_Shortcode();
 
 // CVENT daily sync scheduler
 Hostlinks_CVENT_Scheduler::init();
+
+// Marketing Ops one-click installer (admin-post action)
+Hostlinks_MktOps_Installer::init();
 
 // Marketing Ops integration: one-time detection notice + dismiss handler.
 add_action( 'admin_init',    'hostlinks_handle_mktops_dismiss' );

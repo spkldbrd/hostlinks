@@ -35,6 +35,15 @@ if ( isset( $_POST['hostlinks_reset_mktops_prompt'] ) ) {
 	$notice = '<div class="notice notice-success is-dismissible"><p>Detection prompt reset — it will appear again on the next admin page load if the Marketing Hub page is still published.</p></div>';
 }
 
+// ── Re-scan hub page ───────────────────────────────────────────────────────────
+if ( isset( $_POST['hostlinks_rescan_mktops_hub'] ) ) {
+	check_admin_referer( 'hostlinks_mktops_settings' );
+	delete_transient( 'hostlinks_page_url_mktops_hub' );
+	// Force fresh scan now so the result shows on this page load.
+	Hostlinks_Page_URLs::get_mktops_hub();
+	$notice = '<div class="notice notice-success is-dismissible"><p>Hub page detection re-scanned.</p></div>';
+}
+
 // ── Current values ────────────────────────────────────────────────────────────
 $btn         = get_option( 'hostlinks_mktops_btn', 'disabled' );
 $hub_url     = Hostlinks_Page_URLs::get_mktops_hub();
@@ -47,7 +56,7 @@ $dismissed   = get_option( 'hostlinks_mktops_prompt_dismissed' ) === '1';
 
 <!-- Detection status -------------------------------------------------------->
 <h3 style="font-size:14px;margin:20px 0 8px;">Marketing Hub Page Detection</h3>
-<table class="widefat striped" style="max-width:660px;margin-bottom:16px;">
+<table class="widefat striped" style="max-width:660px;margin-bottom:8px;">
 	<tbody>
 		<tr>
 			<th style="width:200px;">Shortcode</th>
@@ -79,6 +88,13 @@ $dismissed   = get_option( 'hostlinks_mktops_prompt_dismissed' ) === '1';
 		</tr>
 	</tbody>
 </table>
+<form method="post" style="margin-bottom:16px;">
+	<?php wp_nonce_field( 'hostlinks_mktops_settings' ); ?>
+	<button type="submit" name="hostlinks_rescan_mktops_hub" class="button button-secondary">
+		&#8635; Re-scan Now
+	</button>
+	<span style="color:#888;font-size:12px;margin-left:8px;">Detection is cached for 24 hours — click to force a fresh scan.</span>
+</form>
 
 <!-- Main settings form ------------------------------------------------------>
 <form method="post">

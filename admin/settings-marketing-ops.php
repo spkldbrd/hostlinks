@@ -21,7 +21,7 @@ if ( isset( $_POST['hostlinks_save_mktops'] ) ) {
 	check_admin_referer( 'hostlinks_mktops_settings' );
 
 	$btn = sanitize_key( $_POST['hostlinks_mktops_btn'] ?? 'disabled' );
-	if ( ! in_array( $btn, array( 'disabled', 'admin', 'all' ), true ) ) {
+			if ( ! in_array( $btn, array( 'disabled', 'admin', 'admin_plus_mgr', 'all' ), true ) ) {
 		$btn = 'disabled';
 	}
 	update_option( 'hostlinks_mktops_btn', $btn );
@@ -88,11 +88,15 @@ $dismissed   = get_option( 'hostlinks_mktops_prompt_dismissed' ) === '1';
 			<th scope="row"><label for="hostlinks_mktops_btn">"&#x1F4CB; Marketing Ops" Button</label></th>
 			<td>
 				<select id="hostlinks_mktops_btn" name="hostlinks_mktops_btn">
-					<option value="disabled" <?php selected( $btn, 'disabled' ); ?>>Disabled</option>
-					<option value="admin"    <?php selected( $btn, 'admin' ); ?>>Admin only</option>
-					<option value="all"      <?php selected( $btn, 'all' ); ?>>All Hostlinks users</option>
+					<option value="disabled"       <?php selected( $btn, 'disabled' ); ?>>Disabled</option>
+					<option value="admin"          <?php selected( $btn, 'admin' ); ?>>WordPress Admins only</option>
+					<option value="admin_plus_mgr" <?php selected( $btn, 'admin_plus_mgr' ); ?>>Admins &amp; Marketing Managers</option>
+					<option value="all"            <?php selected( $btn, 'all' ); ?>>All Hostlinks users</option>
 				</select>
-				<p class="description">Controls who sees the <strong>&#x1F4CB; Marketing Ops</strong> button on the upcoming events calendar. The button only appears when a Marketing Hub page is detected.</p>
+				<p class="description">
+					Controls who sees the <strong>&#x1F4CB; Marketing Ops</strong> button on the upcoming events calendar. The button only appears when a Marketing Hub page is detected.<br>
+					<em>Admins &amp; Marketing Managers</em> requires the Marketing Ops plugin to be active; Marketing Managers are configured under Marketing Ops → Settings → User Access.
+				</p>
 			</td>
 		</tr>
 	</table>

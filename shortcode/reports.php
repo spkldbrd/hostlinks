@@ -48,6 +48,12 @@ $show_mktops_btn = false;
 if ( $mktops_url ) {
 	if ( $mktops_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
 		$show_mktops_btn = true;
+	} elseif ( $mktops_btn_mode === 'admin_plus_mgr' ) {
+		if ( current_user_can( 'manage_options' ) ) {
+			$show_mktops_btn = true;
+		} elseif ( class_exists( 'HMO_Access_Service' ) && HMO_Access_Service::current_user_is_marketing_admin() ) {
+			$show_mktops_btn = true;
+		}
 	} elseif ( $mktops_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'hostlinks_reports' ) ) {
 		$show_mktops_btn = true;
 	}

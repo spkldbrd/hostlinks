@@ -420,7 +420,7 @@ jQuery(function() {
 					$eve_web_url      = esc_url_raw( trim( $_POST['eve_web_url'][ $key ] ) );
 					$eve_email_url    = esc_url_raw( trim( $_POST['eve_email_url'][ $key ] ?? '' ) );
 					$eve_zoom_time    = sanitize_text_field( $_POST['eve_zoom_time'][ $key ] ?? '' );
-						$hide_ids         = isset( $_POST['eve_public_hide_ids'] ) ? (array) $_POST['eve_public_hide_ids'] : array();
+					$hide_ids         = isset( $_POST['eve_public_hide_ids'] ) ? (array) $_POST['eve_public_hide_ids'] : array();
 						$eve_public_hide  = in_array( (string) $user, $hide_ids ) ? 1 : 0;
 						$eve_instructor   = intval( $_POST['eve_instructor'][ $key ] );
 						// Auto-fill blank roster URL on update if roster page is configured.

@@ -459,7 +459,7 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 				</td>
 			</tr>
 			<tr>
-				<th style="padding:8px 12px;">Trainer URL</th>
+				<th style="padding:8px 12px;">REG URL</th>
 				<td style="padding:8px 12px;">
 					<input type="url" name="eve_trainer_url" value="<?php echo esc_attr( $ev['eve_trainer_url'] ?? '' ); ?>"
 						class="large-text" placeholder="https://" />

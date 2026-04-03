@@ -237,9 +237,9 @@ class Hostlinks_CVENT_Sync {
 		$best['registrationUrl'] ?? $best['publicRegistrationUrl'] ?? $best['websiteLink'] ?? ''
 	);
 
-			if ( ! $dry_run ) {
-				$bootstrap_data = array(
-					'cvent_event_id'        => $best['id'],
+		if ( ! $dry_run ) {
+			$bootstrap_data = array(
+				'cvent_event_id'        => $best['id'],
 					'cvent_event_title'     => $best['title'] ?? '',
 					'cvent_event_start_utc' => isset( $best['start'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $best['start'] ) ) : null,
 					'cvent_match_score'     => $score,

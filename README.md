@@ -1,6 +1,6 @@
 # Hostlinks WordPress Plugin
 
-**Version:** 2.5.86 | **Author:** Digital Solution | **License:** GPL v2
+**Version:** 2.6.2 | **Author:** Digital Solution | **License:** GPL v2
 
 A private WordPress plugin built for Grant Writing USA to manage the full lifecycle of hosted training events. It centralizes event tracking, registration data, instructor/marketer management, CVENT API integration, and front-end display — all in one standalone plugin.
 
@@ -21,15 +21,15 @@ All plugin pages live under the **Hostlinks** top-level menu in the WordPress ad
 
 | Menu Item | Description |
 |---|---|
-| **Events** | The main event list. View, edit, and manage all training events. Add new events manually. |
+| **Events** | The main event list. View, inline-edit, and manage all training events. Each row has an **Edit** button opening the full-page Edit Event form. Add new events manually via the inline form at the top. |
 | **Add New Event** | Shortcut to the "Add" form on the Events page. |
-| **Marketers** | Manage the list of marketers (sales representatives) associated with events. |
+| **Marketers** | Manage marketers (sales representatives) including full name, company, phone, and email contact details. |
 | **Event Requests** | Review incoming event booking requests submitted via the front-end form. Shows a badge count for unread/new requests. |
 | **Instructors** | Manage the instructor list. |
 | **CVENT Sync** | Manually trigger a CVENT sync, view sync results, and see today's API call count. |
 | **New CVENT Events** | Review CVENT events detected in the API that don't yet exist in Hostlinks. Accept, ignore, or link them. Shows a badge count when new events are waiting. |
 | **Settings** | Tabbed settings panel (see below). |
-| **Plugin Info** | Version info, GitHub update status, and database schema version. |
+| **Plugin Info** | Version info, GitHub update status, database schema version, and shortcode reference. |
 
 ---
 
@@ -37,27 +37,44 @@ All plugin pages live under the **Hostlinks** top-level menu in the WordPress ad
 
 | Tab | Description |
 |---|---|
-| **General** | Page URL overrides (Upcoming, Past Events, Reports, Public List, Roster), Google Maps API key. |
-| **Build Request Form** | Configuration for the front-end event request submission form (header text, fields, etc.). |
-| **Roster** | Upload/select a company logo (via WordPress Media Library) to display in the top-right corner of printed rosters. |
+| **General** | Page URL overrides (Upcoming, Past Events, Reports, Public List, Roster, Event Request Form, Marketing Hub), Google Maps API key. |
+| **Build Request Form** | Configuration for the front-end event request form (header text, fields, "+ Event" button visibility). |
+| **Roster** | Upload/select a company logo (via WordPress Media Library) displayed in printed rosters. |
+| **Alerts** | Registration alert thresholds, colors, and badge/tooltip settings for the event calendar. |
+| **Marketing Ops** | Controls visibility of the "📊 Marketing Ops" button on the calendar and Reports pages. |
 | **CVENT** *(hidden)* | CVENT API credentials (Client ID, Client Secret, environment). |
 | **User Access** *(hidden)* | Per-shortcode access mode (Public / Logged In / Approved Viewers) and the approved viewer user list. |
 | **Type Settings** *(hidden)* | Add, edit, and delete event type labels (e.g., Management, Writing, Subaward). |
-| **Import / Export** *(hidden)* | Bulk import/export event data. |
+| **Import / Export** *(hidden)* | Bulk import/export event data, with a Reset (truncate) option. |
 
 ---
 
 ## Front-End Shortcodes
 
-| Shortcode | Page | Description |
-|---|---|---|
-| `[eventlisto]` | Upcoming Events | Calendar of upcoming training events. Each row shows location, dates, registration links, marketer, and — if set — a Roster link. |
-| `[oldeventlisto]` | Past Events | Same layout for completed events. |
-| `[hostlinks_reports]` | Reports | Registration statistics dashboard. Includes a Marketer Summary card, a Year-over-Year card (last 4 calendar years), and date-range filtering (This Month, Last Month, Last 3 Months, Current Year, Custom Range). Powered by Chart.js. |
-| `[public_event_list]` | Public Event List | A simplified, publicly accessible event listing (no access control). |
-| `[hostlinks_roster]` | Roster | Print-ready attendee roster for a specific event, passed via `?eve_id=`. Loads via AJAX with a spinner so the browser never blocks waiting for the CVENT API. |
+| Shortcode | Page | Access | Description |
+|---|---|---|---|
+| `[eventlisto]` | Upcoming Events | Configurable | Calendar of upcoming training events. Shows location, dates, registration links, marketer, and roster link. Includes optional registration alert badges, a "+ Event" button, and a "📊 Marketing Ops" button in the nav bar. |
+| `[oldeventlisto]` | Past Events | Configurable | Same layout for completed events. |
+| `[hostlinks_reports]` | Reports | Configurable | Registration statistics dashboard with Marketer Summary, Year-over-Year (last 4 years), and date-range filtering. Powered by Chart.js. Includes Marketing Ops nav button. |
+| `[public_event_list]` | Public Event List | Always public | Simplified publicly accessible event listing with no access control. |
+| `[hostlinks_roster]` | Roster | Configurable | Print-ready attendee roster for a specific event (`?eve_id=`). Loads via AJAX with spinner. Admin-only Refresh button. |
+| `[hostlinks_event_request_form]` | Event Request | Configurable | Multi-event booking request form for hosts. Includes shipping details section and Google Places Autocomplete. |
 
-All shortcodes except `[public_event_list]` are access-controlled. Administrators always pass. Access modes are configurable per shortcode in **Settings → User Access**.
+Access modes are configurable per shortcode in **Settings → User Access**. Administrators always pass. `[public_event_list]` is always public.
+
+---
+
+## Event URL Fields
+
+Each event stores five URL fields:
+
+| Field | Label in Admin | Description |
+|---|---|---|
+| `eve_trainer_url` | REG URL | CVENT registration link. Auto-populated by CVENT sync for matched events. |
+| `eve_web_url` | WEB URL / HOST URL | Main event web page or host info page. Used as the primary match key for slug-based imports. |
+| `eve_email_url` | EMAIL URL | Email campaign page for the event. |
+| `eve_roster_url` | Roster URL | Front-end roster page link. Auto-populated on event creation/sync if blank. |
+| `eve_zoom_url` | SHORT URL / Zoom URL | Short URL or Zoom join link. |
 
 ---
 
@@ -71,15 +88,17 @@ Hostlinks connects to the CVENT REST API (OAuth 2.0 Client Credentials flow) to 
    - **Auto-match** threshold: score ≥ 90 with a gap ≥ 20 vs. the next candidate.
    - Below threshold: flagged as "needs review" on the New CVENT Events page.
 3. Once matched (auto or manually confirmed), fetch attendees and count PAID vs. FREE registrations based on discount strings.
-4. Update `eve_paid` and `eve_free` counts in the database.
+4. Update `eve_paid`, `eve_free`, and — if blank — `eve_trainer_url` (REG URL) in the database.
 
-**Daily sync** runs automatically via WordPress cron.
+**Daily sync** runs automatically via WordPress cron. Covers all events ending within the last 60 days or in the future.
 
-**New event detection** scans CVENT for events with a 60-day lookback window that don't yet exist in Hostlinks. Results are cached for 1 hour.
+**New event detection** scans CVENT for events with a 60-day lookback that don't yet exist in Hostlinks. Results are cached for 1 hour.
 
-**Subaward detection:** Events with "Subaward", "Sub-Award", "Sub Award", or similar variants in the CVENT title are automatically assigned the Subaward event type and tagged `| SUB` in the location field.
+**Subaward detection:** Events with "Subaward" / "Sub-Award" variants in the CVENT title are auto-assigned the Subaward event type and tagged `| SUB` in the location field.
 
-**Roster URL auto-population:** When a new event is created (via admin form, booking form, or CVENT sync) and the Roster URL field is blank, Hostlinks automatically generates and saves the URL (`{roster-page-url}/?eve_id={id}`).
+**ZOOM/Webinar auto-assignment:** Events with "ZOOM" or webinar markers in the CVENT title are automatically assigned the Zoom marketer and Ericka as instructor.
+
+**Roster URL auto-population:** On first CVENT match (and on manual event creation), if `eve_roster_url` is blank it is automatically set to `{roster-page-url}/?eve_id={id}`.
 
 ---
 
@@ -89,47 +108,76 @@ The roster feature provides a real-time, print-ready attendee list for any event
 
 **How it works:**
 - The front-end page uses the `[hostlinks_roster]` shortcode with `?eve_id=X` in the URL.
-- On load, JavaScript fetches roster HTML asynchronously from `wp-admin/admin-ajax.php`. A spinner with a 600ms fade-in delay gives feedback during API calls without flashing on fast cached loads.
-- Roster data is fetched via CVENT order items + `expand=attendee` (1–2 API calls total). Falls back to individual attendee lookups if the expand parameter is unsupported.
+- On load, JavaScript fetches roster HTML asynchronously via `admin-ajax.php`. A spinner with a 600ms fade-in delay gives feedback without flashing on fast cached loads.
+- Data is fetched via CVENT order items + `expand=attendee` (1–2 API calls). Falls back to individual attendee lookups if the expand parameter is unsupported.
 
 **Caching strategy:**
-- **Upcoming/current events:** cached for 24 hours.
+- **Upcoming/current events:** cached 24 hours.
 - **Past events:** cached permanently.
-- **Auto-finalize:** when a roster for a recently-ended event (0–5 days ago) is first viewed, a WordPress cron job re-fetches and permanently caches it exactly 5 days after the event end date — capturing final CVENT registration numbers.
+- **Auto-finalize:** a WordPress cron job fires 5 days after event end to permanently cache the final roster.
 
 **Display features:**
 - Columns: #, Last Name, First Name, Company/Agency, Title, Sign In (wide blank column for printed sign-in sheets).
-- Optional toggle columns (not shown by default): Email, Phone. Phone numbers auto-formatted to `XXX-XXX-XXXX`.
-- Header title format: `Roster – {Location} – {Type Label}` where type label is `ZOOM`, `Management`, `Writing`, or blank (for Subaward/other).
-- Company logo (set in **Settings → Roster**) appears top-right on both screen and print.
+- Optional toggle columns (hidden by default): Email, Phone (auto-formatted to `XXX-XXX-XXXX`).
+- Header: `Roster – {Location} – {Type Label}` where type label is `ZOOM`, `Management`, `Writing`, or blank (Subaward/other).
+- Company logo (set in **Settings → Roster**) appears top-right on screen and print.
 - Print layout: landscape orientation, site header/footer hidden.
-- Admin-only "Refresh Roster" button forces a cache bypass re-fetch. All permitted users see a "Print" button.
+- Admin-only "Refresh Roster" button forces cache bypass re-fetch.
+
+---
+
+## Registration Alerts
+
+Visual alerts on upcoming event cards in `[eventlisto]` warn when registration thresholds are approaching.
+
+- **Border glow** around the event card — color and threshold configurable in **Settings → Alerts**.
+- **Triangle badge** (optional) — corner badge with a tooltip showing days remaining and registration count. Tooltip supports two lines of custom text.
+- Automatically suppressed for events with the "PRIVATE" marketer.
+- Dark mode compatible (`.wp-dark-mode-active` selector, tested with "WP Dark Mode A11y" plugin).
 
 ---
 
 ## Event Request Form
 
-The `[hostlinks_event_request]` shortcode renders a multi-event submission form for hosts wishing to book a training event.
+The `[hostlinks_event_request_form]` shortcode renders a multi-event submission form for hosts wishing to book a training.
 
 - Google Places Autocomplete for address fields (requires Google Maps API key in Settings).
 - Multi-event rows — submit multiple event dates in a single request.
+- Collapsible **Shipping Details** card (attention name, org, address, workbook count, notes).
 - File upload for parking/venue PDFs.
 - Admin notification emails on submission.
-- Admin review page with full detail view per request.
+- Admin review page with full detail view per request, including shipping details.
 - Badge count on the "Event Requests" menu item for unread submissions.
 - Configurable form header text (Settings → Build Request Form).
+- Access mode configurable in Settings → User Access (default: Approved Viewers Only).
+
+---
+
+## Edit Event (Admin Full-Page Form)
+
+The **Edit** button on each row of the Events list opens a dedicated full-page edit form covering all event fields:
+
+- **Core:** dates, location, type, marketer, instructor, event status.
+- **URLs & Links:** REG URL, WEB URL, EMAIL URL, Roster URL, Parking File URL, Short URL.
+- **CVENT:** CVENT event ID, match status, match score, last synced.
+- **Shipping Details:** all 10 shipping fields with Google Places Autocomplete for the shipping address.
+- **Host & Venue:** host name, displayed-as name, venue name, full venue address (with Google Places Autocomplete), special instructions.
+- **Additional Details:** custom email intro, max attendees.
+- **Host Contacts:** repeatable rows (name, title, phone, email) stored as JSON.
+- **Hotel Recommendations:** repeatable rows (name, address, phone, URL) stored as JSON.
 
 ---
 
 ## Auto-Updates
 
-The plugin self-updates from GitHub Releases via the built-in updater (`includes/class-updater.php`). It checks for a `hostlinks.zip` asset attached to the latest GitHub Release. WordPress's standard update UI in **Plugins → Updates** works normally.
+The plugin self-updates from GitHub Releases via `includes/class-updater.php`. WordPress's standard update UI in **Plugins → Updates** works normally.
 
 **Releasing a new version:**
 1. Bump `HOSTLINKS_VERSION` in `hostlinks.php` and the `* Version:` header comment.
-2. Commit and push to GitHub.
-3. Create a new GitHub Release with a tag matching the version (e.g. `v2.5.87`).
-4. Build and attach `hostlinks.zip` to the release (the zip must contain a root `hostlinks/` folder).
+2. Bump `HOSTLINKS_DB_VERSION` if any DB migrations were added.
+3. Commit and push to GitHub.
+4. Create a new GitHub Release tagged with the version (e.g. `v2.6.1`).
+5. Build and attach `hostlinks.zip` (must contain a root `hostlinks/` folder).
 
 ---
 
@@ -139,12 +187,28 @@ Hostlinks maintains its own custom tables alongside the standard WordPress table
 
 | Table | Purpose |
 |---|---|
-| `wp_event_details_list` | Core event records (location, dates, type, marketer, instructor, registration counts, CVENT link, roster URL, etc.) |
-| `wp_event_marketer` | Marketer records |
+| `wp_event_details_list` | Core event records (location, dates, type, marketer, instructor, registration counts, CVENT link, all URL fields, shipping details, host/venue info, host contacts JSON, hotels JSON, etc.) |
+| `wp_event_marketer` | Marketer records including contact details (name, company, phone, email) |
 | `wp_event_type` | Event type labels |
-| `wp_hostlinks_event_requests` | Front-end booking request submissions |
+| `wp_event_instructor` | Instructor records |
+| `wp_hostlinks_event_requests` | Front-end booking request submissions including shipping details |
 
-Schema upgrades run automatically on every page load using `dbDelta` — safe to run repeatedly, only applies changes when needed. Current DB version: **1.7**.
+Schema upgrades run automatically on every page load via `maybe_upgrade()` using `dbDelta` — safe to run repeatedly. Current DB version: **2.3**.
+
+### DB Migration History
+
+| Version | Change |
+|---|---|
+| 1.1 | Renamed `eve_trainner_url` → `eve_trainer_url` (typo fix) |
+| 1.5 | Renamed `eve_sign_in_url` → `eve_web_url` |
+| 1.6 | Added `eve_public_hide`, `eve_zoom_time` |
+| 1.7 | Added `eve_zoom_url` |
+| 1.8 | Added `eve_created_at` (event creation timestamp) |
+| 1.9 | Added 10 `ship_*` columns to `event_details_list` and `event_requests` |
+| 2.0 | Added marketer contact detail columns to `event_marketer` |
+| 2.1 | Added 15 host/venue/contacts/hotels columns to `event_details_list` |
+| 2.2 | Added `eve_email_url` to `event_details_list` |
+| 2.3 | Version stamp (no schema change) |
 
 ### Event Status Conventions
 
@@ -159,51 +223,57 @@ Schema upgrades run automatically on every page load using `dbDelta` — safe to
 
 ```
 hostlinks/
-├── hostlinks.php                        Main plugin file
+├── hostlinks.php                        Main plugin file (version, DB version, hooks)
+├── CHANGELOG.md                         Version history
 ├── admin/
-│   ├── booking.php                      Events list & edit page
-│   ├── cvent-new-events.php             New CVENT events review
-│   ├── cvent-settings.php               CVENT API credentials
-│   ├── cvent-sync.php                   Manual sync & API call log
-│   ├── event-request-detail.php         Single event request view
-│   ├── event-request-settings.php       Request form configuration
+│   ├── booking.php                      Events list, quick-edit, add-new form
+│   ├── cvent-new-events.php             New CVENT events review & import
+│   ├── cvent-settings.php               CVENT API credentials tab
+│   ├── cvent-sync.php                   Manual sync trigger & API call log
+│   ├── edit-event.php                   Full-page Edit Event form
+│   ├── event-request-detail.php         Single event request detail view
+│   ├── event-request-settings.php       Event request form configuration tab
 │   ├── event-requests.php               Event requests list
-│   ├── import-export.php                Import / Export
-│   ├── instructor-menu.php              Instructors
-│   ├── marketer-menu.php                Marketers
-│   ├── plugin-info.php                  Version & update info
+│   ├── import-export.php                Import / Export / Reset UI
+│   ├── instructor-menu.php              Instructors CRUD
+│   ├── marketer-menu.php                Marketers CRUD (with contact details)
+│   ├── plugin-info.php                  Version, update status, shortcode reference
 │   ├── roster.php                       Admin roster report page
 │   ├── settings.php                     Tabbed settings shell
-│   ├── settings-general.php             General settings tab
-│   ├── settings-roster.php              Roster branding tab
+│   ├── settings-alerts.php              Registration alerts configuration
+│   ├── settings-general.php             General settings (page URLs, Maps API key)
+│   ├── settings-marketing-ops.php       Marketing Ops button settings
+│   ├── settings-roster.php              Roster branding (logo upload)
 │   ├── type-menu.php                    Event type management
-│   └── user-access.php                  Shortcode access control
+│   └── user-access.php                  Per-shortcode access control
 ├── assets/
-│   ├── css/                             Frontend & admin stylesheets
+│   ├── css/
+│   │   ├── hostlinks-calendar.css       Front-end calendar & alert styles
+│   │   └── hostlinks-event-request.css  Event request form styles
 │   ├── js/                              Admin JavaScript
-│   └── images/                          Menu icons and UI images
+│   └── images/                          Menu icons and UI assets
 ├── includes/
-│   ├── class-access.php                 Front-end access control
-│   ├── class-activation.php             Activation hook handler
+│   ├── class-access.php                 Front-end access control logic
+│   ├── class-activation.php             Plugin activation hook handler
 │   ├── class-admin-menus.php            Admin menu registration
-│   ├── class-assets.php                 CSS/JS enqueuing
-│   ├── class-cvent-api.php              CVENT REST API client
+│   ├── class-assets.php                 CSS/JS enqueuing (admin + front-end)
+│   ├── class-cvent-api.php              CVENT REST API client (OAuth 2.0)
 │   ├── class-cvent-matcher.php          Event matching algorithm
 │   ├── class-cvent-scheduler.php        Daily sync cron scheduler
 │   ├── class-cvent-sync.php             Sync orchestration logic
-│   ├── class-db.php                     Database schema & upgrades
+│   ├── class-db.php                     DB schema creation & migrations
 │   ├── class-event-request.php          Request validation & normalization
-│   ├── class-event-request-shortcode.php  Request form shortcode handler
-│   ├── class-event-request-storage.php  Request DB operations
-│   ├── class-import-export.php          Import/export logic
-│   ├── class-page-urls.php              Front-end page URL resolver
-│   ├── class-shortcodes.php             Shortcode registration & AJAX
-│   └── class-updater.php                GitHub auto-update checker
+│   ├── class-event-request-shortcode.php  Front-end request form shortcode
+│   ├── class-event-request-storage.php  Event request DB operations
+│   ├── class-import-export.php          Import/export/reset logic
+│   ├── class-page-urls.php              Front-end page URL resolver & cache
+│   ├── class-shortcodes.php             Shortcode registration & AJAX handlers
+│   └── class-updater.php                GitHub Releases auto-update checker
 └── shortcode/
     ├── initial_eventlisto.php           Upcoming events template
     ├── old_eventlisto.php               Past events template
     ├── reports.php                      Reports dashboard template
-    ├── roster.php                       Roster shell (AJAX loader)
+    ├── roster.php                       Roster AJAX shell (spinner + loader)
     ├── roster-content.php               Roster HTML renderer (AJAX target)
     └── public-event-list.php            Public event list template
 ```

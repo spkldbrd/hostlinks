@@ -160,6 +160,34 @@ $install_notices  = array(
 	</p>
 	<?php endif; ?>
 
+	<?php /* ── Related Plugin: GWU Event Pages ───────────────────────── */ ?>
+	<h2 style="margin-top:2.5rem;">Related Plugin — GWU Event Pages</h2>
+	<table class="widefat striped" style="max-width:680px;">
+		<tbody>
+			<tr>
+				<th style="width:200px;">Plugin Name</th>
+				<td>GWU Event Pages</td>
+			</tr>
+			<tr>
+				<th>Description</th>
+				<td>Standalone event pages plugin for a separate WordPress install.</td>
+			</tr>
+			<tr>
+				<th>GitHub Repository</th>
+				<td><a href="https://github.com/spkldbrd/gwu-event-pages" target="_blank" rel="noopener">https://github.com/spkldbrd/gwu-event-pages</a></td>
+			</tr>
+			<tr>
+				<th>Download</th>
+				<td>
+					<a href="https://github.com/spkldbrd/gwu-event-pages/releases/latest" target="_blank" rel="noopener" class="button button-secondary">
+						&#11015; Download Latest Release
+					</a>
+					<span style="color:#999;font-size:12px;margin-left:8px;">Opens GitHub — download the zip and install manually on the target site.</span>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+
 	<?php /* ── Shortcode Reference ─────────────────────────────────────── */ ?>
 	<h2 style="margin-top:2rem;">Shortcode Reference</h2>
 	<p style="color:#555;margin-bottom:1rem;">Add these shortcodes to any WordPress page. All shortcodes respect the access settings configured under <strong>Hostlinks → Settings → User Access</strong>.</p>

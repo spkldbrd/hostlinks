@@ -125,6 +125,10 @@ if ( isset( $_POST['hostlinks_cvent_add_event'] ) ) {
 
 		$new_eve_id = (int) $wpdb->insert_id;
 
+		if ( $new_eve_id ) {
+			do_action( 'hostlinks_event_created', $new_eve_id, $eve_start );
+		}
+
 		// Auto-populate eve_roster_url if left blank.
 		if ( ! $eve_roster_url && $new_eve_id ) {
 			$roster_base = Hostlinks_Page_URLs::get_roster();

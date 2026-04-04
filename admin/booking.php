@@ -71,6 +71,9 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 				$wpdb->update( $table11, array( 'eve_roster_url' => $auto_roster_url ), array( 'eve_id' => $new_eve_id ), array( '%s' ), array( '%d' ) );
 			}
 		}
+		if ( $new_eve_id ) {
+			do_action( 'hostlinks_event_created', $new_eve_id, $eve_start );
+		}
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Event Sucessfully added. <a href="admin.php?page=booking-menu">View Event</a></p></div>';
 	}
 

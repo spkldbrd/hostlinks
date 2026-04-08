@@ -573,14 +573,14 @@ jQuery(function() {
             <input type="hidden" name="originalid[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
             <td>
               <p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
-              <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required>
+              <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required autocomplete="off">
             </td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_paid'] ?? '' ); ?></p>
               <input type="number" value="<?php echo esc_attr( $alldriver['eve_paid'] ?? '' ); ?>" name="eve_paid[]" required style="width:50px;"></td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_free'] ?? '' ); ?></p>
               <input type="number" value="<?php echo esc_attr( $alldriver['eve_free'] ?? '' ); ?>" name="eve_free[]" required style="width:50px;"></td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_start'] ?? '' ); ?></p>
-              <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot" id="eventenddertot<?php echo esc_attr( $alldriver['eve_id'] ); ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required></td>
+              <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot" id="eventenddertot<?php echo esc_attr( $alldriver['eve_id'] ); ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required autocomplete="off"></td>
             <td>
               <select name="eve_type[]" class="evetype" required style="width:100px;">
                 <option value="">Please Choose</option>

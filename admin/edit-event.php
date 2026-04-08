@@ -326,8 +326,8 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 			<tr>
 				<th style="width:140px;padding:8px 12px;">Location</th>
 				<td style="padding:8px 12px;">
-					<input type="text" name="eve_location" value="<?php echo esc_attr( $ev['eve_location'] ); ?>"
-						class="regular-text" required />
+				<input type="text" name="eve_location" value="<?php echo esc_attr( $ev['eve_location'] ); ?>"
+					class="regular-text" required autocomplete="off" />
 				</td>
 			</tr>
 			<tr>

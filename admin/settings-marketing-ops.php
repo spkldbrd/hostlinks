@@ -106,12 +106,12 @@ $dismissed   = get_option( 'hostlinks_mktops_prompt_dismissed' ) === '1';
 				<select id="hostlinks_mktops_btn" name="hostlinks_mktops_btn">
 					<option value="disabled"       <?php selected( $btn, 'disabled' ); ?>>Disabled</option>
 					<option value="admin"          <?php selected( $btn, 'admin' ); ?>>WordPress Admins only</option>
-					<option value="admin_plus_mgr" <?php selected( $btn, 'admin_plus_mgr' ); ?>>Admins &amp; Marketing Managers</option>
+					<option value="admin_plus_mgr" <?php selected( $btn, 'admin_plus_mgr' ); ?>>Admins &amp; Marketing Admins</option>
 					<option value="all"            <?php selected( $btn, 'all' ); ?>>All Hostlinks users</option>
 				</select>
 				<p class="description">
 					Controls who sees the <strong>&#x1F4CB; Marketing Ops</strong> button on the upcoming events calendar. The button only appears when a Marketing Hub page is detected.<br>
-					<em>Admins &amp; Marketing Managers</em> requires the Marketing Ops plugin to be active; Marketing Managers are configured under Marketing Ops → Settings → User Access.
+					<em>Admins &amp; Marketing Admins</em> requires the Marketing Ops plugin to be active; Marketing Admins are configured under Marketing Ops → Settings → User Access → Marketing Admins section.
 				</p>
 			</td>
 		</tr>

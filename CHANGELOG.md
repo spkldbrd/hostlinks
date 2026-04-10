@@ -2,6 +2,73 @@
 
 ---
 
+## v2.6.9 — 2026-04-10
+
+### Fix: Marketing Ops settings label consistency
+- Dropdown option "Admins & Marketing Managers" renamed to **"Admins & Marketing Admins"** in Settings → Marketing Ops.
+- Description text updated to reference "Marketing Admins" and direct users to the correct "Marketing Admins section" under Marketing Ops → Settings → User Access.
+
+---
+
+## v2.6.8 — 2026-04-09
+
+### Fix: Browser autofill protection on event edit fields
+- Added `autocomplete="off"` to the **date range** (`evedate[]`) and **location** (`eve_location[]`) text inputs in the Events list inline-edit form (`booking.php`).
+- Added `autocomplete="off"` to the **location** text input on the full-page Edit Event form (`edit-event.php`).
+- Prevents Chrome/browser autofill from silently overwriting critical event fields when editing URL or other fields on the same row.
+
+---
+
+## v2.6.7 — 2026-04-08
+
+### Enhancement: GWU Event Pages download link on Plugin Info page
+- Added a **"Related Plugin — GWU Event Pages"** section to the Plugin Info admin page.
+- Includes plugin name, description, GitHub repo link, and a **"⬇ Download Latest Release"** button linking to `github.com/spkldbrd/gwu-event-pages/releases/latest`.
+- Intended for manual install on a separate WordPress site (not the same install as Hostlinks).
+
+---
+
+## v2.6.6 — 2026-04-08
+
+### New: `hostlinks_event_created` action hook
+- Added `do_action( 'hostlinks_event_created', $new_eve_id, $eve_start )` in two event-creation paths:
+  - **`admin/booking.php`** — fires after a new event is manually inserted via the admin form.
+  - **`admin/cvent-new-events.php`** — fires after a new event is inserted via the CVENT new-events importer.
+- Enables companion plugins (e.g. Marketing Ops) to auto-provision tasks or records for new events without polling.
+
+---
+
+## v2.6.5 — 2026-04-08
+
+### Enhancement: Custom user selection for "+ Event" button
+- Added a **"Admin + selected users"** option to the "+ Event" button visibility dropdown in **Settings → Build Request Form**.
+- When selected, a searchable multi-select user picker appears listing all WordPress users (display name + email).
+- Selected user IDs are stored in `hostlinks_add_event_btn_users` option (array of WP user IDs).
+- Admins (`manage_options`) always see the button regardless of the list.
+- Applied consistently to both `[eventlisto]` calendar and `[hostlinks_reports]` Reports page.
+
+---
+
+## v2.6.4 — 2026-04-07
+
+### Fix: Marketing Ops hub page detection not refreshing
+- Added a **"↻ Re-scan Now"** button to **Settings → Marketing Ops** below the hub page detection status table.
+- Detection results are cached for 24 hours. Clicking the button deletes the transient and immediately runs a fresh database scan.
+- Fixes the case where the transient was set to "not found" before the Marketing Hub page was published, leaving it stuck for 24 hours.
+
+---
+
+## v2.6.3 — 2026-04-07
+
+### New: One-click Marketing Ops companion plugin installer
+- **Plugin Info page** now includes a **"Companion Plugin — Marketing Ops"** section showing live install status (Active / Installed-not-active / Not installed) with the installed version.
+- When Marketing Ops is **not installed**: an **"⬇ Install Marketing Ops Now"** button fetches the latest release ZIP from GitHub (`spkldbrd/hostlinks-marketing-ops`) and installs it via `Plugin_Upgrader`.
+- When installed but **not active**: an **"Activate"** button links directly to the WordPress plugin activation URL.
+- Post-install redirect back to Plugin Info with a contextual success/error notice.
+- New file: `includes/class-mktops-installer.php` — handles GitHub API fetch, upgrader invocation, and folder rename (same `fix_source_dir` approach as `class-updater.php`).
+
+---
+
 ## v2.6.2 — 2026-03-05
 
 ### Enhancement: Marketing Ops button — "Admins & Marketing Managers" visibility mode

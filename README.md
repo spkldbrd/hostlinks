@@ -1,6 +1,6 @@
 # Hostlinks WordPress Plugin
 
-**Version:** 2.6.2 | **Author:** Digital Solution | **License:** GPL v2
+**Version:** 2.6.9 | **Author:** Digital Solution | **License:** GPL v2
 
 A private WordPress plugin built for Grant Writing USA to manage the full lifecycle of hosted training events. It centralizes event tracking, registration data, instructor/marketer management, CVENT API integration, and front-end display — all in one standalone plugin.
 
@@ -29,7 +29,7 @@ All plugin pages live under the **Hostlinks** top-level menu in the WordPress ad
 | **CVENT Sync** | Manually trigger a CVENT sync, view sync results, and see today's API call count. |
 | **New CVENT Events** | Review CVENT events detected in the API that don't yet exist in Hostlinks. Accept, ignore, or link them. Shows a badge count when new events are waiting. |
 | **Settings** | Tabbed settings panel (see below). |
-| **Plugin Info** | Version info, GitHub update status, database schema version, and shortcode reference. |
+| **Plugin Info** | Version info, GitHub update status, shortcode reference, companion plugin installer (Marketing Ops one-click install), and related plugin download links. |
 
 ---
 
@@ -38,10 +38,10 @@ All plugin pages live under the **Hostlinks** top-level menu in the WordPress ad
 | Tab | Description |
 |---|---|
 | **General** | Page URL overrides (Upcoming, Past Events, Reports, Public List, Roster, Event Request Form, Marketing Hub), Google Maps API key. |
-| **Build Request Form** | Configuration for the front-end event request form (header text, fields, "+ Event" button visibility). |
+| **Build Request Form** | Configuration for the front-end event request form (header text, fields, "+ Event" button visibility: Disabled / Admin only / Admin + selected users / All Hostlinks users). |
 | **Roster** | Upload/select a company logo (via WordPress Media Library) displayed in printed rosters. |
 | **Alerts** | Registration alert thresholds, colors, and badge/tooltip settings for the event calendar. |
-| **Marketing Ops** | Controls visibility of the "📊 Marketing Ops" button on the calendar and Reports pages. |
+| **Marketing Ops** | Controls visibility of the "📊 Marketing Ops" button (Disabled / Admins only / Admins & Marketing Admins / All users). Shows hub page detection status with a **Re-scan Now** button to force a fresh page scan. |
 | **CVENT** *(hidden)* | CVENT API credentials (Client ID, Client Secret, environment). |
 | **User Access** *(hidden)* | Per-shortcode access mode (Public / Logged In / Approved Viewers) and the approved viewer user list. |
 | **Type Settings** *(hidden)* | Add, edit, and delete event type labels (e.g., Management, Writing, Subaward). |
@@ -61,6 +61,48 @@ All plugin pages live under the **Hostlinks** top-level menu in the WordPress ad
 | `[hostlinks_event_request_form]` | Event Request | Configurable | Multi-event booking request form for hosts. Includes shipping details section and Google Places Autocomplete. |
 
 Access modes are configurable per shortcode in **Settings → User Access**. Administrators always pass. `[public_event_list]` is always public.
+
+### "+ Event" Button Visibility Options
+
+Configured in **Settings → Build Request Form**:
+
+| Mode | Who sees the button |
+|---|---|
+| Disabled | Nobody |
+| Admin only | `manage_options` users only |
+| Admin + selected users | Admins plus specific WP users chosen via a searchable multi-select picker. User IDs stored in `hostlinks_add_event_btn_users` option. |
+| All Hostlinks users | Anyone with approved viewer access |
+
+---
+
+## Companion Plugins
+
+Managed from **Plugin Info** admin page:
+
+| Plugin | Install | Purpose |
+|---|---|---|
+| **Hostlinks Marketing Ops** | One-click install from GitHub via `Plugin_Upgrader` | Marketing analytics hub, manager-level access roles, 📊 Marketing Ops calendar button |
+| **GWU Event Pages** | Download link → `github.com/spkldbrd/gwu-event-pages/releases/latest` | Standalone event pages for a separate WordPress install |
+
+The Plugin Info page shows live status (Active / Installed-not-active / Not installed) for Marketing Ops, with an Activate button when installed but inactive.
+
+---
+
+## Action Hooks for Companion Plugins
+
+Hostlinks fires the following `do_action` hooks that companion plugins can hook into:
+
+### `hostlinks_event_created`
+
+```php
+do_action( 'hostlinks_event_created', int $new_eve_id, string $eve_start );
+```
+
+Fired immediately after a new event row is inserted in `event_details_list`. Triggered by:
+- **Manual add** via the admin Events form (`booking.php`)
+- **CVENT importer** when accepting a new CVENT event (`cvent-new-events.php`)
+
+**Use case:** The Marketing Ops plugin hooks here to auto-provision checklist tasks for new events without requiring someone to open the event detail page first.
 
 ---
 
@@ -173,11 +215,16 @@ The **Edit** button on each row of the Events list opens a dedicated full-page e
 The plugin self-updates from GitHub Releases via `includes/class-updater.php`. WordPress's standard update UI in **Plugins → Updates** works normally.
 
 **Releasing a new version:**
-1. Bump `HOSTLINKS_VERSION` in `hostlinks.php` and the `* Version:` header comment.
+1. Bump `HOSTLINKS_VERSION` in `hostlinks.php` (both the `* Version:` header and the `define()`).
 2. Bump `HOSTLINKS_DB_VERSION` if any DB migrations were added.
-3. Commit and push to GitHub.
-4. Create a new GitHub Release tagged with the version (e.g. `v2.6.1`).
-5. Build and attach `hostlinks.zip` (must contain a root `hostlinks/` folder).
+3. Commit and push to GitHub (`git push origin master`).
+4. Create a git tag matching the version number — no `v` prefix: `git tag 2.6.9 && git push origin 2.6.9`.
+5. Build `hostlinks.zip` (must contain a root `hostlinks/` folder): `Compress-Archive -Path "hostlinks" -DestinationPath "hostlinks.zip" -Force`.
+6. Create a GitHub Release: `gh release create {tag} --title "{tag}" --notes "..." "../hostlinks.zip"`.
+
+The updater checks `https://api.github.com/repos/spkldbrd/hostlinks/releases/latest`. It prefers the uploaded `hostlinks.zip` asset; falls back to the archive URL for older releases. The `fix_source_dir` filter renames GitHub's extracted folder (`hostlinks-{tag}/`) to `hostlinks/` to ensure WordPress recognizes it as an update.
+
+**One-click install of companion plugins** uses the same pattern in `includes/class-mktops-installer.php` — fetches the latest release ZIP from the companion's GitHub repo and installs via `Plugin_Upgrader`.
 
 ---
 
@@ -194,6 +241,8 @@ Hostlinks maintains its own custom tables alongside the standard WordPress table
 | `wp_hostlinks_event_requests` | Front-end booking request submissions including shipping details |
 
 Schema upgrades run automatically on every page load via `maybe_upgrade()` using `dbDelta` — safe to run repeatedly. Current DB version: **2.3**.
+
+> **Important:** Never skip a DB version number, even for no-schema-change releases. The `version_compare` check in `maybe_upgrade()` uses the stored `hostlinks_db_version` option; skipping a version means that migration block will never run on sites already past that number.
 
 ### DB Migration History
 
@@ -266,7 +315,8 @@ hostlinks/
 │   ├── class-event-request-shortcode.php  Front-end request form shortcode
 │   ├── class-event-request-storage.php  Event request DB operations
 │   ├── class-import-export.php          Import/export/reset logic
-│   ├── class-page-urls.php              Front-end page URL resolver & cache
+│   ├── class-mktops-installer.php       One-click installer for Marketing Ops companion plugin
+│   ├── class-page-urls.php              Front-end page URL resolver & cache (24h transient)
 │   ├── class-shortcodes.php             Shortcode registration & AJAX handlers
 │   └── class-updater.php                GitHub Releases auto-update checker
 └── shortcode/
@@ -277,6 +327,34 @@ hostlinks/
     ├── roster-content.php               Roster HTML renderer (AJAX target)
     └── public-event-list.php            Public event list template
 ```
+
+---
+
+## Developer Notes & Known Gotchas
+
+### Page URL Detection
+`class-page-urls.php` scans `wp_posts.post_content` for shortcode tags using a `LIKE '%[shortcode]%'` query. Results are cached as transients for 24 hours. If a page is published after the cache is set, use the **Re-scan Now** button (Settings → Marketing Ops for the hub page, or wait for cache expiry for other pages). The `clear_cache()` static method deletes all URL transients at once — call it after saving page URL overrides.
+
+### Inline Edit Safety
+The Events list (`booking.php`) uses a bulk form where all visible rows are submitted on Update. Only rows with the checkbox ticked are saved (checked against `$_POST['users']` array). The date range field (`evedate[]`) and location field (`eve_location[]`) have `autocomplete="off"` to prevent browser autofill from silently overwriting them. For surgical edits to a single event, use the **Edit** button (full-page form) rather than the inline list edit.
+
+### CVENT Sync — What It Does and Does NOT Write
+The sync process **only writes** to these columns: `eve_paid`, `eve_free`, `cvent_*` metadata columns, `eve_trainer_url` (if blank), `eve_roster_url` (if blank). It **never writes** `eve_start`, `eve_end`, or `eve_tot_date`. Date changes on events always originate from manual edits, not sync.
+
+### Zoom Event Matching
+Zoom events auto-match using `dates_overlap(25) + type_match(35) + zoom_match(30) = 90`, the minimum auto-match threshold. This means any same-type zoom event within the date window can auto-match. If two zoom events of the same type occur in the same month, they may match each other incorrectly. Review `cvent_match_status = 'auto'` rows with `cvent_match_score = 90` for potential mismatches.
+
+### `hostlinks_event_created` Hook
+Only fires on **new inserts**, not on edits. The `$eve_start` parameter is the raw date string from the form (format: `Y-m-d`). The `$new_eve_id` is the integer primary key from `wpdb->insert_id`.
+
+### Marketing Ops Plugin Dependency
+The `admin_plus_mgr` visibility mode for both the Marketing Ops button and the "+ Event" button depends on `HMO_Access_Service::current_user_is_marketing_admin()` from the Marketing Ops plugin. If Marketing Ops is inactive, this mode silently falls back to admin-only behavior (the class_exists check prevents fatal errors).
+
+### Dark Mode CSS
+All dark mode styles use `.wp-dark-mode-active` as the parent selector (not `.dark`). This is compatible with the "WP Dark Mode A11y" WordPress plugin which adds that class to `<html>`. If switching dark mode plugins, update this selector in `hostlinks-calendar.css` and `hostlinks-event-request.css`.
+
+### Browser Compatibility — Date Fields
+The full-page Edit Event form (`edit-event.php`) uses `<input type="date">` native date pickers — these are safe from autofill. The Events list inline edit uses `<input type="text">` for the date range field (jQuery daterangepicker format `YYYY/MM/DD - YYYY/MM/DD`), which is protected by `autocomplete="off"` but is inherently more fragile than a native date picker.
 
 ---
 

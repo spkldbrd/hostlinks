@@ -415,9 +415,6 @@ jQuery(function() {
 					$_eveparts        = preg_split( '/ - /', $eve_tot_date, 2 );
 					$_ts_start        = isset( $_eveparts[0] ) ? strtotime( trim( $_eveparts[0] ) ) : false;
 					$_ts_end          = isset( $_eveparts[1] ) ? strtotime( trim( $_eveparts[1] ) ) : false;
-					// #region agent log
-					file_put_contents( ABSPATH . 'debug-19ead4.log', json_encode( array( 'sessionId' => '19ead4', 'runId' => 'pre-fix', 'hypothesisId' => 'date-parse', 'location' => 'booking.php:update', 'message' => 'date parse result', 'data' => array( 'eve_id' => $userid, 'raw' => $eve_tot_date, 'ts_start' => $_ts_start, 'ts_end' => $_ts_end, 'fallback' => ( ! $_ts_start || ! $_ts_end ) ), 'timestamp' => round( microtime( true ) * 1000 ) ) ) . "\n", FILE_APPEND | LOCK_EX );
-					// #endregion
 					if ( $_ts_start && $_ts_end ) {
 						$eve_start = date( 'Y-m-d', $_ts_start );
 						$eve_end   = date( 'Y-m-d', $_ts_end );

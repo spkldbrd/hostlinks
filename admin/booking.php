@@ -22,9 +22,11 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 		$eve_paid         = intval( $_POST['eve_paid'] );
 		$eve_free         = intval( $_POST['eve_free'] );
 		$eve_tot_date     = sanitize_text_field( $_POST['evedate'] );
-		$evedatearray     = explode( '-', $eve_tot_date );
-		$eve_start        = date( 'Y-m-d', strtotime( trim( $evedatearray[0] ) ) );
-		$eve_end          = date( 'Y-m-d', strtotime( trim( $evedatearray[1] ) ) );
+		$_eveparts_add    = preg_split( '/ - /', $eve_tot_date, 2 );
+		$_ts_start_add    = isset( $_eveparts_add[0] ) ? strtotime( trim( $_eveparts_add[0] ) ) : false;
+		$_ts_end_add      = isset( $_eveparts_add[1] ) ? strtotime( trim( $_eveparts_add[1] ) ) : false;
+		$eve_start        = $_ts_start_add ? date( 'Y-m-d', $_ts_start_add ) : '';
+		$eve_end          = $_ts_end_add   ? date( 'Y-m-d', $_ts_end_add )   : '';
 		$eve_type         = intval( $_POST['eve_type'] );
 		$eve_zoom         = sanitize_text_field( $_POST['eve_zoom'] ?? '' );
 		$eve_marketer     = intval( $_POST['eve_marketer'] );
@@ -409,10 +411,23 @@ jQuery(function() {
 						$eve_location     = sanitize_text_field( $_POST['eve_location'][ $key ] );
 						$eve_paid         = intval( $_POST['eve_paid'][ $key ] );
 						$eve_free         = intval( $_POST['eve_free'][ $key ] );
-						$eve_tot_date     = sanitize_text_field( $_POST['evedate'][ $key ] );
-						$evedatearray     = explode( '-', $eve_tot_date );
-						$eve_start        = date( 'Y-m-d', strtotime( trim( $evedatearray[0] ) ) );
-						$eve_end          = date( 'Y-m-d', strtotime( trim( $evedatearray[1] ) ) );
+		$eve_tot_date     = sanitize_text_field( $_POST['evedate'][ $key ] );
+					$_eveparts        = preg_split( '/ - /', $eve_tot_date, 2 );
+					$_ts_start        = isset( $_eveparts[0] ) ? strtotime( trim( $_eveparts[0] ) ) : false;
+					$_ts_end          = isset( $_eveparts[1] ) ? strtotime( trim( $_eveparts[1] ) ) : false;
+					// #region agent log
+					file_put_contents( ABSPATH . 'debug-19ead4.log', json_encode( array( 'sessionId' => '19ead4', 'runId' => 'pre-fix', 'hypothesisId' => 'date-parse', 'location' => 'booking.php:update', 'message' => 'date parse result', 'data' => array( 'eve_id' => $userid, 'raw' => $eve_tot_date, 'ts_start' => $_ts_start, 'ts_end' => $_ts_end, 'fallback' => ( ! $_ts_start || ! $_ts_end ) ), 'timestamp' => round( microtime( true ) * 1000 ) ) ) . "\n", FILE_APPEND | LOCK_EX );
+					// #endregion
+					if ( $_ts_start && $_ts_end ) {
+						$eve_start = date( 'Y-m-d', $_ts_start );
+						$eve_end   = date( 'Y-m-d', $_ts_end );
+					} else {
+						// Unparseable date — preserve existing DB values rather than writing garbage.
+						$_row      = $wpdb->get_row( $wpdb->prepare( "SELECT eve_start, eve_end, eve_tot_date FROM {$table11} WHERE eve_id = %d", $userid ), ARRAY_A );
+						$eve_start    = $_row ? $_row['eve_start']    : '';
+						$eve_end      = $_row ? $_row['eve_end']      : '';
+						$eve_tot_date = $_row ? $_row['eve_tot_date'] : $eve_tot_date;
+					}
 						$eve_type         = intval( $_POST['eve_type'][ $key ] );
 						$eve_zoom_array   = isset( $_POST['eve_zoom'] ) ? (array) $_POST['eve_zoom'] : array();
 						$eve_zoom         = in_array( (string) $user, $eve_zoom_array ) ? 'yes' : '';
@@ -638,21 +653,28 @@ jQuery(function() {
 <script type="text/javascript" src="https://cdn.datatables.net/v/dt/jszip-2.5.0/dt-1.12.1/af-2.4.0/b-2.2.3/b-colvis-2.2.3/b-html5-2.2.3/b-print-2.2.3/cr-1.5.6/date-1.1.2/fc-4.1.0/fh-3.2.4/kt-2.7.0/r-2.3.0/rg-1.2.0/rr-1.2.8/sc-2.0.7/sb-1.3.4/sp-2.0.2/sl-1.4.0/sr-1.1.1/datatables.min.js"></script>
 <script type="text/javascript">
 jQuery(function() {
-  jQuery('.eventenddertot').daterangepicker({
-    timePicker: false,
-    locale: { format: 'YYYY/MM/DD' }
+  jQuery('.eventenddertot').each(function() {
+    var $el  = jQuery(this);
+    var val  = $el.val();
+    var opts = { timePicker: false, locale: { format: 'YYYY/MM/DD' } };
+    var p    = val ? val.split(' - ') : [];
+    if ( p.length === 2 && p[0].trim() && p[1].trim() ) {
+      opts.startDate = p[0].trim();
+      opts.endDate   = p[1].trim();
+    }
+    $el.daterangepicker(opts);
   });
 });
 </script>
 <script type="text/javascript">
 jQuery(document).ready(function(){
   jQuery('#myTable').dataTable({
-    "aoColumns": [null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null,null],
+    "aoColumns": [null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null,null,null,null,null],
     "order": [[4,"asc"]],
     "bPaginate": true, "bLengthChange": true, "bFilter": true, "bSort": true,
     "bInfo": true, "bAutoWidth": true, "stateSave": true, "searching": true,
     "dom": 'lfrtip', "pageLength": 25, "lengthChange": true,
-    "columnDefs": [{"targets":[0,2,3,5,6,7,8,9,10,11,12,13],"orderable":false}]
+    "columnDefs": [{"targets":[0,2,3,5,6,7,8,9,10,11,12,13,14,15,16],"orderable":false}]
   });
   jQuery.extend(jQuery.fn.dataTableExt.oSort, {
     "date-uk-pre": function(a) { var d=a.split('/'); return (d[2]+d[1]+d[0])*1; },

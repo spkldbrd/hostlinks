@@ -46,6 +46,17 @@ $all_types       = $wpdb->get_results( "SELECT event_type_id AS id, event_type_n
 $all_marketers   = $wpdb->get_results( "SELECT event_marketer_id AS id, event_marketer_name AS name FROM {$wpdb->prefix}event_marketer WHERE event_marketer_status = 1 ORDER BY name", ARRAY_A );
 $all_instructors = $wpdb->get_results( "SELECT event_instructor_id AS id, event_instructor_name AS name FROM {$wpdb->prefix}event_instructor WHERE event_instructor_status = 1 ORDER BY name", ARRAY_A );
 
+// ── Helper: build the eve_tot_date display string ("YYYY/MM/DD - YYYY/MM/DD")
+// Returns '' if either input is not a valid YYYY-MM-DD date. Rejecting garbage
+// prevents strings like "foo - foo" from landing in the DB.
+function _hl_build_tot_date( string $start, string $end ): string {
+	$re = '/^\d{4}-\d{2}-\d{2}$/';
+	if ( ! preg_match( $re, $start ) || ! preg_match( $re, $end ) ) {
+		return '';
+	}
+	return str_replace( '-', '/', $start ) . ' - ' . str_replace( '-', '/', $end );
+}
+
 // ── Helper: normalize a phone number to XXX-XXX-XXXX ─────────────────────────
 function _hl_edit_phone( string $raw ): string {
 	$digits = preg_replace( '/\D/', '', $raw );
@@ -82,7 +93,25 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 	// Date fields
 	$eve_start    = sanitize_text_field( $_POST['eve_start_date'] ?? '' );
 	$eve_end      = sanitize_text_field( $_POST['eve_end_date']   ?? $eve_start );
-	$eve_tot_date = str_replace( '-', '/', $eve_start ) . ' - ' . str_replace( '-', '/', $eve_end );
+	$eve_tot_date = _hl_build_tot_date( $eve_start, $eve_end );
+
+	// Required-field guard — abort with an error notice rather than inserting incomplete data.
+	// Placed here (after core + date fields) so we fail fast before doing expensive work
+	// like JSON-encoding contact/hotel arrays below.
+	$missing = array();
+	if ( ! $location )       { $missing[] = 'Location'; }
+	if ( ! $eve_type )       { $missing[] = 'Type'; }
+	if ( ! $eve_marketer )   { $missing[] = 'Marketer'; }
+	if ( ! $eve_instructor ) { $missing[] = 'Instructor'; }
+	if ( ! $eve_start )      { $missing[] = 'Start Date'; }
+	if ( ! empty( $missing ) ) {
+		wp_die(
+			'<p><strong>Cannot save event.</strong> The following required fields are missing: ' . esc_html( implode( ', ', $missing ) ) . '.</p>'
+			. '<p><a href="javascript:history.back()">Go back</a></p>',
+			'Missing Required Fields',
+			array( 'response' => 400 )
+		);
+	}
 
 	// URLs
 	$eve_host_url    = esc_url_raw( trim( $_POST['eve_host_url']    ?? '' ) );
@@ -149,7 +178,9 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 	$insert_cvent_title     = '';
 	$insert_cvent_start_utc = null;
 	if ( $mode === 'cvent' ) {
-		$insert_cvent_uuid      = sanitize_text_field( $_POST['cvent_uuid']      ?? '' );
+		// Use the same normalization as the cached CVENT list so the transient cleanup
+		// below matches reliably even if the UUID contains a BOM or NBSP prefix.
+		$insert_cvent_uuid      = Hostlinks_CVENT_API::sanitize_uuid( $_POST['cvent_uuid'] ?? '' );
 		$insert_cvent_title     = sanitize_text_field( $_POST['cvent_title']     ?? '' );
 		$start_utc_raw          = sanitize_text_field( $_POST['cvent_start_utc'] ?? '' );
 		$insert_cvent_start_utc = $start_utc_raw ? gmdate( 'Y-m-d H:i:s', strtotime( $start_utc_raw ) ) : null;
@@ -218,22 +249,6 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 		$insert_data['cvent_last_synced']     = null;
 	}
 
-	// Required-field guard — abort with an error notice rather than inserting incomplete data.
-	$missing = array();
-	if ( ! $location )       { $missing[] = 'Location'; }
-	if ( ! $eve_type )       { $missing[] = 'Type'; }
-	if ( ! $eve_marketer )   { $missing[] = 'Marketer'; }
-	if ( ! $eve_instructor ) { $missing[] = 'Instructor'; }
-	if ( ! $eve_start )      { $missing[] = 'Start Date'; }
-	if ( ! empty( $missing ) ) {
-		wp_die(
-			'<p><strong>Cannot save event.</strong> The following required fields are missing: ' . esc_html( implode( ', ', $missing ) ) . '.</p>'
-			. '<p><a href="javascript:history.back()">Go back</a></p>',
-			'Missing Required Fields',
-			array( 'response' => 400 )
-		);
-	}
-
 	$wpdb->insert( $table, $insert_data );
 	$new_eve_id = (int) $wpdb->insert_id;
 
@@ -288,7 +303,7 @@ if ( $mode === 'edit' && isset( $_POST['hl_edit_full_event'] ) ) {
 	// Date fields
 	$eve_start    = sanitize_text_field( $_POST['eve_start_date'] ?? '' );
 	$eve_end      = sanitize_text_field( $_POST['eve_end_date']   ?? $eve_start );
-	$eve_tot_date = str_replace( '-', '/', $eve_start ) . ' - ' . str_replace( '-', '/', $eve_end );
+	$eve_tot_date = _hl_build_tot_date( $eve_start, $eve_end );
 
 	// URLs
 	$eve_host_url    = esc_url_raw( trim( $_POST['eve_host_url']    ?? '' ) );
@@ -1427,14 +1442,14 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 	// ── Open native date picker when clicking anywhere in the field ──────
 	// Default browser behavior only opens the picker when clicking the small
 	// calendar icon. showPicker() (Chromium/Safari/Edge) opens it on any click.
+	// Bound to 'click' only (not 'focus') so keyboard users can still Tab in
+	// and type/arrow-edit without the picker popping up unexpectedly.
 	document.querySelectorAll('input.hl-date-input').forEach(function(inp) {
-		function openPicker() {
+		inp.addEventListener('click', function() {
 			if (typeof inp.showPicker === 'function') {
 				try { inp.showPicker(); } catch (e) {}
 			}
-		}
-		inp.addEventListener('click', openPicker);
-		inp.addEventListener('focus', openPicker);
+		});
 	});
 
 })();

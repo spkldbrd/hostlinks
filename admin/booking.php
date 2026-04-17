@@ -14,43 +14,43 @@ if ( isset( $_GET['edit_event'] ) || isset( $_GET['add_event'] ) || isset( $_GET
 }
 
 // ── Determine active year-month filter (default: current month) ──────────
-	$currentYear  = (int) date('Y');
-	$currentMonth = date('m');
-	$defaultSyear = $currentYear . '-' . $currentMonth;
+$currentYear  = (int) date('Y');
+$currentMonth = date('m');
+$defaultSyear = $currentYear . '-' . $currentMonth;
 
-	$syear = ( isset( $_GET['syear'] ) && $_GET['syear'] !== '' )
-		? sanitize_text_field( $_GET['syear'] )
-		: $defaultSyear;
+$syear = ( isset( $_GET['syear'] ) && $_GET['syear'] !== '' )
+	? sanitize_text_field( $_GET['syear'] )
+	: $defaultSyear;
 
-	$syearParts  = explode( '-', $syear );
-	$filterYear  = isset( $syearParts[0] ) ? (int) $syearParts[0] : $currentYear;
-	$filterMonth = isset( $syearParts[1] ) ? (int) $syearParts[1] : (int) $currentMonth;
+$syearParts  = explode( '-', $syear );
+$filterYear  = isset( $syearParts[0] ) ? (int) $syearParts[0] : $currentYear;
+$filterMonth = isset( $syearParts[1] ) ? (int) $syearParts[1] : (int) $currentMonth;
 
-	// ── Bulk action processing (POST) ────────────────────────────────────────
-	$sucessmsgnew = '';
-	if ( isset( $_POST['deleteentire'] ) ) {
-		check_admin_referer( 'hostlinks_manage_events' );
+// ── Bulk action processing (POST) ────────────────────────────────────────
+$sucessmsgnew = '';
+if ( isset( $_POST['deleteentire'] ) ) {
+	check_admin_referer( 'hostlinks_manage_events' );
 
-		if ( $_POST['actiondelete'] === 'delete' ) {
-			$users = isset( $_POST['users'] ) ? (array) $_POST['users'] : array();
-			foreach ( $users as $user ) {
-				$wpdb->update( $table11, array( 'eve_status' => 2 ), array( 'eve_id' => intval( $user ) ), array( '%d' ), array( '%d' ) );
-			}
-			update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
-			$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) deleted. <a href="admin.php?page=booking-menu&syear=' . esc_attr( $syear ) . '">Back to list</a></p></div>';
+	if ( $_POST['actiondelete'] === 'delete' ) {
+		$users = isset( $_POST['users'] ) ? (array) $_POST['users'] : array();
+		foreach ( $users as $user ) {
+			$wpdb->update( $table11, array( 'eve_status' => 2 ), array( 'eve_id' => intval( $user ) ), array( '%d' ), array( '%d' ) );
 		}
+		update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
+		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) deleted. <a href="admin.php?page=booking-menu&syear=' . esc_attr( $syear ) . '">Back to list</a></p></div>';
+	}
 
-		if ( $_POST['actiondelete'] === 'uppydate' ) {
-			$users        = isset( $_POST['originalid'] ) ? (array) $_POST['originalid'] : array();
-			$usersadvance = isset( $_POST['users'] )      ? (array) $_POST['users']      : array();
-			if ( ! empty( $usersadvance ) ) {
-				foreach ( $users as $key => $user ) {
-					if ( in_array( $user, $usersadvance ) ) {
-						$userid           = intval( $user );
-						$eve_location     = sanitize_text_field( $_POST['eve_location'][ $key ] );
-						$eve_paid         = intval( $_POST['eve_paid'][ $key ] );
-						$eve_free         = intval( $_POST['eve_free'][ $key ] );
-		$eve_tot_date     = sanitize_text_field( $_POST['evedate'][ $key ] );
+	if ( $_POST['actiondelete'] === 'uppydate' ) {
+		$users        = isset( $_POST['originalid'] ) ? (array) $_POST['originalid'] : array();
+		$usersadvance = isset( $_POST['users'] )      ? (array) $_POST['users']      : array();
+		if ( ! empty( $usersadvance ) ) {
+			foreach ( $users as $key => $user ) {
+				if ( in_array( $user, $usersadvance ) ) {
+					$userid           = intval( $user );
+					$eve_location     = sanitize_text_field( $_POST['eve_location'][ $key ] );
+					$eve_paid         = intval( $_POST['eve_paid'][ $key ] );
+					$eve_free         = intval( $_POST['eve_free'][ $key ] );
+					$eve_tot_date     = sanitize_text_field( $_POST['evedate'][ $key ] );
 					$_eveparts        = preg_split( '/ - /', $eve_tot_date, 2 );
 					$_ts_start        = isset( $_eveparts[0] ) ? strtotime( trim( $_eveparts[0] ) ) : false;
 					$_ts_end          = isset( $_eveparts[1] ) ? strtotime( trim( $_eveparts[1] ) ) : false;
@@ -59,45 +59,45 @@ if ( isset( $_GET['edit_event'] ) || isset( $_GET['add_event'] ) || isset( $_GET
 						$eve_end   = date( 'Y-m-d', $_ts_end );
 					} else {
 						// Unparseable date — preserve existing DB values rather than writing garbage.
-						$_row      = $wpdb->get_row( $wpdb->prepare( "SELECT eve_start, eve_end, eve_tot_date FROM {$table11} WHERE eve_id = %d", $userid ), ARRAY_A );
+						$_row         = $wpdb->get_row( $wpdb->prepare( "SELECT eve_start, eve_end, eve_tot_date FROM {$table11} WHERE eve_id = %d", $userid ), ARRAY_A );
 						$eve_start    = $_row ? $_row['eve_start']    : '';
 						$eve_end      = $_row ? $_row['eve_end']      : '';
 						$eve_tot_date = $_row ? $_row['eve_tot_date'] : $eve_tot_date;
 					}
-						$eve_type         = intval( $_POST['eve_type'][ $key ] );
-						$eve_zoom_array   = isset( $_POST['eve_zoom'] ) ? (array) $_POST['eve_zoom'] : array();
-						$eve_zoom         = in_array( (string) $user, $eve_zoom_array ) ? 'yes' : '';
-						$eve_marketer     = intval( $_POST['eve_marketer'][ $key ] );
-						$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'][ $key ] ) );
-						$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'][ $key ] ) );
-						$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'][ $key ] ) );
+					$eve_type         = intval( $_POST['eve_type'][ $key ] );
+					$eve_zoom_array   = isset( $_POST['eve_zoom'] ) ? (array) $_POST['eve_zoom'] : array();
+					$eve_zoom         = in_array( (string) $user, $eve_zoom_array ) ? 'yes' : '';
+					$eve_marketer     = intval( $_POST['eve_marketer'][ $key ] );
+					$eve_host_url     = esc_url_raw( trim( $_POST['eve_host_url'][ $key ] ) );
+					$eve_roster_url   = esc_url_raw( trim( $_POST['eve_roster_url'][ $key ] ) );
+					$eve_trainer_url  = esc_url_raw( trim( $_POST['eve_trainer_url'][ $key ] ) );
 					$eve_web_url      = esc_url_raw( trim( $_POST['eve_web_url'][ $key ] ) );
 					$eve_email_url    = esc_url_raw( trim( $_POST['eve_email_url'][ $key ] ?? '' ) );
 					$eve_zoom_time    = sanitize_text_field( $_POST['eve_zoom_time'][ $key ] ?? '' );
 					$hide_ids         = isset( $_POST['eve_public_hide_ids'] ) ? (array) $_POST['eve_public_hide_ids'] : array();
-						$eve_public_hide  = in_array( (string) $user, $hide_ids ) ? 1 : 0;
-						$eve_instructor   = intval( $_POST['eve_instructor'][ $key ] );
-						// Auto-fill blank roster URL on update if roster page is configured.
-						if ( ! $eve_roster_url ) {
-							$roster_base = Hostlinks_Page_URLs::get_roster();
-							if ( $roster_base ) {
-								$eve_roster_url = rtrim( $roster_base, '/' ) . '/?eve_id=' . $userid;
-							}
+					$eve_public_hide  = in_array( (string) $user, $hide_ids ) ? 1 : 0;
+					$eve_instructor   = intval( $_POST['eve_instructor'][ $key ] );
+					// Auto-fill blank roster URL on update if roster page is configured.
+					if ( ! $eve_roster_url ) {
+						$roster_base = Hostlinks_Page_URLs::get_roster();
+						if ( $roster_base ) {
+							$eve_roster_url = rtrim( $roster_base, '/' ) . '/?eve_id=' . $userid;
 						}
-						$wpdb->update(
-							$table11,
-							array(
-								'eve_location'    => $eve_location,
-								'eve_paid'        => $eve_paid,
-								'eve_free'        => $eve_free,
-								'eve_start'       => $eve_start,
-								'eve_end'         => $eve_end,
-								'eve_type'        => $eve_type,
-								'eve_zoom'        => $eve_zoom,
-								'eve_marketer'    => $eve_marketer,
-								'eve_host_url'    => $eve_host_url,
-								'eve_roster_url'  => $eve_roster_url,
-								'eve_trainer_url' => $eve_trainer_url,
+					}
+					$wpdb->update(
+						$table11,
+						array(
+							'eve_location'    => $eve_location,
+							'eve_paid'        => $eve_paid,
+							'eve_free'        => $eve_free,
+							'eve_start'       => $eve_start,
+							'eve_end'         => $eve_end,
+							'eve_type'        => $eve_type,
+							'eve_zoom'        => $eve_zoom,
+							'eve_marketer'    => $eve_marketer,
+							'eve_host_url'    => $eve_host_url,
+							'eve_roster_url'  => $eve_roster_url,
+							'eve_trainer_url' => $eve_trainer_url,
 							'eve_web_url'     => $eve_web_url,
 							'eve_email_url'   => $eve_email_url,
 							'eve_zoom_time'   => $eve_zoom_time,
@@ -109,38 +109,38 @@ if ( isset( $_GET['edit_event'] ) || isset( $_GET['add_event'] ) || isset( $_GET
 						array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%s','%d','%d','%s' ),
 						array( '%d' )
 					);
-					}
 				}
-				update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
-				$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) successfully updated.</p></div>';
 			}
+			update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
+			$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) successfully updated.</p></div>';
 		}
 	}
+}
 
-	// ── Pre-fetch lookup tables once (used for dropdowns in every row) ────────
-	$all_pending_toter   = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_type_status` = '1'", ARRAY_A );
-	$all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
-	$all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
+// ── Pre-fetch lookup tables once (used for dropdowns in every row) ────────
+$all_pending_toter   = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_type_status` = '1'", ARRAY_A );
+$all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
+$all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
 
-	// ── Single JOIN query — eliminates N+1 per-row lookups ───────────────────
-	$all_pending_bookings = $wpdb->get_results(
-		$wpdb->prepare(
-			"SELECT e.*,
-			        t.event_type_name,
-			        m.event_marketer_name,
-			        i.event_instructor_name
-			 FROM   {$table11} e
-			 LEFT JOIN {$table12} t ON e.eve_type       = t.event_type_id
-			 LEFT JOIN {$table13} m ON e.eve_marketer   = m.event_marketer_id
-			 LEFT JOIN {$table14} i ON e.eve_instructor = i.event_instructor_id
-			 WHERE  e.eve_status = '1' AND e.eve_start LIKE %s
-			 ORDER BY e.eve_start ASC",
-			$syear . '%'
-		),
-		ARRAY_A
-	);
-	$tot1 = count( $all_pending_bookings );
-	?>
+// ── Single JOIN query — eliminates N+1 per-row lookups ───────────────────
+$all_pending_bookings = $wpdb->get_results(
+	$wpdb->prepare(
+		"SELECT e.*,
+		        t.event_type_name,
+		        m.event_marketer_name,
+		        i.event_instructor_name
+		 FROM   {$table11} e
+		 LEFT JOIN {$table12} t ON e.eve_type       = t.event_type_id
+		 LEFT JOIN {$table13} m ON e.eve_marketer   = m.event_marketer_id
+		 LEFT JOIN {$table14} i ON e.eve_instructor = i.event_instructor_id
+		 WHERE  e.eve_status = '1' AND e.eve_start LIKE %s
+		 ORDER BY e.eve_start ASC",
+		$syear . '%'
+	),
+	ARRAY_A
+);
+$tot1 = count( $all_pending_bookings );
+?>
 <div id="wpbody">
 <?php echo $sucessmsgnew; ?>
 <div tabindex="0" id="wpbody-content" class="ddddd">
@@ -327,4 +327,3 @@ th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertica
 .TFtable tr:nth-child(odd){background:#f9f9f9;}
 .TFtable tr:nth-child(even){background:#ededed;}
 </style>
-	<?php

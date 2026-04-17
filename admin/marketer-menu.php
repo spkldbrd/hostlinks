@@ -3,6 +3,13 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 global $wpdb, $post;
 $table11 = $wpdb->prefix . 'event_marketer';
 
+// Context-aware base URL so add/edit links stay within the Settings tab
+// when this file is included from admin/settings.php, or route to the
+// standalone page otherwise.
+$hl_base_url = ! empty( $hl_embedded )
+	? admin_url( 'admin.php?page=hostlinks-settings&tab=marketers' )
+	: admin_url( 'admin.php?page=marketer-menu' );
+
 // ── Add new marketer ─────────────────────────────────────────────────────────
 if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 
@@ -22,11 +29,15 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 			),
 			array( '%s', '%d', '%s', '%s', '%s', '%s' )
 		);
-		$sucessmsg = '<div class="updated below-h2" id="message"><p>Marketer successfully added. <a href="admin.php?page=marketer-menu">View Marketers</a></p></div>';
+		$sucessmsg = '<div class="updated below-h2" id="message"><p>Marketer successfully added. <a href="' . esc_url( $hl_base_url ) . '">View Marketers</a></p></div>';
 	}
 	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h2 id="add-new-user">Add New Marketer</h2>
+<?php else : ?>
+  <h2 style="margin-top:0;">Add New Marketer</h2>
+<?php endif; ?>
   <?php echo $sucessmsg; ?>
   <form name="createdriver" method="post" action="" class="anewpostcode">
     <?php wp_nonce_field( 'hostlinks_add_marketer' ); ?>
@@ -59,7 +70,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
       <input type="submit" value="Add New Marketer" class="button button-primary" id="createdriveruser" name="createdriveruser">
     </p>
   </form>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 	<?php
 
 // ── Edit marketer ────────────────────────────────────────────────────────────
@@ -85,12 +96,16 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 			array( '%s', '%d', '%s', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
-		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Marketer successfully updated. <a href="admin.php?page=marketer-menu">View Marketers</a></p></div>';
+		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Marketer successfully updated. <a href="' . esc_url( $hl_base_url ) . '">View Marketers</a></p></div>';
 	}
 	$bokdetsx = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table11 WHERE `event_marketer_id` = %d", $userid ) );
 	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h2 id="add-new-user">Update Marketer</h2>
+<?php else : ?>
+  <h2 style="margin-top:0;">Update Marketer</h2>
+<?php endif; ?>
   <?php echo $sucessmsgnew; ?>
   <form name="createdriver" method="post" action="" class="updpocode">
     <?php wp_nonce_field( 'hostlinks_edit_marketer' ); ?>
@@ -133,7 +148,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
       <input type="submit" value="Update Marketer" class="button button-primary" id="updatethepcode" name="updatethepcode">
     </p>
   </form>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 	<?php
 
 // ── Marketer list ────────────────────────────────────────────────────────────
@@ -175,10 +190,12 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	$tot_active   = count( $all_active );
 	$tot_inactive = count( $all_inactive );
 	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div id="wpbody">
   <div tabindex="0" id="wpbody-content">
     <div class="wrap">
-      <h2>Marketers <a class="add-new-h2" href="admin.php?page=marketer-menu&add=1">Add New Marketer</a></h2>
+<?php endif; ?>
+      <h2<?php echo ! empty( $hl_embedded ) ? ' style="margin-top:0;"' : ''; ?>>Marketers <a class="add-new-h2" href="<?php echo esc_url( $hl_base_url . '&add=1' ); ?>">Add New Marketer</a></h2>
 
       <?php if ( ! empty( $bulk_msg ) ) : ?>
       <div class="updated below-h2" id="message"><p><?php echo esc_html( $bulk_msg ); ?></p></div>
@@ -223,7 +240,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
               <td>
                 <strong><?php echo esc_html( $mk['event_marketer_name'] ); ?></strong>
                 <div class="row-actions">
-                  <span class="edit"><a href="admin.php?page=marketer-menu&editu=<?php echo esc_attr( $mk['event_marketer_id'] ); ?>">Edit</a></span>
+                  <span class="edit"><a href="<?php echo esc_url( $hl_base_url . '&editu=' . (int) $mk['event_marketer_id'] ); ?>">Edit</a></span>
                   &nbsp;|&nbsp;
                   <span class="deactivate">
                     <form method="post" action="" style="display:inline;">
@@ -257,7 +274,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
               <td>
                 <strong><?php echo esc_html( $mk['event_marketer_name'] ); ?></strong>
                 <div class="row-actions">
-                  <span class="edit"><a href="admin.php?page=marketer-menu&editu=<?php echo esc_attr( $mk['event_marketer_id'] ); ?>">Edit</a></span>
+                  <span class="edit"><a href="<?php echo esc_url( $hl_base_url . '&editu=' . (int) $mk['event_marketer_id'] ); ?>">Edit</a></span>
                   &nbsp;|&nbsp;
                   <span class="activate">
                     <form method="post" action="" style="display:inline;">
@@ -282,9 +299,11 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
           </tbody>
         </table>
       </form>
+<?php if ( empty( $hl_embedded ) ) : ?>
     </div>
   </div>
 </div>
+<?php endif; ?>
 	<?php
 }
 ?>

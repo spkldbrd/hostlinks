@@ -25,8 +25,6 @@ class Hostlinks_Admin_Menus {
 		// The first submenu entry replaces the auto-generated duplicate of the parent
 		add_submenu_page( 'booking-menu', 'Events',          'Events',          'manage_options', 'booking-menu',              array( $this, 'page_events' ) );
 		add_submenu_page( 'booking-menu', 'Add New Event',   'Add New Event',   'manage_options', 'admin.php?page=booking-menu&add_event=1' );
-		add_submenu_page( 'booking-menu', 'Marketers',       'Marketers',       'manage_options', 'marketer-menu',             array( $this, 'page_marketer' ) );
-		add_submenu_page( 'booking-menu', 'Instructors',     'Instructors',     'manage_options', 'istructor-menu',            array( $this, 'page_instructor' ) );
 		add_submenu_page( 'booking-menu', 'CVENT Sync',      'CVENT Sync',      'manage_options', 'cvent-sync',                array( $this, 'page_cvent_sync' ) );
 
 		// New CVENT Events — show a badge count when new events are waiting.
@@ -59,6 +57,8 @@ class Hostlinks_Admin_Menus {
 		// Hidden pages — registered with null parent so they are NEVER shown in the menu
 		// but remain accessible via direct URL (e.g. when included from the Settings tabs).
 		add_submenu_page( null, 'Type Settings',          'Type Settings',          'manage_options', 'types-menu',                       array( $this, 'page_types' ) );
+		add_submenu_page( null, 'Marketers',              'Marketers',              'manage_options', 'marketer-menu',                    array( $this, 'page_marketer' ) );
+		add_submenu_page( null, 'Instructors',            'Instructors',            'manage_options', 'istructor-menu',                   array( $this, 'page_instructor' ) );
 		add_submenu_page( null, 'Import / Export',        'Import / Export',        'manage_options', 'hostlinks-import-export',          array( $this, 'page_import_export' ) );
 		add_submenu_page( null, 'CVENT Settings',         'CVENT Settings',         'manage_options', 'cvent-settings',                   array( $this, 'page_cvent_settings' ) );
 		add_submenu_page( null, 'Event Request Settings', 'Event Request Settings', 'manage_options', 'hostlinks-event-request-settings', array( $this, 'page_event_request_settings' ) );

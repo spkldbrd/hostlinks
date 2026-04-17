@@ -13,6 +13,8 @@ $valid_tabs = array(
 	'cvent'             => 'CVENT',
 	'import-export'     => 'Import / Export',
 	'type-settings'     => 'Type Settings',
+	'marketers'         => 'Marketers',
+	'instructors'       => 'Instructors',
 	'public-event-list' => 'Public Event List',
 	'roster'            => 'Roster',
 	'alerts'            => 'Alerts',
@@ -62,6 +64,12 @@ switch ( $current_tab ) {
 		break;
 	case 'type-settings':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/type-menu.php';
+		break;
+	case 'marketers':
+		include HOSTLINKS_PLUGIN_DIR . 'admin/marketer-menu.php';
+		break;
+	case 'instructors':
+		include HOSTLINKS_PLUGIN_DIR . 'admin/instructor-menu.php';
 		break;
 	case 'public-event-list':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/public-event-list-settings.php';

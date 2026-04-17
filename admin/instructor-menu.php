@@ -3,6 +3,13 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 global $wpdb, $post;
 $table11 = $wpdb->prefix . 'event_instructor';
 
+// Context-aware base URL so add/edit links stay within the Settings tab
+// when this file is included from admin/settings.php, or route to the
+// standalone page otherwise.
+$hl_base_url = ! empty( $hl_embedded )
+	? admin_url( 'admin.php?page=hostlinks-settings&tab=instructors' )
+	: admin_url( 'admin.php?page=istructor-menu' );
+
 // ── Add new instructor ───────────────────────────────────────────────────────
 if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 
@@ -15,11 +22,15 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 			array( 'event_instructor_name' => $postcodename, 'event_instructor_status' => 1 ),
 			array( '%s', '%d' )
 		);
-		$sucessmsg = '<div class="updated below-h2" id="message"><p>Instructor successfully added. <a href="admin.php?page=istructor-menu">View Instructors</a></p></div>';
+		$sucessmsg = '<div class="updated below-h2" id="message"><p>Instructor successfully added. <a href="' . esc_url( $hl_base_url ) . '">View Instructors</a></p></div>';
 	}
 	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h2 id="add-new-user">Add New Instructor</h2>
+<?php else : ?>
+  <h2 style="margin-top:0;">Add New Instructor</h2>
+<?php endif; ?>
   <?php echo $sucessmsg; ?>
   <form name="createdriver" method="post" action="" class="anewpostcode">
     <?php wp_nonce_field( 'hostlinks_add_instructor' ); ?>
@@ -33,7 +44,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
       <input type="submit" value="Add New Instructor" class="button button-primary" id="createdriveruser" name="createdriveruser">
     </p>
   </form>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 	<?php
 
 // ── Edit instructor ──────────────────────────────────────────────────────────
@@ -55,12 +66,16 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 			array( '%s', '%d' ),
 			array( '%d' )
 		);
-		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Instructor successfully updated. <a href="admin.php?page=istructor-menu">View Instructors</a></p></div>';
+		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Instructor successfully updated. <a href="' . esc_url( $hl_base_url ) . '">View Instructors</a></p></div>';
 	}
 	$bokdetsx = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table11 WHERE `event_instructor_id` = %d", $userid ) );
 	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div class="wrap">
   <h2 id="add-new-user">Update Instructor</h2>
+<?php else : ?>
+  <h2 style="margin-top:0;">Update Instructor</h2>
+<?php endif; ?>
   <?php echo $sucessmsgnew; ?>
   <form name="createdriver" method="post" action="" class="updpocode">
     <?php wp_nonce_field( 'hostlinks_edit_instructor' ); ?>
@@ -84,7 +99,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
       <input type="submit" value="Update Instructor" class="button button-primary" id="updatethepcode" name="updatethepcode">
     </p>
   </form>
-</div>
+<?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 	<?php
 
 // ── Instructor list ──────────────────────────────────────────────────────────
@@ -126,10 +141,12 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	$tot_active   = count( $all_active );
 	$tot_inactive = count( $all_inactive );
 	?>
+<?php if ( empty( $hl_embedded ) ) : ?>
 <div id="wpbody">
   <div tabindex="0" id="wpbody-content">
     <div class="wrap">
-      <h2>Instructors <a class="add-new-h2" href="admin.php?page=istructor-menu&add=1">Add New Instructor</a></h2>
+<?php endif; ?>
+      <h2<?php echo ! empty( $hl_embedded ) ? ' style="margin-top:0;"' : ''; ?>>Instructors <a class="add-new-h2" href="<?php echo esc_url( $hl_base_url . '&add=1' ); ?>">Add New Instructor</a></h2>
 
       <?php if ( ! empty( $bulk_msg ) ) : ?>
       <div class="updated below-h2" id="message"><p><?php echo esc_html( $bulk_msg ); ?></p></div>
@@ -172,7 +189,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
               <td>
                 <strong><?php echo esc_html( $inst['event_instructor_name'] ); ?></strong>
                 <div class="row-actions">
-                  <span class="edit"><a href="admin.php?page=istructor-menu&editu=<?php echo esc_attr( $inst['event_instructor_id'] ); ?>">Edit</a></span>
+                  <span class="edit"><a href="<?php echo esc_url( $hl_base_url . '&editu=' . (int) $inst['event_instructor_id'] ); ?>">Edit</a></span>
                   &nbsp;|&nbsp;
                   <span class="deactivate">
                     <form method="post" action="" style="display:inline;">
@@ -200,7 +217,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
               <td>
                 <strong><?php echo esc_html( $inst['event_instructor_name'] ); ?></strong>
                 <div class="row-actions">
-                  <span class="edit"><a href="admin.php?page=istructor-menu&editu=<?php echo esc_attr( $inst['event_instructor_id'] ); ?>">Edit</a></span>
+                  <span class="edit"><a href="<?php echo esc_url( $hl_base_url . '&editu=' . (int) $inst['event_instructor_id'] ); ?>">Edit</a></span>
                   &nbsp;|&nbsp;
                   <span class="activate">
                     <form method="post" action="" style="display:inline;">
@@ -219,9 +236,11 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
           </tbody>
         </table>
       </form>
+<?php if ( empty( $hl_embedded ) ) : ?>
     </div>
   </div>
 </div>
+<?php endif; ?>
 	<?php
 }
 ?>

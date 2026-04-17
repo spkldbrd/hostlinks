@@ -127,6 +127,7 @@ $all_pending_bookings = $wpdb->get_results(
 	$wpdb->prepare(
 		"SELECT e.*,
 		        t.event_type_name,
+		        t.event_type_abbr,
 		        m.event_marketer_name,
 		        i.event_instructor_name
 		 FROM   {$table11} e
@@ -209,8 +210,8 @@ $tot1 = count( $all_pending_bookings );
         <thead>
           <tr>
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
-            <th>Location</th><th>Paid</th><th>Free</th><th>Date</th>
-            <th>Type</th><th>Zoom</th><th>Marketer</th>
+            <th>Location</th><th>Paid</th><th>Free</th><th style="width:90px;">Date</th>
+            <th style="width:60px;">Type</th><th>Zoom</th><th>Marketer</th>
             <th style="width:40px;"></th><th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
           </tr>
         </thead>
@@ -230,13 +231,37 @@ $tot1 = count( $all_pending_bookings );
               <input type="number" value="<?php echo esc_attr( $alldriver['eve_paid'] ?? '' ); ?>" name="eve_paid[]" required style="width:50px;"></td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_free'] ?? '' ); ?></p>
               <input type="number" value="<?php echo esc_attr( $alldriver['eve_free'] ?? '' ); ?>" name="eve_free[]" required style="width:50px;"></td>
-            <td><p class="hidder"><?php echo esc_html( $alldriver['eve_start'] ?? '' ); ?></p>
-              <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot" id="eventenddertot<?php echo esc_attr( $alldriver['eve_id'] ); ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required autocomplete="off"></td>
             <td>
-              <select name="eve_type[]" class="evetype" required style="width:100px;">
-                <option value="">Please Choose</option>
-                <?php foreach ( $all_pending_toter as $alldriverx1 ) { ?>
-                  <option value="<?php echo esc_attr( $alldriverx1['event_type_id'] ); ?>" <?php if ( $alldriverx1['event_type_id'] == $alldriver['eve_type'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx1['event_type_name'] ); ?></option>
+              <p class="hidder"><?php echo esc_html( $alldriver['eve_start'] ?? '' ); ?></p>
+              <?php
+              // Compact display: "MM/DD-MM/DD" (same-day collapses to "MM/DD").
+              // The real <input> below stays in the DOM and holds the full
+              // YYYY/MM/DD - YYYY/MM/DD string that daterangepicker & the
+              // POST handler expect — this span is purely visual.
+              $_start_ts = ! empty( $alldriver['eve_start'] ) ? strtotime( $alldriver['eve_start'] ) : false;
+              $_end_ts   = ! empty( $alldriver['eve_end'] )   ? strtotime( $alldriver['eve_end'] )   : false;
+              $_compact  = '';
+              if ( $_start_ts ) {
+                  $_compact = date( 'm/d', $_start_ts );
+                  if ( $_end_ts && $_end_ts !== $_start_ts ) {
+                      $_compact .= '-' . date( 'm/d', $_end_ts );
+                  }
+              }
+              ?>
+              <span class="hl-date-wrap">
+                <span class="hl-compact-date" title="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>"><?php echo esc_html( $_compact !== '' ? $_compact : '—' ); ?></span>
+                <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot hl-date-hidden" id="eventenddertot<?php echo esc_attr( $alldriver['eve_id'] ); ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required autocomplete="off">
+              </span>
+            </td>
+            <td>
+              <select name="eve_type[]" class="evetype hl-type-compact" required>
+                <option value="">—</option>
+                <?php foreach ( $all_pending_toter as $alldriverx1 ) {
+                    $_opt_abbr  = $alldriverx1['event_type_abbr'] ?? '';
+                    $_opt_label = $_opt_abbr !== '' ? $_opt_abbr : $alldriverx1['event_type_name'];
+                    $_opt_title = $alldriverx1['event_type_name'];
+                ?>
+                  <option value="<?php echo esc_attr( $alldriverx1['event_type_id'] ); ?>" title="<?php echo esc_attr( $_opt_title ); ?>" <?php if ( $alldriverx1['event_type_id'] == $alldriver['eve_type'] ) echo 'selected'; ?>><?php echo esc_html( $_opt_label ); ?></option>
                 <?php } ?>
               </select>
               <p class="hidder"><?php echo esc_html( $alldriver['event_type_name'] ?? '' ); ?></p>
@@ -289,6 +314,28 @@ $tot1 = count( $all_pending_bookings );
 <script type="text/javascript" src="https://cdn.datatables.net/v/dt/jszip-2.5.0/dt-1.12.1/af-2.4.0/b-2.2.3/b-colvis-2.2.3/b-html5-2.2.3/b-print-2.2.3/cr-1.5.6/date-1.1.2/fc-4.1.0/fh-3.2.4/kt-2.7.0/r-2.3.0/rg-1.2.0/rr-1.2.8/sc-2.0.7/sb-1.3.4/sp-2.0.2/sl-1.4.0/sr-1.1.1/datatables.min.js"></script>
 <script type="text/javascript">
 jQuery(function() {
+  // Format a moment-ish date-string to "MM/DD" for the compact display.
+  function _hlCompactMD(d) {
+    if (!d || typeof d.format !== 'function') return '';
+    return d.format('MM/DD');
+  }
+  function _hlRefreshCompact($input) {
+    var $row  = $input.closest('tr');
+    var $span = $row.find('span.hl-compact-date');
+    if (!$span.length) return;
+    var dp = $input.data('daterangepicker');
+    if (!dp) return;
+    var s = dp.startDate, e = dp.endDate;
+    var out = _hlCompactMD(s);
+    if (e && e.format('YYYY-MM-DD') !== s.format('YYYY-MM-DD')) {
+      out += '-' + _hlCompactMD(e);
+    }
+    $span.text(out || '—').attr('title', s.format('YYYY/MM/DD') + ' - ' + e.format('YYYY/MM/DD'));
+    // Keep the real hidden input's value in the picker's output format so
+    // the POST handler still parses it via preg_split('/ - /', ...).
+    $input.val( s.format('YYYY/MM/DD') + ' - ' + e.format('YYYY/MM/DD') );
+  }
+
   jQuery('.eventenddertot').each(function() {
     var $el  = jQuery(this);
     var val  = $el.val();
@@ -299,6 +346,14 @@ jQuery(function() {
       opts.endDate   = p[1].trim();
     }
     $el.daterangepicker(opts);
+    $el.on('apply.daterangepicker', function() { _hlRefreshCompact( jQuery(this) ); });
+  });
+
+  // Clicking the compact span opens the associated picker.
+  jQuery(document).on('click', 'span.hl-compact-date', function() {
+    var $input = jQuery(this).siblings('input.eventenddertot');
+    var dp     = $input.data('daterangepicker');
+    if (dp) { dp.show(); }
   });
 });
 </script>
@@ -326,4 +381,18 @@ th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertica
 .updpocode,.anewpostcode{background-color:#e0e0e0;padding:20px;width:49%;}
 .TFtable tr:nth-child(odd){background:#f9f9f9;}
 .TFtable tr:nth-child(even){background:#ededed;}
+
+/* Event list: compact date column.
+   The wrap is a positioned inline box. The compact span sits on top as the
+   visible label. The real daterangepicker-bound input is overlaid at the same
+   spot with opacity:0 so the popup still anchors correctly to the input's
+   on-screen rect, but it's invisible and pointer-events pass through to the
+   span underneath (so the span click handler fires). */
+.hl-date-wrap{position:relative;display:inline-block;}
+.hl-date-hidden{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;pointer-events:none;border:0;padding:0;margin:0;}
+.hl-compact-date{cursor:pointer;display:inline-block;padding:3px 6px;border:1px dashed #bbb;border-radius:3px;font-family:monospace;font-size:12px;white-space:nowrap;background:#fff;}
+.hl-compact-date:hover{background:#eef5fb;border-color:#72aee6;}
+
+/* Event list: narrower Type dropdown when abbreviations are used. */
+select.hl-type-compact{width:64px;padding-left:4px;padding-right:18px;}
 </style>

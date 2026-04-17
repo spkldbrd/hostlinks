@@ -9,11 +9,17 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	if ( isset( $_POST['createdriveruser'] ) ) {
 		check_admin_referer( 'hostlinks_add_type' );
 		$postcodename = sanitize_text_field( $_POST['first_name'] );
+		$type_abbr    = sanitize_text_field( $_POST['event_type_abbr'] ?? '' );
 		$lat_long     = sanitize_text_field( $_POST['lat_long'] );
 		$wpdb->insert(
 			$table11,
-			array( 'event_type_name' => $postcodename, 'event_type_color' => $lat_long, 'event_type_status' => 1 ),
-			array( '%s', '%s', '%d' )
+			array(
+				'event_type_name'   => $postcodename,
+				'event_type_abbr'   => $type_abbr,
+				'event_type_color'  => $lat_long,
+				'event_type_status' => 1,
+			),
+			array( '%s', '%s', '%s', '%d' )
 		);
 		$sucessmsg = '<div class="updated below-h2" id="message"><p>Type Sucessfully added. <a href="admin.php?page=types-menu">View Type</a></p></div>';
 	}
@@ -29,6 +35,13 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
       <tr class="form-field">
         <th><label for="first_name">Name Of the Type <span class="description">(required)</span></label></th>
         <td><input type="text" value="" id="first_name" name="first_name" required onkeypress="return alphabetssonly(event)"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="event_type_abbr">Abbreviation</label></th>
+        <td>
+          <input type="text" value="" id="event_type_abbr" name="event_type_abbr" maxlength="10" style="width:80px;">
+          <p class="description">Short label shown in the compact Type column on the Event List (e.g. MGT, SUB, WRT). Leave blank to use the full name.</p>
+        </td>
       </tr>
       <tr class="form-field">
         <th><label for="lat_long">Type Color <span class="description">(required)</span></label></th>
@@ -58,12 +71,17 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	if ( isset( $_POST['updatethepcode'] ) ) {
 		check_admin_referer( 'hostlinks_edit_type' );
 		$postcodename = sanitize_text_field( $_POST['first_name'] );
+		$type_abbr    = sanitize_text_field( $_POST['event_type_abbr'] ?? '' );
 		$lat_long     = sanitize_text_field( $_POST['lat_long'] );
 		$wpdb->update(
 			$table11,
-			array( 'event_type_name' => $postcodename, 'event_type_color' => $lat_long ),
-			array( 'event_type_id'   => $userid ),
-			array( '%s', '%s' ),
+			array(
+				'event_type_name'  => $postcodename,
+				'event_type_abbr'  => $type_abbr,
+				'event_type_color' => $lat_long,
+			),
+			array( 'event_type_id' => $userid ),
+			array( '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Type Sucessfully Updated. <a href="admin.php?page=types-menu">View Type</a></p></div>';
@@ -81,6 +99,13 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
       <tr class="form-field">
         <th><label for="first_name">Name Of the Type <span class="description">(required)</span></label></th>
         <td><input type="text" value="<?php echo esc_attr( $bokdetsx->event_type_name ?? '' ); ?>" id="first_name" name="first_name" required onkeypress="return alphabetssonly(event)"></td>
+      </tr>
+      <tr class="form-field">
+        <th><label for="event_type_abbr">Abbreviation</label></th>
+        <td>
+          <input type="text" value="<?php echo esc_attr( $bokdetsx->event_type_abbr ?? '' ); ?>" id="event_type_abbr" name="event_type_abbr" maxlength="10" style="width:80px;">
+          <p class="description">Short label shown in the compact Type column on the Event List (e.g. MGT, SUB, WRT). Leave blank to use the full name.</p>
+        </td>
       </tr>
       <tr class="form-field">
         <th><label for="lat_long">Type Color <span class="description">(required)</span></label></th>
@@ -139,6 +164,7 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
             <tr>
               <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
               <th>Type Name</th>
+              <th style="width:140px;">Abbreviation</th>
               <th>Type Color</th>
             </tr>
           </thead>
@@ -149,6 +175,14 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
               <td><strong><?php echo esc_html( $alldriver['event_type_name'] ); ?></strong>
                 <div class="row-actions"><span class="edit"><a href="admin.php?page=types-menu&editu=<?php echo esc_attr( $alldriver['event_type_id'] ); ?>">Edit</a></span></div>
               </td>
+              <td><?php
+                $_abbr = $alldriver['event_type_abbr'] ?? '';
+                if ( $_abbr === '' ) {
+                    echo '<span style="color:#888;font-style:italic;">—</span>';
+                } else {
+                    echo '<code>' . esc_html( $_abbr ) . '</code>';
+                }
+              ?></td>
               <td><div class="struter <?php echo esc_attr( $alldriver['event_type_color'] ); ?>" style="width:50px;">&nbsp;</div></td>
             </tr>
             <?php } ?>

@@ -75,6 +75,15 @@ class Hostlinks_DB {
 		}
 	}
 
+	// v2.4 — add event_type_abbr column to event_type for a compact label on the event list.
+	if ( version_compare( $installed, '2.4', '<' ) ) {
+		$tbl      = $wpdb->prefix . 'event_type';
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+		if ( ! in_array( 'event_type_abbr', $existing, true ) ) {
+			$wpdb->query( "ALTER TABLE `{$tbl}` ADD `event_type_abbr` varchar(20) NOT NULL DEFAULT ''" );
+		}
+	}
+
 	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
 	if ( version_compare( $installed, '2.1', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'event_details_list';
@@ -256,6 +265,7 @@ class Hostlinks_DB {
 		$sql = "CREATE TABLE {$wpdb->prefix}event_type (
 			event_type_id bigint(20) NOT NULL AUTO_INCREMENT,
 			event_type_name varchar(255) NOT NULL DEFAULT '',
+			event_type_abbr varchar(20) NOT NULL DEFAULT '',
 			event_type_color varchar(50) NOT NULL DEFAULT '',
 			event_type_status tinyint(1) NOT NULL DEFAULT 1,
 			PRIMARY KEY  (event_type_id)

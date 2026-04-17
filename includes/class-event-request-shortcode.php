@@ -122,6 +122,14 @@ class Hostlinks_Event_Request_Shortcode {
 		$maps_api_key  = get_option( 'hostlinks_google_maps_api_key', '' );
 		$form_header   = get_option( 'hostlinks_event_request_form_header', 'New Event Build Form' );
 
+		// Notification recipients — surfaced as a user-editable CC list above
+		// the submit button so the submitter can uncheck / add extras.
+		$notif_email   = get_option( 'hostlinks_event_request_notification_email', get_option( 'admin_email' ) );
+		$cc_defaults   = get_option( 'hostlinks_event_request_cc_recipients', array() );
+		if ( ! is_array( $cc_defaults ) ) {
+			$cc_defaults = array();
+		}
+
 		ob_start();
 		include HOSTLINKS_PLUGIN_DIR . 'shortcode/event-request-form.php';
 		return ob_get_clean();
@@ -167,6 +175,27 @@ class Hostlinks_Event_Request_Shortcode {
 			$lines[] = 'Review first: ' . admin_url( 'admin.php?page=hostlinks-event-requests&id=' . $ids[0] );
 		}
 
-		wp_mail( $to, $subject, implode( "\n", $lines ) );
+		// Build Cc: header from the first inserted record's cc_emails JSON.
+		// All records in a single submission share the same CC list so
+		// reading the first one is sufficient.
+		$headers    = array();
+		$cc_list    = array();
+		$cc_raw_json = $first['cc_emails'] ?? '';
+		if ( is_string( $cc_raw_json ) && $cc_raw_json !== '' ) {
+			$decoded = json_decode( $cc_raw_json, true );
+			if ( is_array( $decoded ) ) {
+				foreach ( $decoded as $e ) {
+					$e = sanitize_email( (string) $e );
+					if ( $e && is_email( $e ) && $e !== $to ) {
+						$cc_list[] = $e;
+					}
+				}
+			}
+		}
+		if ( ! empty( $cc_list ) ) {
+			$headers[] = 'Cc: ' . implode( ', ', $cc_list );
+		}
+
+		wp_mail( $to, $subject, implode( "\n", $lines ), $headers );
 	}
 }

@@ -27,12 +27,25 @@ if ( isset( $_POST['hl_save_request_settings'] ) ) {
 		$custom_users = array_filter( $custom_users ); // remove zeros
 	}
 
+	// Default CC recipients — one email per line on the form; stored as a
+	// JSON-safe array so we can surface them as checkboxes on the frontend.
+	$cc_raw   = (string) ( $_POST['hl_cc_recipients'] ?? '' );
+	$cc_lines = preg_split( '/\r\n|\r|\n/', $cc_raw );
+	$cc_list  = array();
+	foreach ( (array) $cc_lines as $line ) {
+		$e = sanitize_email( trim( $line ) );
+		if ( $e && is_email( $e ) && ! in_array( $e, $cc_list, true ) ) {
+			$cc_list[] = $e;
+		}
+	}
+
 	update_option( 'hostlinks_event_request_notification_email', $email );
 	update_option( 'hostlinks_event_request_email_subject_prefix', $prefix );
 	update_option( 'hostlinks_event_request_success_message', $success );
 	update_option( 'hostlinks_event_request_form_header', $form_header );
 	update_option( 'hostlinks_add_event_btn', $add_btn );
 	update_option( 'hostlinks_add_event_btn_users', $custom_users );
+	update_option( 'hostlinks_event_request_cc_recipients', $cc_list );
 
 	$notice = '<div class="notice notice-success is-dismissible"><p>Event Request settings saved.</p></div>';
 }
@@ -46,6 +59,10 @@ $add_btn        = get_option( 'hostlinks_add_event_btn', 'disabled' );
 $custom_users   = get_option( 'hostlinks_add_event_btn_users', array() );
 if ( ! is_array( $custom_users ) ) {
 	$custom_users = array();
+}
+$cc_recipients  = get_option( 'hostlinks_event_request_cc_recipients', array() );
+if ( ! is_array( $cc_recipients ) ) {
+	$cc_recipients = array();
 }
 
 // Build user list for the picker (all WP users, any role).
@@ -123,6 +140,14 @@ $all_users = get_users( array(
 					value="<?php echo esc_attr( $notif_email ); ?>"
 					class="regular-text" />
 				<p class="description">New event request submissions will be sent to this address. Defaults to the site admin email.</p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="hl_cc_recipients">Default CC Recipients</label></th>
+			<td>
+				<textarea id="hl_cc_recipients" name="hl_cc_recipients" rows="4"
+					class="large-text" placeholder="one@example.com&#10;two@example.com"><?php echo esc_textarea( implode( "\n", $cc_recipients ) ); ?></textarea>
+				<p class="description">One email per line. These will appear on the front-end request form as pre-checked CC checkboxes next to the submit button. Visitors can uncheck any or add their own before sending. Included in the <code>Cc:</code> header on the notification email.</p>
 			</td>
 		</tr>
 		<tr>

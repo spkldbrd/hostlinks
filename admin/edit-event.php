@@ -21,8 +21,13 @@ $timezone = wp_timezone();
 $table    = $wpdb->prefix . 'event_details_list';
 
 // ── Mode detection ────────────────────────────────────────────────────────────
+// Modes: edit, add, cvent, request
+//   request: pre-fill the add form from a row in wp_hostlinks_event_requests.
 if ( isset( $_GET['add_cvent'] ) ) {
 	$mode   = 'cvent';
+	$eve_id = 0;
+} elseif ( isset( $_GET['add_request'] ) ) {
+	$mode   = 'request';
 	$eve_id = 0;
 } elseif ( isset( $_GET['add_event'] ) ) {
 	$mode   = 'add';
@@ -40,6 +45,13 @@ if ( isset( $_GET['add_cvent'] ) ) {
 $cvent_uuid_pre      = '';
 $cvent_title_pre     = '';
 $cvent_start_utc_pre = '';
+
+// Request-mode globals populated during data load below. Kept here as safe
+// defaults so later blocks (save handler, header, cancel URL) can reference
+// them unconditionally.
+$request_id     = (int) ( $_GET['add_request'] ?? 0 );
+$request_row    = null;
+$request_header = '';
 
 // ── Load lookup tables ────────────────────────────────────────────────────────
 $all_types       = $wpdb->get_results( "SELECT event_type_id AS id, event_type_name AS name FROM {$wpdb->prefix}event_type WHERE event_type_status = 1 ORDER BY name", ARRAY_A );
@@ -75,7 +87,7 @@ if ( isset( $_GET['saved'] ) ) {
 	$notice = '<div class="notice notice-success is-dismissible"><p>Event added successfully. You can continue editing it here.</p></div>';
 }
 
-// ── ADD handler (add + cvent modes) ──────────────────────────────────────────
+// ── ADD handler (add + cvent + request modes) ───────────────────────────────
 if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 	check_admin_referer( 'hostlinks_add_event_unified' );
 
@@ -280,6 +292,15 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 		do_action( 'hostlinks_event_created', $new_eve_id, $eve_start );
 	}
 
+	// Request mode: mark the originating event request as converted so it
+	// drops off the Pending queue and shows under Completed.
+	if ( $mode === 'request' && $new_eve_id ) {
+		$req_id_posted = (int) ( $_POST['hl_request_id'] ?? 0 );
+		if ( $req_id_posted && class_exists( 'Hostlinks_Event_Request_Storage' ) ) {
+			Hostlinks_Event_Request_Storage::update_status( $req_id_posted, 'converted' );
+		}
+	}
+
 	wp_safe_redirect( admin_url( 'admin.php?page=booking-menu&edit_event=' . $new_eve_id . '&saved=1' ) );
 	exit;
 }
@@ -429,6 +450,92 @@ if ( $mode === 'edit' ) {
 		echo '<div class="wrap"><div class="notice notice-error"><p>Event not found.</p></div></div>';
 		return;
 	}
+} elseif ( $mode === 'request' ) {
+	// Pull the event request row and map its fields onto the $ev shape
+	// expected by the rest of the form. Best-effort name→ID lookup for
+	// the three ID-based fields (type, marketer, instructor).
+	if ( ! class_exists( 'Hostlinks_Event_Request_Storage' ) ) {
+		echo '<div class="wrap"><div class="notice notice-error"><p>Event Request module not available.</p></div></div>';
+		return;
+	}
+	$request_row = Hostlinks_Event_Request_Storage::get_by_id( $request_id );
+	if ( ! $request_row ) {
+		echo '<div class="wrap"><div class="notice notice-error"><p>Event request #' . esc_html( (string) $request_id ) . ' not found.</p></div></div>';
+		return;
+	}
+
+	// Helper: case-insensitive lookup of a name in a lookup array → id (0 if no match).
+	$_hl_lookup_id = function( $name, array $lookup ) {
+		$needle = strtolower( trim( (string) $name ) );
+		if ( $needle === '' ) return 0;
+		foreach ( $lookup as $r ) {
+			if ( strtolower( trim( (string) $r['name'] ) ) === $needle ) {
+				return (int) $r['id'];
+			}
+		}
+		return 0;
+	};
+
+	$req_type_id       = $_hl_lookup_id( $request_row['category'] ?? '', $all_types );
+	$req_marketer_id   = $_hl_lookup_id( $request_row['marketer'] ?? '', $all_marketers );
+	$req_instructor_id = $_hl_lookup_id( $request_row['trainer']  ?? '', $all_instructors );
+
+	$request_header = trim( (string) ( $request_row['event_title'] ?? '' ) );
+
+	$ev = array(
+		'eve_id'          => 0,
+		'eve_location'    => sanitize_text_field( ( $request_row['city'] ?? '' ) . ( ! empty( $request_row['state'] ) ? ', ' . $request_row['state'] : '' ) ),
+		'eve_start'       => sanitize_text_field( $request_row['start_date'] ?? '' ),
+		'eve_end'         => sanitize_text_field( $request_row['end_date']   ?? $request_row['start_date'] ?? '' ),
+		'eve_type'        => $req_type_id,
+		'eve_zoom'        => ( strtolower( (string) ( $request_row['format'] ?? '' ) ) === 'virtual' ) ? 'yes' : '',
+		'eve_zoom_time'   => trim( (string) ( $request_row['start_time'] ?? '' ) ) . ( ! empty( $request_row['end_time'] ) ? '-' . $request_row['end_time'] : '' ),
+		'eve_marketer'    => $req_marketer_id,
+		'eve_instructor'  => $req_instructor_id,
+		'eve_paid'        => 0,
+		'eve_free'        => 0,
+		'eve_status'      => 1,
+		'eve_public_hide' => 0,
+		'max_attendees'   => $request_row['max_attendees'] ?? '',
+		'eve_host_url'    => '',
+		'eve_roster_url'  => '',
+		'eve_trainer_url' => '',
+		'eve_web_url'     => '',
+		'eve_email_url'   => '',
+		// Host/venue — direct pass-through
+		'host_name'       => (string) ( $request_row['host_name']         ?? '' ),
+		'displayed_as'    => (string) ( $request_row['displayed_as']      ?? '' ),
+		'location_name'   => (string) ( $request_row['location_name']     ?? '' ),
+		'street_address_1'=> (string) ( $request_row['street_address_1']  ?? '' ),
+		'street_address_2'=> (string) ( $request_row['street_address_2']  ?? '' ),
+		'street_address_3'=> (string) ( $request_row['street_address_3']  ?? '' ),
+		'city'            => (string) ( $request_row['city']              ?? '' ),
+		'state'           => (string) ( $request_row['state']             ?? '' ),
+		'zip_code'        => (string) ( $request_row['zip_code']          ?? '' ),
+		'special_instructions' => (string) ( $request_row['special_instructions'] ?? '' ),
+		'parking_file_url'    => (string) ( $request_row['parking_file_url']    ?? '' ),
+		'custom_email_intro'  => (string) ( $request_row['custom_email_intro']  ?? '' ),
+		// host_contacts / hotels: already JSON strings in the request table.
+		'host_contacts'       => (string) ( $request_row['host_contacts'] ?? '' ),
+		'hotels'              => (string) ( $request_row['hotels']        ?? '' ),
+		// Shipping — direct pass-through
+		'ship_name'      => (string) ( $request_row['ship_name']      ?? '' ),
+		'ship_email'     => (string) ( $request_row['ship_email']     ?? '' ),
+		'ship_phone'     => (string) ( $request_row['ship_phone']     ?? '' ),
+		'ship_address_1' => (string) ( $request_row['ship_address_1'] ?? '' ),
+		'ship_address_2' => (string) ( $request_row['ship_address_2'] ?? '' ),
+		'ship_address_3' => (string) ( $request_row['ship_address_3'] ?? '' ),
+		'ship_city'      => (string) ( $request_row['ship_city']      ?? '' ),
+		'ship_state'     => (string) ( $request_row['ship_state']     ?? '' ),
+		'ship_zip'       => (string) ( $request_row['ship_zip']       ?? '' ),
+		'ship_workbooks' => $request_row['ship_workbooks'] ?? '',
+		'ship_notes'     => (string) ( $request_row['ship_notes']     ?? '' ),
+		'cvent_event_id'     => '',
+		'cvent_event_title'  => '',
+		'cvent_match_status' => '',
+		'cvent_match_score'  => '',
+		'cvent_last_synced'  => '',
+	);
 } else {
 	// Add or CVENT mode: pre-populate from GET params or use blank defaults.
 	$cvent_uuid_pre      = $mode === 'cvent' ? sanitize_text_field( $_GET['add_cvent']         ) : '';
@@ -607,6 +714,11 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 		if ( $cvent_title_pre ) {
 			echo '<span style="font-size:14px;color:#50575e;font-weight:400;margin-left:8px;">— ' . esc_html( $cvent_title_pre ) . '</span>';
 		}
+	} elseif ( $mode === 'request' ) {
+		echo 'Convert Event Request #' . (int) $request_id;
+		if ( $request_header ) {
+			echo '<span style="font-size:14px;color:#50575e;font-weight:400;margin-left:8px;">— ' . esc_html( $request_header ) . '</span>';
+		}
 	} else {
 		echo 'Add New Event';
 	}
@@ -624,6 +736,9 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 <input type="hidden" name="cvent_uuid"      value="<?php echo esc_attr( $cvent_uuid_pre ); ?>">
 <input type="hidden" name="cvent_title"     value="<?php echo esc_attr( $cvent_title_pre ); ?>">
 <input type="hidden" name="cvent_start_utc" value="<?php echo esc_attr( $cvent_start_utc_pre ); ?>">
+<?php endif; ?>
+<?php if ( $mode === 'request' ) : ?>
+<input type="hidden" name="hl_request_id" value="<?php echo esc_attr( (string) $request_id ); ?>">
 <?php endif; ?>
 <?php endif; ?>
 
@@ -1190,12 +1305,23 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 	<button type="submit" name="hl_edit_full_event" class="button button-primary" style="font-size:14px;padding:6px 20px;">Save Changes</button>
 	&nbsp;
 	<a href="<?php echo esc_url( $list_url ); ?>" class="button button-secondary">Cancel</a>
-	<?php else : ?>
+	<?php else :
+		if ( $mode === 'cvent' ) {
+			$submit_label = 'Save to Hostlinks';
+			$cancel_href  = admin_url( 'admin.php?page=cvent-new-events' );
+		} elseif ( $mode === 'request' ) {
+			$submit_label = 'Save to Hostlinks';
+			$cancel_href  = admin_url( 'admin.php?page=hostlinks-event-requests' );
+		} else {
+			$submit_label = 'Add New Event';
+			$cancel_href  = $list_url;
+		}
+	?>
 	<button type="submit" name="hl_add_event_submit" class="button button-primary" style="font-size:14px;padding:6px 20px;">
-		<?php echo $mode === 'cvent' ? 'Save to Hostlinks' : 'Add New Event'; ?>
+		<?php echo esc_html( $submit_label ); ?>
 	</button>
 	&nbsp;
-	<a href="<?php echo esc_url( $mode === 'cvent' ? admin_url( 'admin.php?page=cvent-new-events' ) : $list_url ); ?>" class="button button-secondary">Cancel</a>
+	<a href="<?php echo esc_url( $cancel_href ); ?>" class="button button-secondary">Cancel</a>
 	<?php endif; ?>
 </p>
 </form>

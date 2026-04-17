@@ -189,7 +189,7 @@ class Hostlinks_Event_Request {
 			'parking_file_url'    => $parking_file_url ?? '',
 			'max_attendees'       => $max_raw !== '' ? (int) $max_raw : null,
 			'special_message'     => '',
-			'cc_emails'           => '[]',
+			'cc_emails'           => self::sanitize_cc_emails( $raw['hl_cc_emails'] ?? array() ),
 			'start_time'          => '',
 			'end_time'            => '',
 			'hotels'              => wp_json_encode( $hotels ),
@@ -269,6 +269,24 @@ class Hostlinks_Event_Request {
 			return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6 );
 		}
 		return $raw; // Return as-is if not a standard US number.
+	}
+
+	/**
+	 * Sanitize a CC-emails array (from the front-end submit) into a
+	 * JSON-encoded deduped list suitable for the cc_emails text column.
+	 */
+	public static function sanitize_cc_emails( $raw ): string {
+		if ( ! is_array( $raw ) ) {
+			return '[]';
+		}
+		$out = array();
+		foreach ( $raw as $item ) {
+			$e = sanitize_email( trim( (string) $item ) );
+			if ( $e && is_email( $e ) && ! in_array( $e, $out, true ) ) {
+				$out[] = $e;
+			}
+		}
+		return wp_json_encode( $out );
 	}
 
 	/** Simple Y-m-d date sanity check. */

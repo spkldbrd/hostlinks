@@ -35,11 +35,12 @@ if ( ! empty( $_GET['id'] ) ) {
 }
 
 // ── List view ─────────────────────────────────────────────────────────────────
-$status_filter = sanitize_text_field( $_GET['status'] ?? '' );
+// Default to Pending (status=new) when no explicit filter is requested.
+$status_filter = sanitize_text_field( $_GET['status'] ?? 'new' );
 $current_page  = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
 $per_page      = 25;
 
-$result  = Hostlinks_Event_Request_Storage::get_list( $status_filter, $per_page, $current_page );
+$result  = Hostlinks_Event_Request_Storage::get_list( $status_filter === 'all' ? '' : $status_filter, $per_page, $current_page );
 $rows    = $result['rows'];
 $total   = $result['total'];
 $counts  = Hostlinks_Event_Request_Storage::count_by_status();
@@ -49,8 +50,8 @@ $base_url = admin_url( 'admin.php?page=hostlinks-event-requests' );
 
 // Status tab helper
 function hl_status_tab( string $key, string $label, int $count, string $current, string $base ): string {
-	$is_active = ( $key === $current ) || ( $key === '' && $current === '' );
-	$url       = $key ? add_query_arg( 'status', $key, $base ) : $base;
+	$is_active = ( $key === $current );
+	$url       = add_query_arg( 'status', $key, $base );
 	$cls       = $is_active ? 'current' : '';
 	return sprintf(
 		'<li class="%s"><a href="%s">%s <span class="count">(%d)</span></a></li>',
@@ -59,20 +60,22 @@ function hl_status_tab( string $key, string $label, int $count, string $current,
 }
 ?>
 <div class="wrap">
-<h1 class="wp-heading-inline">Hostlinks — Event Requests</h1>
+<h1 class="wp-heading-inline">Hostlinks — New Event Queue</h1>
 <a href="<?php echo esc_url( admin_url( 'admin.php?page=hostlinks-event-request-settings' ) ); ?>"
 	class="page-title-action">Settings</a>
 <hr class="wp-header-end" />
 <?php echo $action_notice; ?>
 
-<!-- Status tabs -->
+<!-- Queue tabs: Pending = new, Completed = converted. Archived + All kept for reference. -->
 <ul class="subsubsub">
 	<?php
-	echo hl_status_tab( '', 'All', $total_all, $status_filter, $base_url );
-	foreach ( Hostlinks_Event_Request::STATUSES as $key => $label ) {
-		echo ' | ';
-		echo hl_status_tab( $key, $label, (int) ( $counts[ $key ] ?? 0 ), $status_filter, $base_url );
-	}
+	echo hl_status_tab( 'new',       'Pending',   (int) ( $counts['new']       ?? 0 ), $status_filter, $base_url );
+	echo ' | ';
+	echo hl_status_tab( 'converted', 'Completed', (int) ( $counts['converted'] ?? 0 ), $status_filter, $base_url );
+	echo ' | ';
+	echo hl_status_tab( 'archived',  'Archived',  (int) ( $counts['archived']  ?? 0 ), $status_filter, $base_url );
+	echo ' | ';
+	echo hl_status_tab( 'all',       'All',       $total_all,                            $status_filter, $base_url );
 	?>
 </ul>
 
@@ -109,13 +112,12 @@ function hl_status_tab( string $key, string $label, int $count, string $current,
 		);
 		$badge_color = $status_badge_colors[ $status ] ?? '#9e9e9e';
 
-		$nonce_reviewed = wp_create_nonce( 'hl_request_action_' . $rid );
 		$nonce_archived = wp_create_nonce( 'hl_request_action_' . $rid );
 		$nonce_new      = wp_create_nonce( 'hl_request_action_' . $rid );
 
-		$reviewed_url = add_query_arg( array( 'hl_action' => 'reviewed', 'id' => $rid, '_wpnonce' => $nonce_reviewed ), $base_url );
 		$archive_url  = add_query_arg( array( 'hl_action' => 'archived', 'id' => $rid, '_wpnonce' => $nonce_archived ), $base_url );
 		$reopen_url   = add_query_arg( array( 'hl_action' => 'new',      'id' => $rid, '_wpnonce' => $nonce_new      ), $base_url );
+		$convert_url  = admin_url( 'admin.php?page=booking-menu&add_request=' . $rid );
 
 		$city_state = trim( ( $row['city'] ? $row['city'] : '' ) . ( $row['state'] ? ', ' . $row['state'] : '' ), ', ' );
 		$dates      = '';
@@ -143,15 +145,19 @@ function hl_status_tab( string $key, string $label, int $count, string $current,
 			</span>
 		</td>
 		<td>
-			<a href="<?php echo esc_url( $detail_url ); ?>">View</a>
-			<?php if ( $status !== 'reviewed' && $status !== 'converted' ) : ?>
-				&nbsp;|&nbsp;<a href="<?php echo esc_url( $reviewed_url ); ?>">Mark Reviewed</a>
-			<?php endif; ?>
-			<?php if ( $status !== 'archived' ) : ?>
-				&nbsp;|&nbsp;<a href="<?php echo esc_url( $archive_url ); ?>"
+			<?php if ( $status === 'new' ) : ?>
+				<a href="<?php echo esc_url( $convert_url ); ?>" class="button button-small button-primary">+ Add to Hostlinks</a>
+				<br><a href="<?php echo esc_url( $detail_url ); ?>" style="font-size:12px;">View</a>
+				&nbsp;|&nbsp;<a href="<?php echo esc_url( $archive_url ); ?>" style="font-size:12px;"
 					onclick="return confirm('Archive this request?');">Archive</a>
 			<?php else : ?>
-				&nbsp;|&nbsp;<a href="<?php echo esc_url( $reopen_url ); ?>">Re-open</a>
+				<a href="<?php echo esc_url( $detail_url ); ?>">View</a>
+				<?php if ( $status !== 'archived' ) : ?>
+					&nbsp;|&nbsp;<a href="<?php echo esc_url( $archive_url ); ?>"
+						onclick="return confirm('Archive this request?');">Archive</a>
+				<?php else : ?>
+					&nbsp;|&nbsp;<a href="<?php echo esc_url( $reopen_url ); ?>">Re-open</a>
+				<?php endif; ?>
 			<?php endif; ?>
 		</td>
 	</tr>

@@ -7,8 +7,8 @@ $table12 = $wpdb->prefix . 'event_type';
 $table13 = $wpdb->prefix . 'event_marketer';
 $table14 = $wpdb->prefix . 'event_instructor';
 
-// ── Full event form (add new, add from CVENT, or edit) ───────────────────────
-if ( isset( $_GET['edit_event'] ) || isset( $_GET['add_event'] ) || isset( $_GET['add_cvent'] ) ) {
+// ── Full event form (add new, add from CVENT, add from request, or edit) ────
+if ( isset( $_GET['edit_event'] ) || isset( $_GET['add_event'] ) || isset( $_GET['add_cvent'] ) || isset( $_GET['add_request'] ) ) {
 	require_once __DIR__ . '/edit-event.php';
 	return;
 }

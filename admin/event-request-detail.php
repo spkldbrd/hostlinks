@@ -77,18 +77,16 @@ if ( ! empty( $req['submission_group'] ) ) {
 
 <!-- Actions row -->
 <div style="margin:12px 0 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-	<?php if ( $status !== 'reviewed' && $status !== 'converted' ) : ?>
-	<a href="<?php echo esc_url( $reviewed_url ); ?>" class="button button-primary">Mark Reviewed</a>
+	<?php if ( $status !== 'converted' ) : ?>
+	<a href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&add_request=' . (int) $req['id'] ) ); ?>"
+		class="button button-primary">+ Add to Hostlinks</a>
 	<?php endif; ?>
-	<?php if ( $status !== 'archived' ) : ?>
+	<?php if ( $status !== 'archived' && $status !== 'converted' ) : ?>
 	<a href="<?php echo esc_url( $archive_url ); ?>" class="button"
 		onclick="return confirm('Archive this request?');">Archive</a>
-	<?php else : ?>
+	<?php elseif ( $status === 'archived' ) : ?>
 	<a href="<?php echo esc_url( $reopen_url ); ?>" class="button">Re-open</a>
 	<?php endif; ?>
-	<button class="button" disabled title="Convert to Event — available in a future phase" style="opacity:.5;cursor:not-allowed;">
-		Convert to Event (coming soon)
-	</button>
 </div>
 
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:1100px;">

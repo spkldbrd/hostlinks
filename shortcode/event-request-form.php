@@ -543,6 +543,40 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		<button type="button" class="hl-add-row" data-target="hl-hotel-rows" data-template="hotel">+ Add Hotel</button>
 	</div>
 
+	<!-- Notification CC List -->
+	<div class="hl-form-section hl-form-cc">
+		<h3 class="hl-form-section-title" style="margin-bottom:8px;">Send notification to</h3>
+		<p style="margin:0 0 10px;color:#555;font-size:14px;">
+			Primary: <strong><?php echo esc_html( $notif_email ); ?></strong>
+		</p>
+		<?php
+		// Restore any submitted CC selections on validation re-render so the
+		// user's edits aren't lost.
+		$old_cc = isset( $old['hl_cc_emails'] ) && is_array( $old['hl_cc_emails'] )
+			? array_values( array_filter( array_map( 'sanitize_email', $old['hl_cc_emails'] ) ) )
+			: null;
+		// If the user hasn't submitted yet, pre-check every configured default.
+		$active_ccs = $old_cc !== null ? $old_cc : $cc_defaults;
+		// Build union so removed/unchecked defaults still render (unchecked).
+		$all_ccs = array_values( array_unique( array_merge( $cc_defaults, $active_ccs ) ) );
+		?>
+		<p style="margin:0 0 6px;color:#555;font-size:13px;">CC these recipients:</p>
+		<div id="hl-cc-rows" class="hl-cc-rows">
+			<?php foreach ( $all_ccs as $_cc ) :
+				$_checked = in_array( $_cc, $active_ccs, true );
+			?>
+			<div class="hl-cc-row">
+				<label class="hl-cc-label">
+					<input type="checkbox" name="hl_cc_emails[]" value="<?php echo esc_attr( $_cc ); ?>" <?php checked( $_checked ); ?> />
+					<span><?php echo esc_html( $_cc ); ?></span>
+				</label>
+				<button type="button" class="hl-cc-remove" aria-label="Remove">&times;</button>
+			</div>
+			<?php endforeach; ?>
+		</div>
+		<button type="button" id="hl-cc-add" class="hl-cc-add-btn">+ Add recipient</button>
+	</div>
+
 	<!-- Submit -->
 	<div class="hl-form-section hl-form-submit">
 		<button type="submit" name="hl_event_request_submit" value="1" class="hl-submit-btn">
@@ -844,6 +878,34 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		}
 	});
 });
+
+// ── CC recipients: remove any row, add a new blank email-input row ────────
+(function(){
+	var container = document.getElementById('hl-cc-rows');
+	var addBtn    = document.getElementById('hl-cc-add');
+	if (!container || !addBtn) return;
+
+	function attachRemove(row) {
+		var btn = row.querySelector('.hl-cc-remove');
+		if (btn) btn.addEventListener('click', function(){ row.remove(); });
+	}
+	container.querySelectorAll('.hl-cc-row').forEach(attachRemove);
+
+	addBtn.addEventListener('click', function(){
+		var row = document.createElement('div');
+		row.className = 'hl-cc-row';
+		row.innerHTML =
+			'<label class="hl-cc-label">' +
+				'<input type="checkbox" checked disabled />' +
+				'<input type="email" name="hl_cc_emails[]" placeholder="email@example.com" class="hl-cc-new-input" required />' +
+			'</label>' +
+			'<button type="button" class="hl-cc-remove" aria-label="Remove">&times;</button>';
+		container.appendChild(row);
+		attachRemove(row);
+		var input = row.querySelector('input[type="email"]');
+		if (input) input.focus();
+	});
+})();
 
 // ── Shipping toggle ───────────────────────────────────────────────────────
 var shippingCheckbox = document.getElementById('hl_add_shipping');

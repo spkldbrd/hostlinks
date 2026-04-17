@@ -545,36 +545,34 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 
 	<!-- Notification CC List -->
 	<div class="hl-form-section hl-form-cc">
-		<h3 class="hl-form-section-title" style="margin-bottom:8px;">Send notification to</h3>
-		<p style="margin:0 0 10px;color:#555;font-size:14px;">
-			Primary: <strong><?php echo esc_html( $notif_email ); ?></strong>
-		</p>
+		<div class="hl-cc-header">
+			<div class="hl-cc-header-text">
+				<h3 class="hl-cc-title">Send notification to</h3>
+				<p class="hl-cc-primary">Primary: <strong><?php echo esc_html( $notif_email ); ?></strong></p>
+			</div>
+			<button type="button" id="hl-cc-add" class="hl-cc-add-btn">+ Add recipient</button>
+		</div>
 		<?php
 		// Restore any submitted CC selections on validation re-render so the
-		// user's edits aren't lost.
+		// user's edits aren't lost. On first render use the configured
+		// defaults. Rows removed via the x button drop out of the DOM and
+		// are never submitted, so we don't need an unchecked-but-present
+		// representation.
 		$old_cc = isset( $old['hl_cc_emails'] ) && is_array( $old['hl_cc_emails'] )
-			? array_values( array_filter( array_map( 'sanitize_email', $old['hl_cc_emails'] ) ) )
+			? array_values( array_unique( array_filter( array_map( 'sanitize_email', $old['hl_cc_emails'] ) ) ) )
 			: null;
-		// If the user hasn't submitted yet, pre-check every configured default.
 		$active_ccs = $old_cc !== null ? $old_cc : $cc_defaults;
-		// Build union so removed/unchecked defaults still render (unchecked).
-		$all_ccs = array_values( array_unique( array_merge( $cc_defaults, $active_ccs ) ) );
 		?>
-		<p style="margin:0 0 6px;color:#555;font-size:13px;">CC these recipients:</p>
+		<p class="hl-cc-sublabel">CC these recipients:</p>
 		<div id="hl-cc-rows" class="hl-cc-rows">
-			<?php foreach ( $all_ccs as $_cc ) :
-				$_checked = in_array( $_cc, $active_ccs, true );
-			?>
+			<?php foreach ( $active_ccs as $_cc ) : ?>
 			<div class="hl-cc-row">
-				<label class="hl-cc-label">
-					<input type="checkbox" name="hl_cc_emails[]" value="<?php echo esc_attr( $_cc ); ?>" <?php checked( $_checked ); ?> />
-					<span><?php echo esc_html( $_cc ); ?></span>
-				</label>
+				<input type="hidden" name="hl_cc_emails[]" value="<?php echo esc_attr( $_cc ); ?>" />
+				<span class="hl-cc-email"><?php echo esc_html( $_cc ); ?></span>
 				<button type="button" class="hl-cc-remove" aria-label="Remove">&times;</button>
 			</div>
 			<?php endforeach; ?>
 		</div>
-		<button type="button" id="hl-cc-add" class="hl-cc-add-btn">+ Add recipient</button>
 	</div>
 
 	<!-- Submit -->
@@ -895,10 +893,7 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		var row = document.createElement('div');
 		row.className = 'hl-cc-row';
 		row.innerHTML =
-			'<label class="hl-cc-label">' +
-				'<input type="checkbox" checked disabled />' +
-				'<input type="email" name="hl_cc_emails[]" placeholder="email@example.com" class="hl-cc-new-input" required />' +
-			'</label>' +
+			'<input type="email" name="hl_cc_emails[]" placeholder="email@example.com" class="hl-cc-new-input" required />' +
 			'<button type="button" class="hl-cc-remove" aria-label="Remove">&times;</button>';
 		container.appendChild(row);
 		attachRemove(row);

@@ -24,7 +24,7 @@ class Hostlinks_Admin_Menus {
 
 		// The first submenu entry replaces the auto-generated duplicate of the parent
 		add_submenu_page( 'booking-menu', 'Events',          'Events',          'manage_options', 'booking-menu',              array( $this, 'page_events' ) );
-		add_submenu_page( 'booking-menu', 'Add New Event',   'Add New Event',   'manage_options', 'admin.php?page=booking-menu&add=1' );
+		add_submenu_page( 'booking-menu', 'Add New Event',   'Add New Event',   'manage_options', 'admin.php?page=booking-menu&add_event=1' );
 		add_submenu_page( 'booking-menu', 'Marketers',       'Marketers',       'manage_options', 'marketer-menu',             array( $this, 'page_marketer' ) );
 		global $wpdb;
 		$req_count  = (int) $wpdb->get_var( $wpdb->prepare(

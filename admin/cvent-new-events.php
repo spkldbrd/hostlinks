@@ -69,97 +69,9 @@ if ( isset( $_POST['hostlinks_cvent_unignore'] ) ) {
 	}
 }
 
-// ── Add to Hostlinks action ───────────────────────────────────────────────────
-if ( isset( $_POST['hostlinks_cvent_add_event'] ) ) {
-	check_admin_referer( 'hostlinks_cvent_new_events' );
-
-	$table       = $wpdb->prefix . 'event_details_list';
-	$cvent_uuid  = sanitize_text_field( $_POST['cvent_uuid'] ?? '' );
-	$cvent_title = sanitize_text_field( $_POST['cvent_title'] ?? '' );
-	$cvent_start_utc = sanitize_text_field( $_POST['cvent_start_utc'] ?? '' );
-
-	$eve_location    = sanitize_text_field( $_POST['eve_location'] ?? '' );
-	$eve_type        = intval( $_POST['eve_type'] ?? 0 );
-	$eve_zoom        = sanitize_text_field( $_POST['eve_zoom'] ?? '' );
-	$eve_marketer    = intval( $_POST['eve_marketer'] ?? 0 );
-	$eve_instructor  = intval( $_POST['eve_instructor'] ?? 0 );
-	$eve_host_url    = esc_url_raw( trim( $_POST['eve_host_url'] ?? '' ) );
-	$eve_roster_url  = esc_url_raw( trim( $_POST['eve_roster_url'] ?? '' ) );
-	$eve_trainer_url = esc_url_raw( trim( $_POST['eve_trainer_url'] ?? '' ) );
-	$eve_web_url = esc_url_raw( trim( $_POST['eve_web_url'] ?? '' ) );
-	$eve_start       = sanitize_text_field( $_POST['eve_start'] ?? '' );
-	$eve_end         = sanitize_text_field( $_POST['eve_end'] ?? '' );
-	$eve_tot_date    = str_replace( '-', '/', $eve_start ) . ' - ' . str_replace( '-', '/', $eve_end );
-
-	if ( ! $eve_location || ! $eve_type || ! $eve_marketer || ! $eve_start || ! $eve_end ) {
-		$action_msg  = 'Please fill in all required fields: Location, Type, Marketer, Start Date, End Date.';
-		$action_type = 'error';
-	} else {
-		$wpdb->insert(
-			$table,
-			array(
-				'eve_location'          => $eve_location,
-				'eve_paid'              => 0,
-				'eve_free'              => 0,
-				'eve_start'             => $eve_start,
-				'eve_end'               => $eve_end,
-				'eve_type'              => $eve_type,
-				'eve_zoom'              => $eve_zoom,
-				'eve_marketer'          => $eve_marketer,
-				'eve_host_url'          => $eve_host_url,
-				'eve_roster_url'        => $eve_roster_url,
-				'eve_trainer_url'       => $eve_trainer_url,
-				'eve_web_url'       => $eve_web_url,
-				'eve_instructor'        => $eve_instructor,
-				'eve_tot_date'          => $eve_tot_date,
-				'eve_status'            => 1,
-				'cvent_event_id'        => $cvent_uuid,
-				'cvent_event_title'     => $cvent_title,
-				'cvent_event_start_utc' => $cvent_start_utc ? gmdate( 'Y-m-d H:i:s', strtotime( $cvent_start_utc ) ) : null,
-				'cvent_match_status'    => 'manual',
-				'cvent_last_synced'     => null,
-				'eve_created_at'        => current_time( 'mysql' ),
-			),
-			array( '%s','%d','%d','%s','%s','%d','%s','%d','%s','%s','%s','%s','%d','%s','%d','%s','%s','%s','%s','%s','%s' )
-		);
-
-		$new_eve_id = (int) $wpdb->insert_id;
-
-		if ( $new_eve_id ) {
-			do_action( 'hostlinks_event_created', $new_eve_id, $eve_start );
-		}
-
-		// Auto-populate eve_roster_url if left blank.
-		if ( ! $eve_roster_url && $new_eve_id ) {
-			$roster_base = Hostlinks_Page_URLs::get_roster();
-			if ( $roster_base ) {
-				$auto_roster_url = rtrim( $roster_base, '/' ) . '/?eve_id=' . $new_eve_id;
-				$wpdb->update( $table, array( 'eve_roster_url' => $auto_roster_url ), array( 'eve_id' => $new_eve_id ), array( '%s' ), array( '%d' ) );
-			}
-		}
-
-		// Remove from transient cache.
-		if ( $cvent_uuid ) {
-			$cached = get_transient( 'hostlinks_cvent_new_events' );
-			if ( is_array( $cached ) ) {
-				$cached = array_values( array_filter(
-					$cached,
-					function( $e ) use ( $cvent_uuid ) {
-						return Hostlinks_CVENT_API::sanitize_uuid( $e['id'] ?? '' ) !== $cvent_uuid;
-					}
-				) );
-				set_transient( 'hostlinks_cvent_new_events', $cached, HOUR_IN_SECONDS );
-				update_option( 'hostlinks_cvent_new_count', count( $cached ) );
-			}
-		}
-
-		$action_msg = sprintf(
-			'Event added to Hostlinks! <a href="admin.php?page=booking-menu">View Events List</a>',
-			$new_eve_id,
-			$new_eve_id
-		);
-	}
-}
+// ── Add to Hostlinks: handled by the unified edit-event form ─────────────────
+// The "+ Add" button below redirects to ?page=booking-menu&add_cvent={uuid}
+// with CVENT data passed as GET params so edit-event.php can pre-populate.
 
 // ── Load lookup data ──────────────────────────────────────────────────────────
 $all_types       = $wpdb->get_results( "SELECT * FROM `{$wpdb->prefix}event_type` WHERE event_type_status = 1", ARRAY_A );
@@ -382,7 +294,22 @@ function hostlinks_cvent_zoom_location( $title ) {
 		}
 		$guessed_type  = hostlinks_cvent_guess_type( $title, $type_keyword_map );
 		$reg_url       = $ev['registrationUrl'] ?? $ev['publicRegistrationUrl'] ?? $ev['websiteLink'] ?? '';
-		$form_id       = 'cvent-add-form-' . $idx;
+
+		// Build redirect URL — passes all pre-fill data to the unified event form.
+		$add_url = admin_url( 'admin.php?' . http_build_query( array(
+			'page'            => 'booking-menu',
+			'add_cvent'       => $uuid,
+			'cvent_title'     => $title,
+			'cvent_start_utc' => $start_raw,
+			'cvent_start'     => $start_val,
+			'cvent_end'       => $end_val,
+			'cvent_type'      => $guessed_type,
+			'cvent_zoom'      => $is_zoom ? '1' : '0',
+			'cvent_loc'       => $prefilled_loc,
+			'cvent_reg_url'   => $reg_url,
+			'cvent_mkt'       => $zoom_marketer_id,
+			'cvent_inst'      => $ericka_instructor_id,
+		) ) );
 		?>
 		<tr>
 			<td><strong><?php echo esc_html( $title ); ?></strong></td>
@@ -390,10 +317,7 @@ function hostlinks_cvent_zoom_location( $title ) {
 			<td><?php echo esc_html( $end_disp ); ?></td>
 			<td style="font-size:11px;color:#888;"><?php echo esc_html( $uuid ); ?></td>
 			<td>
-				<button type="button" class="button button-small button-primary"
-					onclick="var r=document.getElementById('<?php echo esc_js($form_id); ?>');r.style.display=r.style.display==='none'?'table-row':'none';">
-					+ Add
-				</button>
+				<a href="<?php echo esc_url( $add_url ); ?>" class="button button-small button-primary">+ Add</a>
 				&nbsp;
 				<form method="post" style="display:inline;">
 					<?php wp_nonce_field( 'hostlinks_cvent_new_events' ); ?>
@@ -403,176 +327,6 @@ function hostlinks_cvent_zoom_location( $title ) {
 						onclick="return confirm('Permanently ignore this CVENT event? It will not appear in this list again.');">
 						Ignore
 					</button>
-				</form>
-			</td>
-		</tr>
-
-		<!-- Inline add form row (hidden by default) -->
-		<tr id="<?php echo esc_attr( $form_id ); ?>" style="display:none;background:#f0f6fc;">
-			<td colspan="5" style="padding:16px 20px;">
-				<form method="post">
-					<?php wp_nonce_field( 'hostlinks_cvent_new_events' ); ?>
-					<input type="hidden" name="cvent_uuid"      value="<?php echo esc_attr( $uuid ); ?>">
-					<input type="hidden" name="cvent_title"     value="<?php echo esc_attr( $title ); ?>">
-					<input type="hidden" name="cvent_start_utc" value="<?php echo esc_attr( $start_raw ); ?>">
-
-					<h3 style="margin:0 0 12px;font-size:14px;color:#1d2327;">
-						Add: <em><?php echo esc_html( $title ); ?></em>
-					</h3>
-					<p style="color:#2271b1;font-size:12px;margin:0 0 12px;">
-						Fields marked <span style="color:red;">*</span> are required.
-						Pre-filled fields are guessed from CVENT data — review before saving.
-					</p>
-
-					<table class="form-table" style="width:auto;margin:0;">
-						<tr>
-							<th style="width:130px;padding:6px 10px;font-weight:600;">
-								<label>Location <span style="color:red;">*</span></label>
-							</th>
-							<td style="padding:6px 10px;">
-								<input type="text" name="eve_location"
-									value="<?php echo esc_attr( $prefilled_loc ); ?>"
-									style="width:280px;" required
-									placeholder="City, ST">
-								<?php if ( $prefilled_loc ) : ?>
-									<span style="color:#2271b1;font-size:11px;margin-left:8px;">
-										✓ pre-filled from title
-									</span>
-								<?php endif; ?>
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;">
-								<label>Start Date <span style="color:red;">*</span></label>
-							</th>
-							<td style="padding:6px 10px;">
-								<input type="date" name="eve_start"
-									value="<?php echo esc_attr( $start_val ); ?>" required>
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;">
-								<label>End Date <span style="color:red;">*</span></label>
-							</th>
-							<td style="padding:6px 10px;">
-								<input type="date" name="eve_end"
-									value="<?php echo esc_attr( $end_val ); ?>" required>
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;">
-								<label>Type <span style="color:red;">*</span></label>
-							</th>
-							<td style="padding:6px 10px;">
-								<select name="eve_type" required>
-									<option value="">— select type —</option>
-									<?php foreach ( $all_types as $t ) : ?>
-										<option value="<?php echo esc_attr( $t['event_type_id'] ); ?>"
-											<?php selected( $guessed_type, (int) $t['event_type_id'] ); ?>>
-											<?php echo esc_html( $t['event_type_name'] ); ?>
-										</option>
-									<?php endforeach; ?>
-								</select>
-								<?php if ( $guessed_type ) : ?>
-									<span style="color:#2271b1;font-size:11px;margin-left:8px;">
-										✓ guessed from title
-									</span>
-								<?php endif; ?>
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;"><label>Zoom</label></th>
-							<td style="padding:6px 10px;">
-								<select name="eve_zoom">
-									<option value="">No</option>
-									<option value="yes" <?php selected( $is_zoom ); ?>>Yes</option>
-								</select>
-								<?php if ( $is_zoom ) : ?>
-									<span style="color:#2271b1;font-size:11px;margin-left:8px;">
-										✓ detected from title
-									</span>
-								<?php endif; ?>
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;">
-								<label>Marketer <span style="color:red;">*</span></label>
-							</th>
-							<td style="padding:6px 10px;">
-								<select name="eve_marketer" required>
-									<option value="">— select marketer —</option>
-									<?php foreach ( $all_marketers as $m ) : ?>
-										<option value="<?php echo esc_attr( $m['event_marketer_id'] ); ?>"
-											<?php selected( $zoom_marketer_id, (int) $m['event_marketer_id'] ); ?>>
-											<?php echo esc_html( $m['event_marketer_name'] ); ?>
-										</option>
-									<?php endforeach; ?>
-								</select>
-								<?php if ( $zoom_marketer_id ) : ?>
-									<span style="color:#2271b1;font-size:11px;margin-left:8px;">✓ pre-filled for Zoom</span>
-								<?php endif; ?>
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;"><label>Instructor</label></th>
-							<td style="padding:6px 10px;">
-								<select name="eve_instructor">
-									<option value="0">— none / TBA —</option>
-									<?php foreach ( $all_instructors as $i ) : ?>
-										<option value="<?php echo esc_attr( $i['event_instructor_id'] ); ?>"
-											<?php selected( $ericka_instructor_id, (int) $i['event_instructor_id'] ); ?>>
-											<?php echo esc_html( $i['event_instructor_name'] ); ?>
-										</option>
-									<?php endforeach; ?>
-								</select>
-								<?php if ( $ericka_instructor_id ) : ?>
-									<span style="color:#2271b1;font-size:11px;margin-left:8px;">✓ pre-filled for Zoom</span>
-								<?php endif; ?>
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;"><label>Host URL</label></th>
-							<td style="padding:6px 10px;">
-								<input type="url" name="eve_host_url" value=""
-									style="width:360px;" placeholder="https://">
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;"><label>Roster URL</label></th>
-							<td style="padding:6px 10px;">
-								<input type="url" name="eve_roster_url" value=""
-								style="width:360px;" placeholder="Leave blank to auto-populate">
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;"><label>Reg URL</label></th>
-							<td style="padding:6px 10px;">
-								<input type="url" name="eve_trainer_url" value="<?php echo esc_attr( $reg_url ); ?>"
-									style="width:360px;" placeholder="https://">
-								<?php if ( $reg_url ) : ?>
-								<span style="color:#2271b1;font-size:11px;margin-left:8px;">✓ pre-filled from CVENT</span>
-								<?php endif; ?>
-							</td>
-						</tr>
-						<tr>
-							<th style="padding:6px 10px;font-weight:600;"><label>Web URL</label></th>
-							<td style="padding:6px 10px;">
-								<input type="url" name="eve_web_url" value=""
-									style="width:360px;" placeholder="https://">
-							</td>
-						</tr>
-					</table>
-
-					<p style="margin:14px 0 0;">
-						<button type="submit" name="hostlinks_cvent_add_event" class="button button-primary">
-							Save to Hostlinks
-						</button>
-						&nbsp;
-						<button type="button" class="button"
-							onclick="document.getElementById('<?php echo esc_js($form_id); ?>').style.display='none';">
-							Cancel
-						</button>
-					</p>
 				</form>
 			</td>
 		</tr>

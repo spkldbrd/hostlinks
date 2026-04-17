@@ -225,7 +225,7 @@ $tot1 = count( $all_pending_bookings );
         <thead>
           <tr>
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
-            <th style="width:30px;"></th>
+            <th style="width:40px;"></th>
             <th>Location</th><th>Paid</th><th>Free</th><th style="width:90px;">Date</th>
             <th style="width:60px;">Type</th><th>Zoom</th><th>Marketer</th>
             <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
@@ -239,10 +239,12 @@ $tot1 = count( $all_pending_bookings );
           <tr class="alternate" id="user-<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
             <th class="check-column"><input type="checkbox" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" class="administrator splchkkr" name="users[]"></th>
             <input type="hidden" name="originalid[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
-            <td style="text-align:center;white-space:nowrap;padding:0 4px;">
+            <td class="hl-edit-cell">
               <a href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&edit_event=' . (int) $alldriver['eve_id'] ) ); ?>"
-                title="Full Edit" aria-label="Edit event #<?php echo (int) $alldriver['eve_id']; ?>"
-                class="button button-small hl-edit-icon">&#9998;</a>
+                title="Edit event" aria-label="Edit event #<?php echo (int) $alldriver['eve_id']; ?>"
+                class="hl-edit-icon">
+                <span class="dashicons dashicons-edit" aria-hidden="true"></span>
+              </a>
             </td>
             <td>
               <p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
@@ -413,6 +415,33 @@ th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertica
 /* Event list: narrower Type dropdown when abbreviations are used. */
 select.hl-type-compact{width:64px;padding-left:4px;padding-right:18px;}
 
-/* Event list: compact icon-only Edit button (pencil, no text). */
-.hl-edit-icon{padding:2px 6px!important;font-size:13px!important;line-height:1!important;min-height:0!important;}
+/* Event list: Edit icon column — centered square icon-button using the
+   native WordPress dashicons. Flex centering guarantees vertical alignment
+   with the row's form-control content regardless of row height. */
+.hl-edit-cell{text-align:center;vertical-align:middle;padding:4px 6px;width:32px;}
+.hl-edit-icon{
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	width:26px;
+	height:26px;
+	border-radius:4px;
+	color:#2271b1;
+	background:transparent;
+	text-decoration:none;
+	transition:background-color .15s ease, color .15s ease, box-shadow .15s ease;
+	box-sizing:border-box;
+}
+.hl-edit-icon:hover, .hl-edit-icon:focus{
+	background:#2271b1;
+	color:#fff;
+	box-shadow:0 0 0 1px #135e96;
+	outline:none;
+}
+.hl-edit-icon .dashicons{
+	font-size:16px;
+	width:16px;
+	height:16px;
+	line-height:1;
+}
 </style>

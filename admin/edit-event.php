@@ -1,8 +1,11 @@
 <?php
 /**
- * Full card-based edit form for a single event in event_details_list.
- * Accessed via: ?page=booking-menu&edit_event={id}
- * Included from admin/booking.php when $_GET['edit_event'] is set.
+ * Unified event form: Add New, Add from CVENT, and Edit.
+ * Accessed via:
+ *   ?page=booking-menu&edit_event={id}   → Edit existing event
+ *   ?page=booking-menu&add_event=1       → Add new event (blank form)
+ *   ?page=booking-menu&add_cvent={uuid}  → Add from CVENT (pre-populated form)
+ * Included from admin/booking.php.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -13,16 +16,30 @@ if ( ! current_user_can( 'manage_options' ) ) {
 
 global $wpdb;
 
-$eve_id    = (int) ( $_GET['edit_event'] ?? 0 );
-$list_url  = admin_url( 'admin.php?page=booking-menu' );
-$timezone  = wp_timezone();
+$list_url = admin_url( 'admin.php?page=booking-menu' );
+$timezone = wp_timezone();
+$table    = $wpdb->prefix . 'event_details_list';
 
-if ( ! $eve_id ) {
-	wp_safe_redirect( $list_url );
-	exit;
+// ── Mode detection ────────────────────────────────────────────────────────────
+if ( isset( $_GET['add_cvent'] ) ) {
+	$mode   = 'cvent';
+	$eve_id = 0;
+} elseif ( isset( $_GET['add_event'] ) ) {
+	$mode   = 'add';
+	$eve_id = 0;
+} else {
+	$mode   = 'edit';
+	$eve_id = (int) ( $_GET['edit_event'] ?? 0 );
+	if ( ! $eve_id ) {
+		wp_safe_redirect( $list_url );
+		exit;
+	}
 }
 
-$table = $wpdb->prefix . 'event_details_list';
+// Safe defaults for variables only populated in add/cvent modes.
+$cvent_uuid_pre      = '';
+$cvent_title_pre     = '';
+$cvent_start_utc_pre = '';
 
 // ── Load lookup tables ────────────────────────────────────────────────────────
 $all_types       = $wpdb->get_results( "SELECT event_type_id AS id, event_type_name AS name FROM {$wpdb->prefix}event_type WHERE event_type_status = 1 ORDER BY name", ARRAY_A );
@@ -41,9 +58,219 @@ function _hl_edit_phone( string $raw ): string {
 	return $raw;
 }
 
-// ── Handle save ───────────────────────────────────────────────────────────────
+// ── Notices ───────────────────────────────────────────────────────────────────
 $notice = '';
-if ( isset( $_POST['hl_edit_full_event'] ) ) {
+if ( isset( $_GET['saved'] ) ) {
+	$notice = '<div class="notice notice-success is-dismissible"><p>Event added successfully. You can continue editing it here.</p></div>';
+}
+
+// ── ADD handler (add + cvent modes) ──────────────────────────────────────────
+if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
+	check_admin_referer( 'hostlinks_add_event_unified' );
+
+	// Core event fields
+	$location       = sanitize_text_field( $_POST['eve_location']    ?? '' );
+	$eve_type       = (int) ( $_POST['eve_type']       ?? 0 );
+	$eve_marketer   = (int) ( $_POST['eve_marketer']   ?? 0 );
+	$eve_instructor = (int) ( $_POST['eve_instructor'] ?? 0 );
+	$eve_zoom       = sanitize_text_field( $_POST['eve_zoom']      ?? '' );
+	$eve_zoom_time  = sanitize_text_field( $_POST['eve_zoom_time'] ?? '' );
+	$eve_paid       = (int) ( $_POST['eve_paid']  ?? 0 );
+	$eve_free       = (int) ( $_POST['eve_free']  ?? 0 );
+	$eve_public_hide = isset( $_POST['eve_public_hide'] ) ? 1 : 0;
+
+	// Date fields
+	$eve_start    = sanitize_text_field( $_POST['eve_start_date'] ?? '' );
+	$eve_end      = sanitize_text_field( $_POST['eve_end_date']   ?? $eve_start );
+	$eve_tot_date = str_replace( '-', '/', $eve_start ) . ' - ' . str_replace( '-', '/', $eve_end );
+
+	// URLs
+	$eve_host_url    = esc_url_raw( trim( $_POST['eve_host_url']    ?? '' ) );
+	$eve_roster_url  = esc_url_raw( trim( $_POST['eve_roster_url']  ?? '' ) );
+	$eve_trainer_url = esc_url_raw( trim( $_POST['eve_trainer_url'] ?? '' ) );
+	$eve_web_url     = esc_url_raw( trim( $_POST['eve_web_url']     ?? '' ) );
+	$eve_email_url   = esc_url_raw( trim( $_POST['eve_email_url']   ?? '' ) );
+
+	// Shipping
+	$ship_workbooks_raw = trim( $_POST['ship_workbooks'] ?? '' );
+	$has_shipping       = isset( $_POST['hl_add_shipping'] );
+
+	// Host & Venue
+	$host_name     = sanitize_text_field( $_POST['edit_host_name']        ?? '' );
+	$displayed_as  = sanitize_text_field( $_POST['edit_displayed_as']     ?? '' );
+	$location_name = sanitize_text_field( $_POST['edit_location_name']    ?? '' );
+	$addr1         = sanitize_text_field( $_POST['edit_street_address_1'] ?? '' );
+	$addr2         = sanitize_text_field( $_POST['edit_street_address_2'] ?? '' );
+	$addr3         = sanitize_text_field( $_POST['edit_street_address_3'] ?? '' );
+	$ev_city       = sanitize_text_field( $_POST['edit_city']             ?? '' );
+	$ev_state      = sanitize_text_field( $_POST['edit_state']            ?? '' );
+	$zip_code      = sanitize_text_field( $_POST['edit_zip_code']         ?? '' );
+
+	// Additional Details
+	$max_attendees_raw    = trim( $_POST['edit_max_attendees']       ?? '' );
+	$special_instructions = sanitize_textarea_field( $_POST['edit_special_instructions'] ?? '' );
+	$parking_file_url     = esc_url_raw( trim( $_POST['edit_parking_file_url'] ?? '' ) );
+	$custom_email_intro   = sanitize_textarea_field( $_POST['edit_custom_email_intro']   ?? '' );
+
+	// Host Contacts (repeatable → JSON)
+	$host_contacts = array();
+	foreach ( (array) ( $_POST['edit_contact_name'] ?? array() ) as $i => $cname ) {
+		$cname = sanitize_text_field( $cname );
+		if ( $cname === '' ) continue;
+		$host_contacts[] = array(
+			'name'             => $cname,
+			'agency'           => sanitize_text_field( $_POST['edit_contact_agency'][$i]  ?? '' ),
+			'title'            => sanitize_text_field( $_POST['edit_contact_title'][$i]   ?? '' ),
+			'email'            => sanitize_email(      $_POST['edit_contact_email'][$i]   ?? '' ),
+			'phone'            => _hl_edit_phone( sanitize_text_field( $_POST['edit_contact_phone'][$i]  ?? '' ) ),
+			'phone2'           => _hl_edit_phone( sanitize_text_field( $_POST['edit_contact_phone2'][$i] ?? '' ) ),
+			'cc_on_alerts'     => ! empty( $_POST['edit_contact_cc'][$i] ),
+			'include_in_email' => ! empty( $_POST['edit_contact_include'][$i] ),
+			'dnl_phone'        => ! empty( $_POST['edit_contact_dnl_phone'][$i] ),
+			'dnl_phone2'       => ! empty( $_POST['edit_contact_dnl_phone2'][$i] ),
+		);
+	}
+
+	// Hotels (repeatable → JSON)
+	$hotels_arr = array();
+	foreach ( (array) ( $_POST['edit_hotel_name'] ?? array() ) as $i => $hname ) {
+		$hname = sanitize_text_field( $hname );
+		if ( $hname === '' ) continue;
+		$hotels_arr[] = array(
+			'name'    => $hname,
+			'phone'   => sanitize_text_field( $_POST['edit_hotel_phone'][$i]   ?? '' ),
+			'address' => sanitize_text_field( $_POST['edit_hotel_address'][$i] ?? '' ),
+			'url'     => esc_url_raw( trim( $_POST['edit_hotel_url'][$i] ?? '' ) ),
+		);
+	}
+
+	// CVENT-specific fields (only populated in cvent mode)
+	$insert_cvent_uuid      = '';
+	$insert_cvent_title     = '';
+	$insert_cvent_start_utc = null;
+	if ( $mode === 'cvent' ) {
+		$insert_cvent_uuid      = sanitize_text_field( $_POST['cvent_uuid']      ?? '' );
+		$insert_cvent_title     = sanitize_text_field( $_POST['cvent_title']     ?? '' );
+		$start_utc_raw          = sanitize_text_field( $_POST['cvent_start_utc'] ?? '' );
+		$insert_cvent_start_utc = $start_utc_raw ? gmdate( 'Y-m-d H:i:s', strtotime( $start_utc_raw ) ) : null;
+	}
+
+	$insert_data = array(
+		// Core
+		'eve_location'    => $location,
+		'eve_type'        => $eve_type,
+		'eve_marketer'    => $eve_marketer,
+		'eve_instructor'  => $eve_instructor,
+		'eve_zoom'        => $eve_zoom,
+		'eve_zoom_time'   => $eve_zoom_time,
+		'eve_paid'        => $eve_paid,
+		'eve_free'        => $eve_free,
+		'eve_public_hide' => $eve_public_hide,
+		'eve_status'      => (int) ( $_POST['eve_status'] ?? 1 ),
+		'eve_start'       => $eve_start,
+		'eve_end'         => $eve_end,
+		'eve_tot_date'    => $eve_tot_date,
+		// URLs
+		'eve_host_url'    => $eve_host_url,
+		'eve_roster_url'  => $eve_roster_url,
+		'eve_trainer_url' => $eve_trainer_url,
+		'eve_web_url'     => $eve_web_url,
+		'eve_email_url'   => $eve_email_url,
+		// Shipping
+		'ship_name'      => $has_shipping ? sanitize_text_field( $_POST['ship_name']      ?? '' ) : '',
+		'ship_email'     => $has_shipping ? sanitize_email(      $_POST['ship_email']     ?? '' ) : '',
+		'ship_phone'     => $has_shipping ? sanitize_text_field( $_POST['ship_phone']     ?? '' ) : '',
+		'ship_address_1' => $has_shipping ? sanitize_text_field( $_POST['ship_address_1'] ?? '' ) : '',
+		'ship_address_2' => $has_shipping ? sanitize_text_field( $_POST['ship_address_2'] ?? '' ) : '',
+		'ship_address_3' => $has_shipping ? sanitize_text_field( $_POST['ship_address_3'] ?? '' ) : '',
+		'ship_city'      => $has_shipping ? sanitize_text_field( $_POST['ship_city']      ?? '' ) : '',
+		'ship_state'     => $has_shipping ? sanitize_text_field( $_POST['ship_state']     ?? '' ) : '',
+		'ship_zip'       => $has_shipping ? sanitize_text_field( $_POST['ship_zip']       ?? '' ) : '',
+		'ship_workbooks' => ( $has_shipping && $ship_workbooks_raw !== '' ) ? (int) $ship_workbooks_raw : null,
+		'ship_notes'     => $has_shipping ? sanitize_textarea_field( $_POST['ship_notes'] ?? '' ) : '',
+		// Host & Venue
+		'host_name'            => $host_name,
+		'displayed_as'         => $displayed_as,
+		'location_name'        => $location_name,
+		'street_address_1'     => $addr1,
+		'street_address_2'     => $addr2,
+		'street_address_3'     => $addr3,
+		'city'                 => $ev_city,
+		'state'                => $ev_state,
+		'zip_code'             => $zip_code,
+		// Additional
+		'max_attendees'        => $max_attendees_raw !== '' ? (int) $max_attendees_raw : null,
+		'special_instructions' => $special_instructions,
+		'parking_file_url'     => $parking_file_url,
+		'custom_email_intro'   => $custom_email_intro,
+		// JSON blobs
+		'host_contacts'        => wp_json_encode( $host_contacts ),
+		'hotels'               => wp_json_encode( $hotels_arr ),
+		// Timestamps
+		'eve_created_at'       => current_time( 'mysql' ),
+	);
+
+	if ( $mode === 'cvent' ) {
+		$insert_data['cvent_event_id']        = $insert_cvent_uuid;
+		$insert_data['cvent_event_title']     = $insert_cvent_title;
+		$insert_data['cvent_event_start_utc'] = $insert_cvent_start_utc;
+		$insert_data['cvent_match_status']    = 'manual';
+		$insert_data['cvent_last_synced']     = null;
+	}
+
+	// Required-field guard — abort with an error notice rather than inserting incomplete data.
+	$missing = array();
+	if ( ! $location )       { $missing[] = 'Location'; }
+	if ( ! $eve_type )       { $missing[] = 'Type'; }
+	if ( ! $eve_marketer )   { $missing[] = 'Marketer'; }
+	if ( ! $eve_instructor ) { $missing[] = 'Instructor'; }
+	if ( ! $eve_start )      { $missing[] = 'Start Date'; }
+	if ( ! empty( $missing ) ) {
+		wp_die(
+			'<p><strong>Cannot save event.</strong> The following required fields are missing: ' . esc_html( implode( ', ', $missing ) ) . '.</p>'
+			. '<p><a href="javascript:history.back()">Go back</a></p>',
+			'Missing Required Fields',
+			array( 'response' => 400 )
+		);
+	}
+
+	$wpdb->insert( $table, $insert_data );
+	$new_eve_id = (int) $wpdb->insert_id;
+
+	// Auto-populate eve_roster_url if left blank.
+	if ( ! $eve_roster_url && $new_eve_id ) {
+		$roster_base = Hostlinks_Page_URLs::get_roster();
+		if ( $roster_base ) {
+			$auto_roster_url = rtrim( $roster_base, '/' ) . '/?eve_id=' . $new_eve_id;
+			$wpdb->update( $table, array( 'eve_roster_url' => $auto_roster_url ), array( 'eve_id' => $new_eve_id ), array( '%s' ), array( '%d' ) );
+		}
+	}
+
+	// Remove from CVENT transient cache so it disappears from the new-events list.
+	if ( $mode === 'cvent' && $insert_cvent_uuid ) {
+		$cached = get_transient( 'hostlinks_cvent_new_events' );
+		if ( is_array( $cached ) ) {
+			$cached = array_values( array_filter(
+				$cached,
+				function( $e ) use ( $insert_cvent_uuid ) {
+					return Hostlinks_CVENT_API::sanitize_uuid( $e['id'] ?? '' ) !== $insert_cvent_uuid;
+				}
+			) );
+			set_transient( 'hostlinks_cvent_new_events', $cached, HOUR_IN_SECONDS );
+			update_option( 'hostlinks_cvent_new_count', count( $cached ) );
+		}
+	}
+
+	if ( $new_eve_id ) {
+		do_action( 'hostlinks_event_created', $new_eve_id, $eve_start );
+	}
+
+	wp_safe_redirect( admin_url( 'admin.php?page=booking-menu&edit_event=' . $new_eve_id . '&saved=1' ) );
+	exit;
+}
+
+// ── EDIT handler ──────────────────────────────────────────────────────────────
+if ( $mode === 'edit' && isset( $_POST['hl_edit_full_event'] ) ) {
 	check_admin_referer( 'hostlinks_edit_full_event_' . $eve_id );
 
 	// Core event fields
@@ -180,11 +407,63 @@ if ( isset( $_POST['hl_edit_full_event'] ) ) {
 	$notice = '<div class="notice notice-success is-dismissible"><p>Event updated successfully.</p></div>';
 }
 
-// ── Load the event row ────────────────────────────────────────────────────────
-$ev = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `{$table}` WHERE eve_id = %d", $eve_id ), ARRAY_A );
-if ( ! $ev ) {
-	echo '<div class="wrap"><div class="notice notice-error"><p>Event not found.</p></div></div>';
-	return;
+// ── Load or build the event data array ────────────────────────────────────────
+if ( $mode === 'edit' ) {
+	$ev = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `{$table}` WHERE eve_id = %d", $eve_id ), ARRAY_A );
+	if ( ! $ev ) {
+		echo '<div class="wrap"><div class="notice notice-error"><p>Event not found.</p></div></div>';
+		return;
+	}
+} else {
+	// Add or CVENT mode: pre-populate from GET params or use blank defaults.
+	$cvent_uuid_pre      = $mode === 'cvent' ? sanitize_text_field( $_GET['add_cvent']         ) : '';
+	$cvent_title_pre     = sanitize_text_field( $_GET['cvent_title']     ?? '' );
+	$cvent_start_utc_pre = sanitize_text_field( $_GET['cvent_start_utc'] ?? '' );
+
+	$ev = array(
+		'eve_id'          => 0,
+		'eve_location'    => sanitize_text_field( $_GET['cvent_loc']   ?? '' ),
+		'eve_start'       => sanitize_text_field( $_GET['cvent_start'] ?? '' ),
+		'eve_end'         => sanitize_text_field( $_GET['cvent_end']   ?? '' ),
+		'eve_type'        => (int) ( $_GET['cvent_type'] ?? 0 ),
+		'eve_zoom'        => ( ! empty( $_GET['cvent_zoom'] ) && '1' === $_GET['cvent_zoom'] ) ? 'yes' : '',
+		'eve_zoom_time'   => '',
+		'eve_marketer'    => (int) ( $_GET['cvent_mkt']  ?? 0 ),
+		'eve_instructor'  => (int) ( $_GET['cvent_inst'] ?? 0 ),
+		'eve_paid'        => 0,
+		'eve_free'        => 0,
+		'eve_status'      => 1,
+		'eve_public_hide' => 0,
+		'max_attendees'   => '',
+		'eve_host_url'    => '',
+		'eve_roster_url'  => '',
+		'eve_trainer_url' => esc_url_raw( sanitize_text_field( $_GET['cvent_reg_url'] ?? '' ) ),
+		'eve_web_url'     => '',
+		'eve_email_url'   => '',
+		'host_name'       => '',
+		'displayed_as'    => '',
+		'location_name'   => '',
+		'street_address_1'=> '',
+		'street_address_2'=> '',
+		'street_address_3'=> '',
+		'city'            => '',
+		'state'           => '',
+		'zip_code'        => '',
+		'special_instructions' => '',
+		'parking_file_url'    => '',
+		'custom_email_intro'  => '',
+		'host_contacts'       => '',
+		'hotels'              => '',
+		'ship_name'      => '', 'ship_email'     => '', 'ship_phone'  => '',
+		'ship_address_1' => '', 'ship_address_2' => '', 'ship_address_3' => '',
+		'ship_city'      => '', 'ship_state'     => '', 'ship_zip'    => '',
+		'ship_workbooks' => '', 'ship_notes'     => '',
+		'cvent_event_id'     => $cvent_uuid_pre,
+		'cvent_event_title'  => $cvent_title_pre,
+		'cvent_match_status' => $mode === 'cvent' ? 'manual' : '',
+		'cvent_match_score'  => '',
+		'cvent_last_synced'  => '',
+	);
 }
 
 // Resolved display names for the view header
@@ -302,14 +581,36 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 <div class="wrap">
 <h1>
 	<a href="<?php echo esc_url( $list_url ); ?>" style="text-decoration:none;color:#50575e;font-size:14px;margin-right:8px;">&#8592; Event List</a>
-	Edit Event #<?php echo $eve_id; ?>
-	<?php if ( $marketer_name ) echo '<span style="font-size:14px;color:#50575e;font-weight:400;margin-left:8px;">— ' . esc_html( $marketer_name ) . '</span>'; ?>
+	<?php
+	if ( $mode === 'edit' ) {
+		echo 'Edit Event #' . $eve_id;
+		if ( $marketer_name ) {
+			echo '<span style="font-size:14px;color:#50575e;font-weight:400;margin-left:8px;">— ' . esc_html( $marketer_name ) . '</span>';
+		}
+	} elseif ( $mode === 'cvent' ) {
+		echo 'Add CVENT Event';
+		if ( $cvent_title_pre ) {
+			echo '<span style="font-size:14px;color:#50575e;font-weight:400;margin-left:8px;">— ' . esc_html( $cvent_title_pre ) . '</span>';
+		}
+	} else {
+		echo 'Add New Event';
+	}
+	?>
 </h1>
 
 <?php echo $notice; ?>
 
 <form method="post" id="hl-edit-event-form">
+<?php if ( $mode === 'edit' ) : ?>
 <?php wp_nonce_field( 'hostlinks_edit_full_event_' . $eve_id ); ?>
+<?php else : ?>
+<?php wp_nonce_field( 'hostlinks_add_event_unified' ); ?>
+<?php if ( $mode === 'cvent' ) : ?>
+<input type="hidden" name="cvent_uuid"      value="<?php echo esc_attr( $cvent_uuid_pre ); ?>">
+<input type="hidden" name="cvent_title"     value="<?php echo esc_attr( $cvent_title_pre ); ?>">
+<input type="hidden" name="cvent_start_utc" value="<?php echo esc_attr( $cvent_start_utc_pre ); ?>">
+<?php endif; ?>
+<?php endif; ?>
 
 <div style="max-width:1100px;">
 
@@ -487,6 +788,25 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 	<div>
 
 		<h2 class="hl-edit-section-title" style="margin-top:0;">CVENT Link</h2>
+		<?php if ( $mode === 'cvent' ) : ?>
+		<table style="width:100%;border-collapse:collapse;">
+			<tr>
+				<th style="width:140px;padding:8px 12px;background:#f0f6fc;border:1px solid #c3d4e8;font-weight:600;vertical-align:top;">CVENT Title</th>
+				<td style="padding:8px 12px;border:1px solid #c3d4e8;font-size:12px;"><?php echo esc_html( $cvent_title_pre ); ?></td>
+			</tr>
+			<tr>
+				<th style="padding:8px 12px;background:#f0f6fc;border:1px solid #c3d4e8;font-weight:600;vertical-align:top;">CVENT UUID</th>
+				<td style="padding:8px 12px;border:1px solid #c3d4e8;font-family:monospace;font-size:11px;"><?php echo esc_html( $cvent_uuid_pre ); ?></td>
+			</tr>
+			<?php if ( $ev['eve_start'] ) : ?>
+			<tr>
+				<th style="padding:8px 12px;background:#f0f6fc;border:1px solid #c3d4e8;font-weight:600;vertical-align:top;">CVENT Start</th>
+				<td style="padding:8px 12px;border:1px solid #c3d4e8;font-size:12px;"><?php echo esc_html( $ev['eve_start'] ); ?></td>
+			</tr>
+			<?php endif; ?>
+		</table>
+		<p style="margin:6px 0 0;font-size:11px;color:#2271b1;">Fields below are pre-filled from CVENT data — review before saving.</p>
+		<?php elseif ( $mode === 'edit' ) : ?>
 		<table style="width:100%;border-collapse:collapse;">
 			<?php
 			$cvent_rows = array(
@@ -508,6 +828,9 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 			<tr><td colspan="2" style="padding:8px 12px;color:#888;font-style:italic;">No CVENT link — sync or manually add a CVENT ID on the Event List.</td></tr>
 			<?php endif; ?>
 		</table>
+		<?php else : ?>
+		<p style="color:#888;font-style:italic;margin:0;">No CVENT link — this event will be added manually.</p>
+		<?php endif; ?>
 
 		<!-- Shipping Details -->
 		<h2 class="hl-edit-section-title">Shipping Details</h2>
@@ -845,9 +1168,17 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 </div><!-- .max-width wrapper -->
 
 <p class="submit" style="margin-top:28px;">
+	<?php if ( $mode === 'edit' ) : ?>
 	<button type="submit" name="hl_edit_full_event" class="button button-primary" style="font-size:14px;padding:6px 20px;">Save Changes</button>
 	&nbsp;
 	<a href="<?php echo esc_url( $list_url ); ?>" class="button button-secondary">Cancel</a>
+	<?php else : ?>
+	<button type="submit" name="hl_add_event_submit" class="button button-primary" style="font-size:14px;padding:6px 20px;">
+		<?php echo $mode === 'cvent' ? 'Save to Hostlinks' : 'Add New Event'; ?>
+	</button>
+	&nbsp;
+	<a href="<?php echo esc_url( $mode === 'cvent' ? admin_url( 'admin.php?page=cvent-new-events' ) : $list_url ); ?>" class="button button-secondary">Cancel</a>
+	<?php endif; ?>
 </p>
 </form>
 </div><!-- .wrap -->
@@ -1055,5 +1386,40 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 		});
 	}
 <?php endif; ?>
+
+	// ── Auto end-date from Type + Start Date ─────────────────────────────
+	var hlTypeSelect  = document.querySelector('select[name="eve_type"]');
+	var hlStartInput  = document.querySelector('input[name="eve_start_date"]');
+	var hlEndInput    = document.querySelector('input[name="eve_end_date"]');
+
+	function hlAutoEndDate() {
+		if (!hlTypeSelect || !hlStartInput || !hlEndInput) return;
+		var typeName = (hlTypeSelect.options[hlTypeSelect.selectedIndex]
+			? hlTypeSelect.options[hlTypeSelect.selectedIndex].text
+			: '').toLowerCase().trim();
+		var start = hlStartInput.value;
+		if (!start || !typeName) return;
+
+		var d = new Date(start + 'T00:00:00');
+		if (isNaN(d.getTime())) return;
+
+		if (/sub[-\s]?awards?/i.test(typeName)) {
+			// Subaward → same day (end = start)
+		} else if (typeName.indexOf('management') !== -1 || typeName.indexOf('writing') !== -1) {
+			// Management / Writing → +1 day
+			d.setDate(d.getDate() + 1);
+		} else {
+			return; // Other types — don't auto-set end date
+		}
+
+		var y   = d.getFullYear();
+		var mo  = String(d.getMonth() + 1).padStart(2, '0');
+		var day = String(d.getDate()).padStart(2, '0');
+		hlEndInput.value = y + '-' + mo + '-' + day;
+	}
+
+	if (hlTypeSelect)  hlTypeSelect.addEventListener('change', hlAutoEndDate);
+	if (hlStartInput) hlStartInput.addEventListener('change', hlAutoEndDate);
+
 })();
 </script>

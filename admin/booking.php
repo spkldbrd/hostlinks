@@ -24,7 +24,9 @@ $syear = ( isset( $_GET['syear'] ) && $_GET['syear'] !== '' )
 
 $syearParts  = explode( '-', $syear );
 $filterYear  = isset( $syearParts[0] ) ? (int) $syearParts[0] : $currentYear;
-$filterMonth = isset( $syearParts[1] ) ? (int) $syearParts[1] : (int) $currentMonth;
+// $filterMonth is 0 when showing the whole year (syear=YYYY with no -MM suffix).
+$filterMonth = isset( $syearParts[1] ) ? (int) $syearParts[1] : 0;
+$allMonths   = ( $filterMonth === 0 );
 
 // ── Bulk action processing (POST) ────────────────────────────────────────
 $sucessmsgnew = '';
@@ -148,7 +150,12 @@ $tot1 = count( $all_pending_bookings );
   <div class="wrap">
     <h2>Events <a class="add-new-h2" href="admin.php?page=booking-menu&add_event=1">Add New Event</a></h2>
     <ul class="subsubsubx">
-      <li class="all"><a class="current">Showing <?php echo $tot1; ?> event(s) for <?php echo esc_html( date( 'F Y', mktime( 0, 0, 0, $filterMonth, 1, $filterYear ) ) ); ?></a></li>
+      <li class="all"><a class="current">Showing <?php echo $tot1; ?> event(s) for <?php
+          echo esc_html( $allMonths
+              ? ( 'All of ' . $filterYear )
+              : date( 'F Y', mktime( 0, 0, 0, $filterMonth, 1, $filterYear ) )
+          );
+      ?></a></li>
     </ul>
 
     <?php /* ── Year / Month filter — uses JS redirect so it works inside a WP admin page callback ── */ ?>
@@ -166,6 +173,7 @@ $tot1 = count( $all_pending_bookings );
             ?>
           </select>
           <select id="hl-choosemonth">
+            <option value="all" <?php echo $allMonths ? 'selected' : ''; ?>>All months</option>
             <?php
             $monthNames = array( 1=>'Jan',2=>'Feb',3=>'Mar',4=>'Apr',5=>'May',6=>'Jun',
                                  7=>'Jul',8=>'Aug',9=>'Sep',10=>'Oct',11=>'Nov',12=>'Dec' );
@@ -181,9 +189,11 @@ $tot1 = count( $all_pending_bookings );
     </div>
     <script>
     function hlApplyFilter() {
-        var yr = document.getElementById('hl-chooseyear').value;
-        var mo = document.getElementById('hl-choosemonth').value;
-        window.location.href = 'admin.php?page=booking-menu&syear=' + yr + '-' + mo;
+        var yr  = document.getElementById('hl-chooseyear').value;
+        var mo  = document.getElementById('hl-choosemonth').value;
+        var url = 'admin.php?page=booking-menu&syear=' + yr;
+        if (mo !== 'all') { url += '-' + mo; }
+        window.location.href = url;
     }
     document.getElementById('hl-chooseyear').addEventListener('change', hlApplyFilter);
     document.getElementById('hl-choosemonth').addEventListener('change', hlApplyFilter);

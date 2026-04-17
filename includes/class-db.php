@@ -9,7 +9,30 @@ class Hostlinks_DB {
 	 * Run dbDelta only when the stored schema version is behind HOSTLINKS_DB_VERSION.
 	 * Called on 'plugins_loaded' so it fires after every plugin update, not just activation.
 	 */
+	/**
+	 * Ensure the event_type_abbr column exists on wp_event_type.
+	 * Idempotent: checks first, only ALTERs if missing. Safe to call on every load.
+	 *
+	 * This exists as a standalone helper because maybe_upgrade() used to
+	 * bump hostlinks_db_version regardless of whether individual ALTERs
+	 * succeeded, leaving sites with the option advanced but the column
+	 * missing. Calling this outside the version gate prevents that class of
+	 * stuck state for this specific column.
+	 */
+	public static function ensure_event_type_abbr_column() {
+		global $wpdb;
+		$tbl     = $wpdb->prefix . 'event_type';
+		$has_col = ! empty( $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$tbl}` LIKE %s", 'event_type_abbr' ) ) );
+		if ( ! $has_col ) {
+			$wpdb->query( "ALTER TABLE `{$tbl}` ADD `event_type_abbr` varchar(20) NOT NULL DEFAULT ''" );
+		}
+	}
+
 	public static function maybe_upgrade() {
+		// Always self-heal the event_type_abbr column — cheap SHOW COLUMNS
+		// check, runs even when the stored DB version is already at target.
+		self::ensure_event_type_abbr_column();
+
 		$installed = get_option( 'hostlinks_db_version', '0' );
 		if ( ! version_compare( $installed, HOSTLINKS_DB_VERSION, '<' ) ) {
 			return;

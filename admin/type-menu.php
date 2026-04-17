@@ -8,6 +8,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	$sucessmsg = '';
 	if ( isset( $_POST['createdriveruser'] ) ) {
 		check_admin_referer( 'hostlinks_add_type' );
+		// Self-heal in case the v2.4 migration didn't add the abbr column.
+		Hostlinks_DB::ensure_event_type_abbr_column();
 		$postcodename = sanitize_text_field( $_POST['first_name'] );
 		$type_abbr    = sanitize_text_field( $_POST['event_type_abbr'] ?? '' );
 		$lat_long     = sanitize_text_field( $_POST['lat_long'] );
@@ -70,6 +72,8 @@ if ( isset( $_GET['add'] ) && $_GET['add'] == 1 ) {
 	$sucessmsgnew = '';
 	if ( isset( $_POST['updatethepcode'] ) ) {
 		check_admin_referer( 'hostlinks_edit_type' );
+		// Self-heal in case the v2.4 migration didn't add the abbr column.
+		Hostlinks_DB::ensure_event_type_abbr_column();
 		$postcodename = sanitize_text_field( $_POST['first_name'] );
 		$type_abbr    = sanitize_text_field( $_POST['event_type_abbr'] ?? '' );
 		$lat_long     = sanitize_text_field( $_POST['lat_long'] );

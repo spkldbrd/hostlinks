@@ -632,20 +632,6 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 				</td>
 			</tr>
 			<tr>
-				<th style="padding:8px 12px;">Start Date</th>
-				<td style="padding:8px 12px;">
-					<input type="date" name="eve_start_date" value="<?php echo esc_attr( $ev['eve_start'] ?? '' ); ?>"
-						class="regular-text" required />
-				</td>
-			</tr>
-			<tr>
-				<th style="padding:8px 12px;">End Date</th>
-				<td style="padding:8px 12px;">
-					<input type="date" name="eve_end_date" value="<?php echo esc_attr( $ev['eve_end'] ?? '' ); ?>"
-						class="regular-text" required />
-				</td>
-			</tr>
-			<tr>
 				<th style="padding:8px 12px;">Type</th>
 				<td style="padding:8px 12px;">
 					<select name="eve_type" required>
@@ -656,6 +642,20 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 						</option>
 						<?php endforeach; ?>
 					</select>
+				</td>
+			</tr>
+			<tr>
+				<th style="padding:8px 12px;">Start Date</th>
+				<td style="padding:8px 12px;">
+					<input type="date" name="eve_start_date" value="<?php echo esc_attr( $ev['eve_start'] ?? '' ); ?>"
+						class="regular-text hl-date-input" required />
+				</td>
+			</tr>
+			<tr>
+				<th style="padding:8px 12px;">End Date</th>
+				<td style="padding:8px 12px;">
+					<input type="date" name="eve_end_date" value="<?php echo esc_attr( $ev['eve_end'] ?? '' ); ?>"
+						class="regular-text hl-date-input" required />
 				</td>
 			</tr>
 			<tr>
@@ -757,6 +757,7 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 				<td style="padding:8px 12px;">
 					<input type="url" name="eve_roster_url" value="<?php echo esc_attr( $ev['eve_roster_url'] ?? '' ); ?>"
 						class="large-text" placeholder="https://" />
+					<br><small style="color:#888;">Leave blank to auto-populate with the default roster URL plus this event's ID.</small>
 				</td>
 			</tr>
 			<tr>
@@ -764,6 +765,7 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 				<td style="padding:8px 12px;">
 					<input type="url" name="eve_trainer_url" value="<?php echo esc_attr( $ev['eve_trainer_url'] ?? '' ); ?>"
 						class="large-text" placeholder="https://" />
+					<br><small style="color:#888;">Leave blank to auto-populate from CVENT when the next sync runs.</small>
 				</td>
 			</tr>
 			<tr>
@@ -771,6 +773,7 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 				<td style="padding:8px 12px;">
 					<input type="url" name="eve_web_url" value="<?php echo esc_attr( $ev['eve_web_url'] ?? '' ); ?>"
 						class="large-text" placeholder="https://" />
+					<br><small style="color:#888;">Leave blank to auto-populate from the Marketing Ops event page when it's generated.</small>
 				</td>
 			</tr>
 			<tr>
@@ -1420,6 +1423,19 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 
 	if (hlTypeSelect)  hlTypeSelect.addEventListener('change', hlAutoEndDate);
 	if (hlStartInput) hlStartInput.addEventListener('change', hlAutoEndDate);
+
+	// ── Open native date picker when clicking anywhere in the field ──────
+	// Default browser behavior only opens the picker when clicking the small
+	// calendar icon. showPicker() (Chromium/Safari/Edge) opens it on any click.
+	document.querySelectorAll('input.hl-date-input').forEach(function(inp) {
+		function openPicker() {
+			if (typeof inp.showPicker === 'function') {
+				try { inp.showPicker(); } catch (e) {}
+			}
+		}
+		inp.addEventListener('click', openPicker);
+		inp.addEventListener('focus', openPicker);
+	});
 
 })();
 </script>

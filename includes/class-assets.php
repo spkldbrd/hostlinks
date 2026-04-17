@@ -8,6 +8,23 @@ class Hostlinks_Assets {
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts',    array( $this, 'enqueue_frontend' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin' ) );
+		add_action( 'admin_head',            array( $this, 'print_admin_menu_css' ) );
+	}
+
+	/**
+	 * Tighten the padding on the Hostlinks admin submenu items.
+	 * Scoped to #toplevel_page_booking-menu so no other plugin's menu is affected.
+	 * Printed inline (few bytes) and covers both the expanded and folded-flyout states.
+	 */
+	public function print_admin_menu_css() {
+		?>
+		<style id="hostlinks-admin-menu-css">
+		#adminmenu #toplevel_page_booking-menu .wp-submenu > li > a,
+		.folded #adminmenu #toplevel_page_booking-menu .wp-submenu > li > a {
+			padding: 5px 2px 5px 12px;
+		}
+		</style>
+		<?php
 	}
 
 	public function enqueue_frontend() {

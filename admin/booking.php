@@ -210,9 +210,10 @@ $tot1 = count( $all_pending_bookings );
         <thead>
           <tr>
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
+            <th style="width:30px;"></th>
             <th>Location</th><th>Paid</th><th>Free</th><th style="width:90px;">Date</th>
             <th style="width:60px;">Type</th><th>Zoom</th><th>Marketer</th>
-            <th style="width:40px;"></th><th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
+            <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
           </tr>
         </thead>
         <tbody id="the-list">
@@ -223,6 +224,11 @@ $tot1 = count( $all_pending_bookings );
           <tr class="alternate" id="user-<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
             <th class="check-column"><input type="checkbox" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" class="administrator splchkkr" name="users[]"></th>
             <input type="hidden" name="originalid[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
+            <td style="text-align:center;white-space:nowrap;padding:0 4px;">
+              <a href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&edit_event=' . (int) $alldriver['eve_id'] ) ); ?>"
+                title="Full Edit" aria-label="Edit event #<?php echo (int) $alldriver['eve_id']; ?>"
+                class="button button-small hl-edit-icon">&#9998;</a>
+            </td>
             <td>
               <p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
               <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required autocomplete="off">
@@ -276,19 +282,15 @@ $tot1 = count( $all_pending_bookings );
               </select>
               <p class="hidder"><?php echo esc_html( $alldriver['event_marketer_name'] ?? '' ); ?></p>
             </td>
-            <td style="text-align:center;white-space:nowrap;">
-              <a href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&edit_event=' . (int) $alldriver['eve_id'] ) ); ?>"
-                title="Full Edit" class="button button-small" style="padding:2px 8px;font-size:11px;">&#9998; Edit</a>
-            </td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>" name="eve_trainer_url[]" style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_web_url'] ?? '' ); ?>" name="eve_web_url[]" style="width:140px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_email_url'] ?? '' ); ?>" name="eve_email_url[]" style="width:140px;" placeholder="https://"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" style="width:98px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" style="width:98px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>" name="eve_trainer_url[]" style="width:98px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_web_url'] ?? '' ); ?>" name="eve_web_url[]" style="width:98px;"></td>
+            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_email_url'] ?? '' ); ?>" name="eve_email_url[]" style="width:98px;" placeholder="https://"></td>
             <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_zoom_time'] ?? '' ); ?>" name="eve_zoom_time[]" placeholder="e.g. 9:30-4:30 EST" style="width:110px;"></td>
             <td style="text-align:center;"><input type="checkbox" name="eve_public_hide_ids[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" <?php checked( 1, intval( $alldriver['eve_public_hide'] ?? 0 ) ); ?>></td>
             <td>
-              <select name="eve_instructor[]" class="evetype" required style="width:100px;">
+              <select name="eve_instructor[]" class="evetype" required style="width:80px;">
                 <option value="">Please Choose</option>
                 <?php foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
                   <option value="<?php echo esc_attr( $alldriverx3['event_instructor_id'] ); ?>" <?php if ( $alldriver['eve_instructor'] == $alldriverx3['event_instructor_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx3['event_instructor_name'] ); ?></option>
@@ -360,12 +362,12 @@ jQuery(function() {
 <script type="text/javascript">
 jQuery(document).ready(function(){
   jQuery('#myTable').dataTable({
-    "aoColumns": [null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null,null,null,null,null],
-    "order": [[4,"asc"]],
+    "aoColumns": [null,null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null,null,null,null],
+    "order": [[5,"asc"]],
     "bPaginate": true, "bLengthChange": true, "bFilter": true, "bSort": true,
     "bInfo": true, "bAutoWidth": true, "stateSave": true, "searching": true,
     "dom": 'lfrtip', "pageLength": 25, "lengthChange": true,
-    "columnDefs": [{"targets":[0,2,3,5,6,7,8,9,10,11,12,13,14,15,16],"orderable":false}]
+    "columnDefs": [{"targets":[0,1,3,4,6,7,8,9,10,11,12,13,14,15,16],"orderable":false}]
   });
   jQuery.extend(jQuery.fn.dataTableExt.oSort, {
     "date-uk-pre": function(a) { var d=a.split('/'); return (d[2]+d[1]+d[0])*1; },
@@ -395,4 +397,7 @@ th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertica
 
 /* Event list: narrower Type dropdown when abbreviations are used. */
 select.hl-type-compact{width:64px;padding-left:4px;padding-right:18px;}
+
+/* Event list: compact icon-only Edit button (pencil, no text). */
+.hl-edit-icon{padding:2px 6px!important;font-size:13px!important;line-height:1!important;min-height:0!important;}
 </style>

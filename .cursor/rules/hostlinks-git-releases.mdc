@@ -1,0 +1,77 @@
+---
+description: How to commit, version, and publish Hostlinks plugin (git + GitHub release)
+alwaysApply: true
+---
+
+# Hostlinks Plugin — Git commits and GitHub releases
+
+Follow this when shipping **Hostlinks**. The plugin auto-updater uses **GitHub Releases** (`releases/latest`) and **`hostlinks.zip`** (built by GitHub Actions on release publish).
+
+## Plugin location (this workspace)
+
+```
+c:\cursor\Hostlinks 2.0\wp-content\plugins\hostlinks\
+```
+
+- Remote: `https://github.com/spkldbrd/hostlinks` — branch **`master`**
+- **Git repo root = plugin folder above** (not `Hostlinks 2.0`).
+
+---
+
+## Step 1 — Bump the version
+
+In `hostlinks.php`, update **both**:
+
+```php
+ * Version:     2.7.2
+...
+define( 'HOSTLINKS_VERSION', '2.7.2' );
+```
+
+Bump **`HOSTLINKS_DB_VERSION`** only for schema migrations.
+
+---
+
+## Step 2 — Commit and push (PowerShell — no `&&`)
+
+```powershell
+Set-Location "c:\cursor\Hostlinks 2.0\wp-content\plugins\hostlinks"
+$msg = "fix: short description (v2.X.X)"
+git add -A
+git commit -m $msg
+git push origin master
+```
+
+---
+
+## Step 3 — Create GitHub release (every version bump = a release)
+
+```powershell
+Set-Location "c:\cursor\Hostlinks 2.0\wp-content\plugins\hostlinks"
+gh release create 2.X.X --title "v2.X.X" --notes "## Changes`n`n- ..."
+```
+
+GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)) triggers on `release: published`, builds **`hostlinks.zip`** with the `hostlinks/` root folder, and attaches it automatically. No manual zip step needed.
+
+**Agents: never skip `gh release create` after a version bump.**
+
+---
+
+## Semver
+
+**Default to PATCH** — bump the third decimal (`x.x.X`) for almost everything.
+
+| Bump | When |
+|------|------|
+| **PATCH** `x.x.X` | Default — fixes, copy, small UI, new fields, incremental features |
+| MINOR `x.X.0` | Significant new feature or larger behavior change |
+| MAJOR `X.0.0` | Breaking change or major architecture overhaul |
+
+---
+
+## Agent checklist
+
+1. Header `Version:` and `HOSTLINKS_VERSION` match
+2. `git add -A` → commit → `git push origin master`
+3. `gh release create` with version tag and release notes
+4. Confirm Actions run + zip attached on GitHub

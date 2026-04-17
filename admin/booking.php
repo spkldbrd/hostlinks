@@ -125,11 +125,16 @@ $all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_
 $all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
 
 // ── Single JOIN query — eliminates N+1 per-row lookups ───────────────────
+// NOTE: we deliberately DO NOT reference t.event_type_abbr here. That column
+// arrived in DB v2.4, and if the migration has not yet run on a given site
+// (stale option, silently-failed ALTER, etc.), referencing it would kill the
+// whole SELECT and render the event list as empty. The dropdown gets the
+// abbreviation from $all_pending_toter (SELECT * below, with ?? '' fallback),
+// so omitting it from the JOIN costs nothing.
 $all_pending_bookings = $wpdb->get_results(
 	$wpdb->prepare(
 		"SELECT e.*,
 		        t.event_type_name,
-		        t.event_type_abbr,
 		        m.event_marketer_name,
 		        i.event_instructor_name
 		 FROM   {$table11} e

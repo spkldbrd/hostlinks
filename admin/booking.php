@@ -384,7 +384,20 @@ jQuery(document).ready(function(){
     "bPaginate": true, "bLengthChange": true, "bFilter": true, "bSort": true,
     "bInfo": true, "bAutoWidth": true, "stateSave": true, "searching": true,
     "dom": 'lfrtip', "pageLength": 25, "lengthChange": true,
-    "columnDefs": [{"targets":[0,1,3,4,6,7,8,9,10,11,12,13,14,15,16],"orderable":false}]
+    "columnDefs": [{"targets":[0,1,3,4,6,7,8,9,10,11,12,13,14,15,16],"orderable":false}],
+    // Keep sort/pagination state persisted across loads, but always start
+    // with an empty search box. Clears both the saved value and any
+    // per-column search state before DataTables applies it on init.
+    "stateLoadParams": function(settings, data) {
+      if (data && data.search) { data.search.search = ""; }
+      if (data && Array.isArray(data.columns)) {
+        for (var i = 0; i < data.columns.length; i++) {
+          if (data.columns[i] && data.columns[i].search) {
+            data.columns[i].search.search = "";
+          }
+        }
+      }
+    }
   });
   jQuery.extend(jQuery.fn.dataTableExt.oSort, {
     "date-uk-pre": function(a) { var d=a.split('/'); return (d[2]+d[1]+d[0])*1; },

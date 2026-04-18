@@ -16,7 +16,11 @@ if ( ! current_user_can( 'manage_options' ) ) {
 
 global $wpdb;
 
-$list_url = admin_url( 'admin.php?page=booking-menu' );
+$list_url      = admin_url( 'admin.php?page=booking-menu' );
+$queue_url     = admin_url( 'admin.php?page=hostlinks-event-requests' );
+// In request mode, "back" should return to the Event Queue, not the Event List.
+$back_url      = ( isset( $_GET['add_request'] ) ) ? $queue_url : $list_url;
+$back_label    = ( isset( $_GET['add_request'] ) ) ? '&#8592; Event Queue' : '&#8592; Event List';
 $timezone = wp_timezone();
 $table    = $wpdb->prefix . 'event_details_list';
 
@@ -702,7 +706,7 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 
 <div class="wrap">
 <h1>
-	<a href="<?php echo esc_url( $list_url ); ?>" style="text-decoration:none;color:#50575e;font-size:14px;margin-right:8px;">&#8592; Event List</a>
+	<a href="<?php echo esc_url( $back_url ); ?>" style="text-decoration:none;color:#50575e;font-size:14px;margin-right:8px;"><?php echo $back_label; ?></a>
 	<?php
 	if ( $mode === 'edit' ) {
 		echo 'Edit Event #' . $eve_id;

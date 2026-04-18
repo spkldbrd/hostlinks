@@ -519,9 +519,10 @@ if ( $mode === 'edit' ) {
 		'special_instructions' => (string) ( $request_row['special_instructions'] ?? '' ),
 		'parking_file_url'    => (string) ( $request_row['parking_file_url']    ?? '' ),
 		'custom_email_intro'  => (string) ( $request_row['custom_email_intro']  ?? '' ),
-		// host_contacts / hotels: already JSON strings in the request table.
-		'host_contacts'       => (string) ( $request_row['host_contacts'] ?? '' ),
-		'hotels'              => (string) ( $request_row['hotels']        ?? '' ),
+		// host_contacts / hotels: get_by_id() already JSON-decodes these into
+		// PHP arrays; re-encode so the form's json_decode() roundtrip works.
+		'host_contacts' => wp_json_encode( is_array( $request_row['host_contacts'] ) ? $request_row['host_contacts'] : array() ),
+		'hotels'        => wp_json_encode( is_array( $request_row['hotels'] )        ? $request_row['hotels']        : array() ),
 		// Shipping — direct pass-through
 		'ship_name'      => (string) ( $request_row['ship_name']      ?? '' ),
 		'ship_email'     => (string) ( $request_row['ship_email']     ?? '' ),

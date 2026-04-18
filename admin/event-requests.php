@@ -12,7 +12,30 @@ if ( ! empty( $_GET['hl_action'] ) && ! empty( $_GET['id'] ) && ! empty( $_GET['
 	$action_id = (int) $_GET['id'];
 	if ( wp_verify_nonce( $_GET['_wpnonce'], 'hl_request_action_' . $action_id ) ) {
 		$new_status = sanitize_text_field( $_GET['hl_action'] );
-		if ( array_key_exists( $new_status, Hostlinks_Event_Request::STATUSES ) ) {
+
+		// ── Resend notification email ─────────────────────────────────────
+		if ( $new_status === 'resend_email' ) {
+			$source_row = Hostlinks_Event_Request_Storage::get_by_id( $action_id );
+			if ( $source_row ) {
+				$group   = $source_row['submission_group'] ?? '';
+				$all_rows = $group
+					? Hostlinks_Event_Request_Storage::get_by_submission_group( $group )
+					: array( $source_row );
+				$ids     = array_column( $all_rows, 'id' );
+				// Re-encode JSON blobs that get_by_id decodes, so send_notification
+				// receives the same shape as the original submission.
+				$records = array_map( function( $r ) {
+					$r['host_contacts'] = wp_json_encode( is_array( $r['host_contacts'] ) ? $r['host_contacts'] : array() );
+					$r['hotels']        = wp_json_encode( is_array( $r['hotels'] )        ? $r['hotels']        : array() );
+					$r['cc_emails']     = wp_json_encode( is_array( $r['cc_emails'] )     ? $r['cc_emails']     : array() );
+					return $r;
+				}, $all_rows );
+				Hostlinks_Event_Request_Shortcode::send_notification( $ids, $records );
+				$action_notice = '<div class="notice notice-success is-dismissible"><p>Notification email re-sent for request #' . $action_id . ' (' . count( $all_rows ) . ' event' . ( count( $all_rows ) > 1 ? 's' : '' ) . ' in this submission).</p></div>';
+			}
+
+		// ── Standard status change ────────────────────────────────────────
+		} elseif ( array_key_exists( $new_status, Hostlinks_Event_Request::STATUSES ) ) {
 			Hostlinks_Event_Request_Storage::update_status( $action_id, $new_status );
 			$label = Hostlinks_Event_Request::STATUSES[ $new_status ];
 			$action_notice = '<div class="notice notice-success is-dismissible"><p>Request #' . $action_id . ' marked as <strong>' . esc_html( $label ) . '</strong>.</p></div>';
@@ -112,11 +135,11 @@ function hl_status_tab( string $key, string $label, int $count, string $current,
 		);
 		$badge_color = $status_badge_colors[ $status ] ?? '#9e9e9e';
 
-		$nonce_archived = wp_create_nonce( 'hl_request_action_' . $rid );
-		$nonce_new      = wp_create_nonce( 'hl_request_action_' . $rid );
+		$nonce_row    = wp_create_nonce( 'hl_request_action_' . $rid );
 
-		$archive_url  = add_query_arg( array( 'hl_action' => 'archived', 'id' => $rid, '_wpnonce' => $nonce_archived ), $base_url );
-		$reopen_url   = add_query_arg( array( 'hl_action' => 'new',      'id' => $rid, '_wpnonce' => $nonce_new      ), $base_url );
+		$archive_url  = add_query_arg( array( 'hl_action' => 'archived',      'id' => $rid, '_wpnonce' => $nonce_row ), $base_url );
+		$reopen_url   = add_query_arg( array( 'hl_action' => 'new',           'id' => $rid, '_wpnonce' => $nonce_row ), $base_url );
+		$resend_url   = add_query_arg( array( 'hl_action' => 'resend_email',  'id' => $rid, '_wpnonce' => $nonce_row ), $base_url );
 		$convert_url  = admin_url( 'admin.php?page=booking-menu&add_request=' . $rid );
 
 		$city_state = trim( ( $row['city'] ? $row['city'] : '' ) . ( $row['state'] ? ', ' . $row['state'] : '' ), ', ' );
@@ -148,10 +171,14 @@ function hl_status_tab( string $key, string $label, int $count, string $current,
 			<?php if ( $status === 'new' ) : ?>
 				<a href="<?php echo esc_url( $convert_url ); ?>" class="button button-small button-primary">+ Add to Hostlinks</a>
 				<br><a href="<?php echo esc_url( $detail_url ); ?>" style="font-size:12px;">View</a>
+				&nbsp;|&nbsp;<a href="<?php echo esc_url( $resend_url ); ?>" style="font-size:12px;"
+					onclick="return confirm('Re-send the notification email for this submission?');">Resend Email</a>
 				&nbsp;|&nbsp;<a href="<?php echo esc_url( $archive_url ); ?>" style="font-size:12px;"
 					onclick="return confirm('Archive this request?');">Archive</a>
 			<?php else : ?>
 				<a href="<?php echo esc_url( $detail_url ); ?>">View</a>
+				&nbsp;|&nbsp;<a href="<?php echo esc_url( $resend_url ); ?>"
+					onclick="return confirm('Re-send the notification email for this submission?');">Resend Email</a>
 				<?php if ( $status !== 'archived' ) : ?>
 					&nbsp;|&nbsp;<a href="<?php echo esc_url( $archive_url ); ?>"
 						onclick="return confirm('Archive this request?');">Archive</a>

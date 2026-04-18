@@ -121,6 +121,37 @@ class Hostlinks_Event_Request_Storage {
 	}
 
 	/**
+	 * Fetch all fully-decoded rows for a submission group, ordered by start date.
+	 * Used for resending the notification email for an entire submission.
+	 *
+	 * @param string $submission_group  UUID from any row in the group.
+	 * @return array  Array of decoded row arrays (same shape as get_by_id()).
+	 */
+	public static function get_by_submission_group( string $submission_group ): array {
+		global $wpdb;
+		if ( $submission_group === '' ) {
+			return array();
+		}
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT * FROM ' . self::table() . ' WHERE submission_group = %s ORDER BY start_date ASC',
+				$submission_group
+			),
+			ARRAY_A
+		);
+		if ( ! $rows ) {
+			return array();
+		}
+		foreach ( $rows as &$row ) {
+			$row['cc_emails']     = json_decode( $row['cc_emails'],     true ) ?: array();
+			$row['hotels']        = json_decode( $row['hotels'],        true ) ?: array();
+			$row['host_contacts'] = json_decode( $row['host_contacts'], true ) ?: array();
+		}
+		unset( $row );
+		return $rows;
+	}
+
+	/**
 	 * Fetch sibling records that share the same submission_group UUID,
 	 * excluding the current record itself.
 	 *

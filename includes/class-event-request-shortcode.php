@@ -81,7 +81,7 @@ class Hostlinks_Event_Request_Shortcode {
 			return;
 		}
 
-		$this->send_notification( $this->inserted_ids, $records );
+		self::send_notification( $this->inserted_ids, $records );
 		$this->old = array();
 	}
 
@@ -137,7 +137,13 @@ class Hostlinks_Event_Request_Shortcode {
 
 	// ── Notification email ────────────────────────────────────────────────────
 
-	private function send_notification( array $ids, array $records ) {
+	/**
+	 * Send (or re-send) the notification email for a submission.
+	 *
+	 * @param int[]  $ids      DB row IDs for this submission.
+	 * @param array  $records  Fully-decoded row arrays (same shape as storage returns).
+	 */
+	public static function send_notification( array $ids, array $records ) {
 		$to = get_option( 'hostlinks_event_request_notification_email', get_option( 'admin_email' ) );
 		if ( empty( $to ) ) {
 			return;

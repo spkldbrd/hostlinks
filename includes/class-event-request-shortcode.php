@@ -317,10 +317,6 @@ class Hostlinks_Event_Request_Shortcode {
 		// ── Footer ───────────────────────────────────────────────────────────
 		$L[] = '';
 		$L[] = $sep2;
-		if ( ! empty( $ids ) ) {
-			$L[] = 'Review in admin: ' . admin_url( 'admin.php?page=hostlinks-event-requests&id=' . $ids[0] );
-		}
-		$L[] = 'Add to Hostlinks: ' . admin_url( 'admin.php?page=hostlinks-event-requests' );
 
 		// ── Cc: header ───────────────────────────────────────────────────────
 		$headers     = array();

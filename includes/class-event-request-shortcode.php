@@ -149,174 +149,209 @@ class Hostlinks_Event_Request_Shortcode {
 			return;
 		}
 
-		$first  = $records[0] ?? array();
-		$prefix = get_option( 'hostlinks_event_request_email_subject_prefix', '[Event Request]' );
-
-		$city     = $first['city']  ?? '';
-		$state    = $first['state'] ?? '';
-		$location = trim( $city . ( $state ? ', ' . $state : '' ) );
+		$first    = $records[0] ?? array();
 		$n_events = count( $records );
-		$subject  = trim( $prefix ) . ' ' . $location . ' — ' . $n_events . ' event' . ( $n_events > 1 ? 's' : '' ) . ' submitted';
 
-		$sep  = str_repeat( '-', 60 );
-		$sep2 = str_repeat( '=', 60 );
-		$L    = array(); // output lines
+		// ── Subject ──────────────────────────────────────────────────────────
+		$all_virtual = ( $n_events > 0 ) && array_reduce(
+			$records,
+			fn( $carry, $r ) => $carry && ( ( $r['format'] ?? '' ) === 'virtual' ),
+			true
+		);
 
-		// ── Header ──────────────────────────────────────────────────────────
-		$L[] = 'New Event Request Submission';
-		$L[] = 'Submitted: ' . ( ! empty( $first['submitted_at'] ) ? date( 'M j, Y g:i A', strtotime( $first['submitted_at'] ) ) : date( 'M j, Y' ) );
-		$L[] = $sep2;
+		if ( $all_virtual ) {
+			$subject = 'New ZOOM events';
+		} else {
+			$city  = trim( $first['city']  ?? '' );
+			$state = trim( $first['state'] ?? '' );
+			$loc   = $city . ( $state ? ', ' . $state : '' );
 
-		// ── Section 1: Events ────────────────────────────────────────────────
-		$L[] = '';
-		$L[] = 'EVENTS (' . $n_events . ')';
-		$L[] = $sep;
+			$date_str = self::_format_date_range(
+				$first['start_date'] ?? '',
+				$first['end_date']   ?? ''
+			);
 
-		foreach ( $records as $idx => $data ) {
-			$rid  = $ids[ $idx ] ?? '?';
-			$is_v = ( $data['format'] ?? '' ) === 'virtual';
-			$L[] = '';
-			$L[] = '  Event #' . $rid;
-			$L[] = '  Type: '     . ( $data['category']   ?? '—' );
-			$L[] = '  Start: '    . ( $data['start_date'] ?? '—' );
-			$L[] = '  End: '      . ( $data['end_date']   ?? '—' );
-			$L[] = '  Trainer: '  . ( $data['trainer']    ?? '—' );
-			$L[] = '  Format: '   . ( $is_v ? 'Virtual (Zoom)' : 'In-Person' );
-			$L[] = '  Timezone: ' . ( $data['timezone']   ?? '—' );
-		}
-
-		// ── Section 2: Marketer / Trainer ────────────────────────────────────
-		$L[] = '';
-		$L[] = $sep;
-		$L[] = 'MARKETER & TRAINER';
-		$L[] = $sep;
-		$L[] = '  Marketer: ' . ( $first['marketer'] ?? '—' );
-		$L[] = '  Trainer: '  . ( $first['trainer']  ?? '—' );
-
-		// ── Section 3: Host & Venue ───────────────────────────────────────────
-		$L[] = '';
-		$L[] = $sep;
-		$L[] = 'HOST & VENUE';
-		$L[] = $sep;
-		$L[] = '  Host Name: '      . ( $first['host_name']     ?? '' );
-		$L[] = '  Displayed As: '   . ( $first['displayed_as']  ?? '' );
-		$L[] = '  Location / Room: '. ( $first['location_name'] ?? '' );
-		$addr_parts = array_filter( array(
-			$first['street_address_1'] ?? '',
-			$first['street_address_2'] ?? '',
-			$first['street_address_3'] ?? '',
-		) );
-		if ( $addr_parts ) {
-			foreach ( $addr_parts as $ap ) {
-				$L[] = '  Address: ' . $ap;
+			// Resolve type abbreviation from the DB; fall back to category name.
+			global $wpdb;
+			$category = trim( $first['category'] ?? '' );
+			$abbr     = '';
+			if ( $category ) {
+				$abbr = (string) $wpdb->get_var( $wpdb->prepare(
+					"SELECT event_type_abbr FROM {$wpdb->prefix}event_type WHERE event_type_name = %s LIMIT 1",
+					$category
+				) );
 			}
-		}
-		$L[] = '  City, State, ZIP: ' . trim( $location . ( ! empty( $first['zip_code'] ) ? ' ' . $first['zip_code'] : '' ) );
+			if ( $abbr === '' ) {
+				$abbr = $category;
+			}
 
-		// ── Section 4: Host Contacts ─────────────────────────────────────────
+			$subject = 'New Workshop in: ' . $loc . ', ' . $date_str . ' ' . $abbr;
+		}
+
+		// ── Smart possessive for marketer ─────────────────────────────────────
+		$marketer_raw  = trim( $first['marketer'] ?? '' );
+		$non_person    = array( 'private', 'zoom', 'virtual', 'tbd' );
+		$marketer_lc   = strtolower( $marketer_raw );
+		$is_private    = ( $marketer_lc === 'private' );
+		$is_non_person = in_array( $marketer_lc, $non_person, true );
+
+		$L   = array();
+		$sep = '----';
+
+		// ── Intro line ───────────────────────────────────────────────────────
+		if ( $marketer_raw !== '' && ! $is_private ) {
+			$possessive = $is_non_person ? $marketer_raw . '.' : $marketer_raw . "'s.";
+			$L[] = 'This class will be ' . $possessive;
+			$L[] = '';
+		}
+
+		// ── Event type + date blocks ──────────────────────────────────────────
+		foreach ( $records as $data ) {
+			if ( ! empty( $data['category'] ) ) {
+				$L[] = $data['category'];
+			}
+			$dr = self::_format_date_range( $data['start_date'] ?? '', $data['end_date'] ?? '' );
+			if ( $dr ) {
+				$L[] = $dr;
+			}
+			if ( ( $data['format'] ?? '' ) === 'virtual' ) {
+				$L[] = 'Virtual (Zoom)';
+				if ( ! empty( $data['timezone'] ) ) {
+					$L[] = $data['timezone'];
+				}
+			}
+			if ( ! empty( $data['trainer'] ) ) {
+				$L[] = 'Trainer: ' . $data['trainer'];
+			}
+			$L[] = '';
+		}
+
+		// ── Venue ────────────────────────────────────────────────────────────
+		$displayed_as = trim( $first['displayed_as'] ?? '' );
+		$host_name    = trim( $first['host_name']    ?? '' );
+		$venue_label  = $displayed_as ?: $host_name;
+
+		if ( $venue_label ) {
+			$L[] = $sep;
+			$L[] = '';
+			$L[] = $venue_label;
+			if ( ! empty( $first['location_name'] ) ) {
+				$L[] = $first['location_name'];
+			}
+			foreach ( array_filter( array(
+				$first['street_address_1'] ?? '',
+				$first['street_address_2'] ?? '',
+				$first['street_address_3'] ?? '',
+			) ) as $addr_line ) {
+				$L[] = $addr_line;
+			}
+			$city_raw  = trim( $first['city']     ?? '' );
+			$state_raw = trim( $first['state']    ?? '' );
+			$zip_raw   = trim( $first['zip_code'] ?? '' );
+			$csz       = $city_raw
+				. ( $state_raw ? ' ' . $state_raw : '' )
+				. ( $zip_raw   ? '   ' . $zip_raw : '' );
+			if ( $csz ) {
+				$L[] = $csz;
+			}
+			$L[] = '';
+		}
+
+		// ── Host contacts ─────────────────────────────────────────────────────
 		$contacts_json = $first['host_contacts'] ?? '[]';
 		$contacts      = is_array( $contacts_json )
 			? $contacts_json
 			: ( json_decode( $contacts_json, true ) ?: array() );
 
-		if ( ! empty( $contacts ) ) {
-			$L[] = '';
-			$L[] = $sep;
-			$L[] = 'HOST CONTACTS';
-			$L[] = $sep;
-			foreach ( $contacts as $ci => $c ) {
-				$L[] = '';
-				$L[] = '  Contact ' . ( $ci + 1 );
-				if ( ! empty( $c['name'] ) )   { $L[] = '    Name: '    . $c['name']; }
-				if ( ! empty( $c['agency'] ) ) { $L[] = '    Agency: '  . $c['agency']; }
-				if ( ! empty( $c['title'] ) )  { $L[] = '    Title: '   . $c['title']; }
-				if ( ! empty( $c['email'] ) )  { $L[] = '    Email: '   . $c['email']; }
-				if ( ! empty( $c['phone'] ) )  { $L[] = '    Phone: '   . $c['phone']  . ( ! empty( $c['dnl_phone'] )  ? ' [Do Not List]' : '' ); }
-				if ( ! empty( $c['phone2'] ) ) { $L[] = '    Phone 2: ' . $c['phone2'] . ( ! empty( $c['dnl_phone2'] ) ? ' [Do Not List]' : '' ); }
+		foreach ( $contacts as $c ) {
+			if ( ! empty( $c['name'] ) )   { $L[] = $c['name']; }
+			if ( ! empty( $c['agency'] ) ) { $L[] = $c['agency']; }
+			if ( ! empty( $c['title'] ) )  { $L[] = $c['title']; }
+			if ( ! empty( $c['email'] ) )  { $L[] = $c['email']; }
+			if ( ! empty( $c['phone'] ) ) {
+				$L[] = $c['phone'] . ( ! empty( $c['dnl_phone'] ) ? ' [Do Not List]' : '' );
 			}
+			if ( ! empty( $c['phone2'] ) ) {
+				$L[] = $c['phone2'] . ( ! empty( $c['dnl_phone2'] ) ? ' [Do Not List]' : '' );
+			}
+			$L[] = '';
 		}
 
-		// ── Section 5: Hotels ────────────────────────────────────────────────
+		// ── Hotels ───────────────────────────────────────────────────────────
 		$hotels_json = $first['hotels'] ?? '[]';
 		$hotels      = is_array( $hotels_json )
 			? $hotels_json
 			: ( json_decode( $hotels_json, true ) ?: array() );
 
-		if ( ! empty( $hotels ) ) {
+		foreach ( $hotels as $h ) {
+			if ( ! empty( $h['name'] ) )    { $L[] = $h['name']; }
+			if ( ! empty( $h['address'] ) ) { $L[] = $h['address']; }
+			if ( ! empty( $h['phone'] ) )   { $L[] = $h['phone']; }
+			if ( ! empty( $h['url'] ) )     { $L[] = $h['url']; }
 			$L[] = '';
-			$L[] = $sep;
-			$L[] = 'HOTEL RECOMMENDATIONS';
-			$L[] = $sep;
-			foreach ( $hotels as $hi => $h ) {
-				$L[] = '';
-				$L[] = '  Hotel ' . ( $hi + 1 ) . ': ' . ( $h['name'] ?? '' );
-				if ( ! empty( $h['phone'] ) )   { $L[] = '    Phone: '   . $h['phone']; }
-				if ( ! empty( $h['address'] ) ) { $L[] = '    Address: ' . $h['address']; }
-				if ( ! empty( $h['url'] ) )     { $L[] = '    URL: '     . $h['url']; }
-			}
 		}
 
-		// ── Section 6: Additional Details ────────────────────────────────────
+		// ── Shipping / Att: ───────────────────────────────────────────────────
+		$has_shipping = ! empty( $first['ship_name'] )
+			|| ! empty( $first['ship_address_1'] )
+			|| ! empty( $first['ship_email'] );
+
+		if ( $has_shipping ) {
+			if ( ! empty( $first['ship_name'] ) ) {
+				$L[] = 'Att: ' . $first['ship_name'];
+			}
+			foreach ( array_filter( array(
+				$first['ship_address_1'] ?? '',
+				$first['ship_address_2'] ?? '',
+				$first['ship_address_3'] ?? '',
+			) ) as $sa ) {
+				$L[] = $sa;
+			}
+			$ship_csz = trim(
+				( $first['ship_city']  ?? '' )
+				. ( ! empty( $first['ship_state'] ) ? ' ' . $first['ship_state'] : '' )
+				. ( ! empty( $first['ship_zip'] )   ? '   ' . $first['ship_zip'] : '' )
+			);
+			if ( $ship_csz ) {
+				$L[] = $ship_csz;
+			}
+			if ( ! empty( $first['ship_phone'] ) ) { $L[] = $first['ship_phone']; }
+			if ( ! empty( $first['ship_email'] ) ) { $L[] = $first['ship_email']; }
+			if ( isset( $first['ship_workbooks'] ) && $first['ship_workbooks'] !== null && $first['ship_workbooks'] !== '' ) {
+				$L[] = 'Workbooks: ' . $first['ship_workbooks'];
+			}
+			if ( ! empty( $first['ship_notes'] ) ) { $L[] = $first['ship_notes']; }
+			$L[] = '';
+		}
+
+		// ── Additional details ────────────────────────────────────────────────
 		$has_additional = ! empty( $first['max_attendees'] )
 			|| ! empty( $first['special_instructions'] )
 			|| ! empty( $first['custom_email_intro'] )
 			|| ! empty( $first['parking_file_url'] );
 
 		if ( $has_additional ) {
+			$L[] = $sep;
 			$L[] = '';
-			$L[] = $sep;
-			$L[] = 'ADDITIONAL DETAILS';
-			$L[] = $sep;
-			if ( ! empty( $first['max_attendees'] ) ) { $L[] = '  Max Attendees: ' . $first['max_attendees']; }
-			if ( ! empty( $first['special_instructions'] ) ) {
-				$L[] = '  Special Instructions:';
-				foreach ( explode( "\n", $first['special_instructions'] ) as $si_line ) {
-					$L[] = '    ' . $si_line;
-				}
+			if ( ! empty( $first['max_attendees'] ) ) {
+				$L[] = 'Max Attendees: ' . $first['max_attendees'];
 			}
 			if ( ! empty( $first['custom_email_intro'] ) ) {
-				$L[] = '  Custom Email Intro:';
 				foreach ( explode( "\n", $first['custom_email_intro'] ) as $ce_line ) {
-					$L[] = '    ' . $ce_line;
+					$L[] = $ce_line;
 				}
 			}
-			if ( ! empty( $first['parking_file_url'] ) ) { $L[] = '  Parking / Directions: ' . $first['parking_file_url']; }
-		}
-
-		// ── Section 7: Shipping ──────────────────────────────────────────────
-		$has_shipping = ! empty( $first['ship_name'] )
-			|| ! empty( $first['ship_address_1'] )
-			|| ! empty( $first['ship_email'] );
-
-		if ( $has_shipping ) {
-			$L[] = '';
-			$L[] = $sep;
-			$L[] = 'SHIPPING DETAILS';
-			$L[] = $sep;
-			if ( ! empty( $first['ship_name'] ) )  { $L[] = '  Name: '  . $first['ship_name']; }
-			if ( ! empty( $first['ship_email'] ) ) { $L[] = '  Email: ' . $first['ship_email']; }
-			if ( ! empty( $first['ship_phone'] ) ) { $L[] = '  Phone: ' . $first['ship_phone']; }
-			$ship_addr = array_filter( array(
-				$first['ship_address_1'] ?? '',
-				$first['ship_address_2'] ?? '',
-				$first['ship_address_3'] ?? '',
-			) );
-			foreach ( $ship_addr as $sa ) { $L[] = '  Address: ' . $sa; }
-			$ship_csz = trim(
-				( $first['ship_city'] ?? '' )
-				. ( ! empty( $first['ship_state'] ) ? ', ' . $first['ship_state'] : '' )
-				. ( ! empty( $first['ship_zip'] )   ? ' ' . $first['ship_zip']   : '' )
-			);
-			if ( $ship_csz ) { $L[] = '  City / State: ' . $ship_csz; }
-			if ( isset( $first['ship_workbooks'] ) && $first['ship_workbooks'] !== null && $first['ship_workbooks'] !== '' ) {
-				$L[] = '  Workbooks: ' . $first['ship_workbooks'];
+			if ( ! empty( $first['special_instructions'] ) ) {
+				$L[] = 'Special Instructions:';
+				foreach ( explode( "\n", $first['special_instructions'] ) as $si_line ) {
+					$L[] = $si_line;
+				}
 			}
-			if ( ! empty( $first['ship_notes'] ) ) { $L[] = '  Notes: ' . $first['ship_notes']; }
+			if ( ! empty( $first['parking_file_url'] ) ) {
+				$L[] = 'Parking / Directions: ' . $first['parking_file_url'];
+			}
+			$L[] = '';
 		}
-
-		// ── Footer ───────────────────────────────────────────────────────────
-		$L[] = '';
-		$L[] = $sep2;
 
 		// ── Cc: header ───────────────────────────────────────────────────────
 		$headers     = array();
@@ -338,5 +373,40 @@ class Hostlinks_Event_Request_Shortcode {
 		}
 
 		wp_mail( $to, $subject, implode( "\n", $L ), $headers );
+	}
+
+	/**
+	 * Format a start/end YYYY-MM-DD pair into a human-readable range.
+	 *
+	 * 2026-08-19 / 2026-08-20  →  August 19-20, 2026
+	 * 2026-07-31 / 2026-08-01  →  July 31 - August 1, 2026
+	 * 2026-08-19 / 2026-08-19  →  August 19, 2026
+	 */
+	private static function _format_date_range( string $start_raw, string $end_raw ): string {
+		if ( $start_raw === '' ) {
+			return '';
+		}
+		$tz    = wp_timezone();
+		$start = DateTime::createFromFormat( 'Y-m-d', $start_raw, $tz );
+		if ( ! $start ) {
+			return $start_raw;
+		}
+		if ( $end_raw === '' || $end_raw === $start_raw ) {
+			return $start->format( 'F j, Y' );
+		}
+		$end = DateTime::createFromFormat( 'Y-m-d', $end_raw, $tz );
+		if ( ! $end ) {
+			return $start->format( 'F j, Y' );
+		}
+		if ( $start->format( 'Y' ) === $end->format( 'Y' ) ) {
+			if ( $start->format( 'm' ) === $end->format( 'm' ) ) {
+				// Same month and year: August 19-20, 2026
+				return $start->format( 'F' ) . ' ' . $start->format( 'j' ) . '-' . $end->format( 'j' ) . ', ' . $start->format( 'Y' );
+			}
+			// Different month, same year: July 31 - August 1, 2026
+			return $start->format( 'F j' ) . ' - ' . $end->format( 'F j' ) . ', ' . $start->format( 'Y' );
+		}
+		// Different years (rare): July 31, 2026 - January 2, 2027
+		return $start->format( 'F j, Y' ) . ' - ' . $end->format( 'F j, Y' );
 	}
 }

@@ -195,166 +195,186 @@ class Hostlinks_Event_Request_Shortcode {
 		$is_private    = ( $marketer_lc === 'private' );
 		$is_non_person = in_array( $marketer_lc, $non_person, true );
 
-		$L   = array();
-		$sep = '----';
+		// ── HTML helpers ──────────────────────────────────────────────────────
+		$esc = function( $s ) {
+			return htmlspecialchars( (string) $s, ENT_QUOTES, 'UTF-8' );
+		};
+		$shdr = function( $label ) {
+			return '<p style="margin:20px 0 2px 0;"><strong><u>' . $label . '</u></strong></p>';
+		};
+
+		$html = '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.8;color:#222;">' . "\n";
 
 		// ── Intro line ───────────────────────────────────────────────────────
 		if ( $marketer_raw !== '' && ! $is_private ) {
 			$possessive = $is_non_person ? $marketer_raw . '.' : $marketer_raw . "'s.";
-			$L[] = 'This class will be ' . $possessive;
-			$L[] = '';
+			$html .= '<p>This class will be ' . $esc( $possessive ) . '</p>' . "\n";
 		}
 
 		// ── Event type + date blocks ──────────────────────────────────────────
 		foreach ( $records as $data ) {
+			$html .= '<p>';
 			if ( ! empty( $data['category'] ) ) {
-				$L[] = $data['category'];
+				$html .= $esc( $data['category'] ) . '<br>';
 			}
 			$dr = self::_format_date_range( $data['start_date'] ?? '', $data['end_date'] ?? '' );
 			if ( $dr ) {
-				$L[] = $dr;
+				$html .= $esc( $dr ) . '<br>';
 			}
 			if ( ( $data['format'] ?? '' ) === 'virtual' ) {
-				$L[] = 'Virtual (Zoom)';
+				$html .= 'Virtual (Zoom)';
 				if ( ! empty( $data['timezone'] ) ) {
-					$L[] = $data['timezone'];
+					$html .= '<br>' . $esc( $data['timezone'] );
 				}
+				$html .= '<br>';
 			}
 			if ( ! empty( $data['trainer'] ) ) {
-				$L[] = 'Trainer: ' . $data['trainer'];
+				$html .= 'Trainer: ' . $esc( $data['trainer'] ) . '<br>';
 			}
-			$L[] = '';
+			$html .= '</p>' . "\n";
 		}
 
-		// ── Venue ────────────────────────────────────────────────────────────
-		$displayed_as = trim( $first['displayed_as'] ?? '' );
-		$host_name    = trim( $first['host_name']    ?? '' );
-		$venue_label  = $displayed_as ?: $host_name;
+		// ── HOST INFO ─────────────────────────────────────────────────────────
+		$displayed_as  = trim( $first['displayed_as']  ?? '' );
+		$host_name     = trim( $first['host_name']     ?? '' );
+		$location_name = trim( $first['location_name'] ?? '' );
+		$addr_parts    = array_filter( array(
+			$first['street_address_1'] ?? '',
+			$first['street_address_2'] ?? '',
+			$first['street_address_3'] ?? '',
+		) );
+		$city_raw  = trim( $first['city']     ?? '' );
+		$state_raw = trim( $first['state']    ?? '' );
+		$zip_raw   = trim( $first['zip_code'] ?? '' );
+		$csz       = $city_raw
+			. ( $state_raw ? ' ' . $state_raw : '' )
+			. ( $zip_raw   ? '   ' . $zip_raw : '' );
 
-		if ( $venue_label ) {
-			$L[] = $sep;
-			$L[] = '';
-			$L[] = $venue_label;
-			if ( ! empty( $first['location_name'] ) ) {
-				$L[] = $first['location_name'];
+		$has_venue = $displayed_as || $host_name || $location_name || $addr_parts || $csz;
+		if ( $has_venue ) {
+			$html .= $shdr( 'HOST INFO' );
+			$html .= '<p>';
+			if ( $displayed_as ) {
+				$html .= $esc( $displayed_as ) . '<br>';
 			}
-			foreach ( array_filter( array(
-				$first['street_address_1'] ?? '',
-				$first['street_address_2'] ?? '',
-				$first['street_address_3'] ?? '',
-			) ) as $addr_line ) {
-				$L[] = $addr_line;
+			if ( $host_name && $host_name !== $displayed_as ) {
+				$html .= $esc( $host_name ) . '<br>';
 			}
-			$city_raw  = trim( $first['city']     ?? '' );
-			$state_raw = trim( $first['state']    ?? '' );
-			$zip_raw   = trim( $first['zip_code'] ?? '' );
-			$csz       = $city_raw
-				. ( $state_raw ? ' ' . $state_raw : '' )
-				. ( $zip_raw   ? '   ' . $zip_raw : '' );
+			if ( $location_name ) {
+				$html .= $esc( $location_name ) . '<br>';
+			}
+			foreach ( $addr_parts as $addr_line ) {
+				$html .= $esc( $addr_line ) . '<br>';
+			}
 			if ( $csz ) {
-				$L[] = $csz;
+				$html .= $esc( $csz );
 			}
-			$L[] = '';
+			$html .= '</p>' . "\n";
 		}
 
-		// ── Host contacts ─────────────────────────────────────────────────────
+		// ── HOST CONTACTS ─────────────────────────────────────────────────────
 		$contacts_json = $first['host_contacts'] ?? '[]';
 		$contacts      = is_array( $contacts_json )
 			? $contacts_json
 			: ( json_decode( $contacts_json, true ) ?: array() );
 
-		foreach ( $contacts as $c ) {
-			if ( ! empty( $c['name'] ) )   { $L[] = $c['name']; }
-			if ( ! empty( $c['agency'] ) ) { $L[] = $c['agency']; }
-			if ( ! empty( $c['title'] ) )  { $L[] = $c['title']; }
-			if ( ! empty( $c['email'] ) )  { $L[] = $c['email']; }
-			if ( ! empty( $c['phone'] ) ) {
-				$L[] = $c['phone'] . ( ! empty( $c['dnl_phone'] ) ? ' [Do Not List]' : '' );
+		if ( ! empty( $contacts ) ) {
+			$html .= $shdr( 'HOST CONTACTS' );
+			foreach ( $contacts as $c ) {
+				$html .= '<p>';
+				if ( ! empty( $c['name'] ) )   { $html .= $esc( $c['name'] )   . '<br>'; }
+				if ( ! empty( $c['agency'] ) ) { $html .= $esc( $c['agency'] ) . '<br>'; }
+				if ( ! empty( $c['title'] ) )  { $html .= $esc( $c['title'] )  . '<br>'; }
+				if ( ! empty( $c['email'] ) )  { $html .= $esc( $c['email'] )  . '<br>'; }
+				if ( ! empty( $c['phone'] ) ) {
+					$html .= $esc( $c['phone'] ) . ( ! empty( $c['dnl_phone'] ) ? ' [Do Not List]' : '' ) . '<br>';
+				}
+				if ( ! empty( $c['phone2'] ) ) {
+					$html .= $esc( $c['phone2'] ) . ( ! empty( $c['dnl_phone2'] ) ? ' [Do Not List]' : '' ) . '<br>';
+				}
+				$html .= '</p>' . "\n";
 			}
-			if ( ! empty( $c['phone2'] ) ) {
-				$L[] = $c['phone2'] . ( ! empty( $c['dnl_phone2'] ) ? ' [Do Not List]' : '' );
-			}
-			$L[] = '';
 		}
 
-		// ── Hotels ───────────────────────────────────────────────────────────
+		// ── HOTELS ───────────────────────────────────────────────────────────
 		$hotels_json = $first['hotels'] ?? '[]';
 		$hotels      = is_array( $hotels_json )
 			? $hotels_json
 			: ( json_decode( $hotels_json, true ) ?: array() );
 
-		foreach ( $hotels as $h ) {
-			if ( ! empty( $h['name'] ) )    { $L[] = $h['name']; }
-			if ( ! empty( $h['address'] ) ) { $L[] = $h['address']; }
-			if ( ! empty( $h['phone'] ) )   { $L[] = $h['phone']; }
-			if ( ! empty( $h['url'] ) )     { $L[] = $h['url']; }
-			$L[] = '';
+		if ( ! empty( $hotels ) ) {
+			$html .= $shdr( 'HOTELS' );
+			foreach ( $hotels as $hotel ) {
+				$html .= '<p>';
+				if ( ! empty( $hotel['name'] ) )    { $html .= $esc( $hotel['name'] )    . '<br>'; }
+				if ( ! empty( $hotel['address'] ) ) { $html .= $esc( $hotel['address'] ) . '<br>'; }
+				if ( ! empty( $hotel['phone'] ) )   { $html .= $esc( $hotel['phone'] )   . '<br>'; }
+				if ( ! empty( $hotel['url'] ) )     { $html .= $esc( $hotel['url'] )     . '<br>'; }
+				$html .= '</p>' . "\n";
+			}
 		}
 
-		// ── Shipping / Att: ───────────────────────────────────────────────────
+		// ── SHIPPING INFO ─────────────────────────────────────────────────────
 		$has_shipping = ! empty( $first['ship_name'] )
 			|| ! empty( $first['ship_address_1'] )
 			|| ! empty( $first['ship_email'] );
 
 		if ( $has_shipping ) {
+			$html .= $shdr( 'SHIPPING INFO' );
+			$html .= '<p>';
 			if ( ! empty( $first['ship_name'] ) ) {
-				$L[] = 'Att: ' . $first['ship_name'];
+				$html .= 'Att: ' . $esc( $first['ship_name'] ) . '<br>';
 			}
 			foreach ( array_filter( array(
 				$first['ship_address_1'] ?? '',
 				$first['ship_address_2'] ?? '',
 				$first['ship_address_3'] ?? '',
 			) ) as $sa ) {
-				$L[] = $sa;
+				$html .= $esc( $sa ) . '<br>';
 			}
 			$ship_csz = trim(
 				( $first['ship_city']  ?? '' )
 				. ( ! empty( $first['ship_state'] ) ? ' ' . $first['ship_state'] : '' )
 				. ( ! empty( $first['ship_zip'] )   ? '   ' . $first['ship_zip'] : '' )
 			);
-			if ( $ship_csz ) {
-				$L[] = $ship_csz;
-			}
-			if ( ! empty( $first['ship_phone'] ) ) { $L[] = $first['ship_phone']; }
-			if ( ! empty( $first['ship_email'] ) ) { $L[] = $first['ship_email']; }
+			if ( $ship_csz ) { $html .= $esc( $ship_csz ) . '<br>'; }
+			if ( ! empty( $first['ship_phone'] ) ) { $html .= $esc( $first['ship_phone'] ) . '<br>'; }
+			if ( ! empty( $first['ship_email'] ) ) { $html .= $esc( $first['ship_email'] ) . '<br>'; }
 			if ( isset( $first['ship_workbooks'] ) && $first['ship_workbooks'] !== null && $first['ship_workbooks'] !== '' ) {
-				$L[] = 'Workbooks: ' . $first['ship_workbooks'];
+				$html .= 'Workbooks: ' . $esc( $first['ship_workbooks'] ) . '<br>';
 			}
-			if ( ! empty( $first['ship_notes'] ) ) { $L[] = $first['ship_notes']; }
-			$L[] = '';
+			if ( ! empty( $first['ship_notes'] ) ) { $html .= $esc( $first['ship_notes'] ) . '<br>'; }
+			$html .= '</p>' . "\n";
 		}
 
-		// ── Additional details ────────────────────────────────────────────────
+		// ── SPECIAL INSTRUCTION ───────────────────────────────────────────────
 		$has_additional = ! empty( $first['max_attendees'] )
 			|| ! empty( $first['special_instructions'] )
 			|| ! empty( $first['custom_email_intro'] )
 			|| ! empty( $first['parking_file_url'] );
 
 		if ( $has_additional ) {
-			$L[] = $sep;
-			$L[] = '';
+			$html .= $shdr( 'SPECIAL INSTRUCTION' );
+			$html .= '<p>';
 			if ( ! empty( $first['max_attendees'] ) ) {
-				$L[] = 'Max Attendees: ' . $first['max_attendees'];
+				$html .= 'Max Attendees: ' . $esc( $first['max_attendees'] ) . '<br>';
 			}
 			if ( ! empty( $first['custom_email_intro'] ) ) {
-				foreach ( explode( "\n", $first['custom_email_intro'] ) as $ce_line ) {
-					$L[] = $ce_line;
-				}
+				$html .= nl2br( $esc( $first['custom_email_intro'] ) ) . '<br>';
 			}
 			if ( ! empty( $first['special_instructions'] ) ) {
-				$L[] = 'Special Instructions:';
-				foreach ( explode( "\n", $first['special_instructions'] ) as $si_line ) {
-					$L[] = $si_line;
-				}
+				$html .= nl2br( $esc( $first['special_instructions'] ) ) . '<br>';
 			}
 			if ( ! empty( $first['parking_file_url'] ) ) {
-				$L[] = 'Parking / Directions: ' . $first['parking_file_url'];
+				$html .= 'Parking / Directions: ' . $esc( $first['parking_file_url'] ) . '<br>';
 			}
-			$L[] = '';
+			$html .= '</p>' . "\n";
 		}
 
+		$html .= '</div>';
+
 		// ── Cc: header ───────────────────────────────────────────────────────
-		$headers     = array();
+		$headers     = array( 'Content-Type: text/html; charset=UTF-8' );
 		$cc_list     = array();
 		$cc_raw_json = $first['cc_emails'] ?? '';
 		if ( is_string( $cc_raw_json ) && $cc_raw_json !== '' ) {
@@ -372,7 +392,7 @@ class Hostlinks_Event_Request_Shortcode {
 			$headers[] = 'Cc: ' . implode( ', ', $cc_list );
 		}
 
-		wp_mail( $to, $subject, implode( "\n", $L ), $headers );
+		wp_mail( $to, $subject, $html, $headers );
 	}
 
 	/**

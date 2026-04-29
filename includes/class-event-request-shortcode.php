@@ -166,26 +166,7 @@ class Hostlinks_Event_Request_Shortcode {
 			$state = trim( $first['state'] ?? '' );
 			$loc   = $city . ( $state ? ', ' . $state : '' );
 
-			$date_str = self::_format_date_range(
-				$first['start_date'] ?? '',
-				$first['end_date']   ?? ''
-			);
-
-			// Resolve type abbreviation from the DB; fall back to category name.
-			global $wpdb;
-			$category = trim( $first['category'] ?? '' );
-			$abbr     = '';
-			if ( $category ) {
-				$abbr = (string) $wpdb->get_var( $wpdb->prepare(
-					"SELECT event_type_abbr FROM {$wpdb->prefix}event_type WHERE event_type_name = %s LIMIT 1",
-					$category
-				) );
-			}
-			if ( $abbr === '' ) {
-				$abbr = $category;
-			}
-
-			$subject = 'New Workshop in: ' . $loc . ', ' . $date_str . ' ' . $abbr;
+			$subject = 'New Event Build Request: ' . $loc;
 		}
 
 		// ── Smart possessive for marketer ─────────────────────────────────────
@@ -211,11 +192,20 @@ class Hostlinks_Event_Request_Shortcode {
 			$html .= '<p>This class will be ' . $esc( $possessive ) . '</p>' . "\n";
 		}
 
+		// Maps short category names to full workshop display names.
+		$type_display = array(
+			'management' => 'Grant Management Workshop',
+			'writing'    => 'Grant Writing Workshop',
+			'subaward'   => 'Subaward Workshop',
+		);
+
 		// ── Event type + date blocks ──────────────────────────────────────────
 		foreach ( $records as $data ) {
 			$html .= '<p>';
 			if ( ! empty( $data['category'] ) ) {
-				$html .= $esc( $data['category'] ) . '<br>';
+				$cat_key      = strtolower( trim( $data['category'] ) );
+				$cat_label    = $type_display[ $cat_key ] ?? $data['category'];
+				$html .= $esc( $cat_label ) . '<br>';
 			}
 			$dr = self::_format_date_range( $data['start_date'] ?? '', $data['end_date'] ?? '' );
 			if ( $dr ) {
@@ -250,15 +240,13 @@ class Hostlinks_Event_Request_Shortcode {
 			. ( $state_raw ? ' ' . $state_raw : '' )
 			. ( $zip_raw   ? '   ' . $zip_raw : '' );
 
-		$has_venue = $displayed_as || $host_name || $location_name || $addr_parts || $csz;
+		$venue_label = $displayed_as ?: $host_name;
+		$has_venue   = $venue_label || $location_name || $addr_parts || $csz;
 		if ( $has_venue ) {
 			$html .= $shdr( 'HOST INFO' );
 			$html .= '<p>';
-			if ( $displayed_as ) {
-				$html .= $esc( $displayed_as ) . '<br>';
-			}
-			if ( $host_name && $host_name !== $displayed_as ) {
-				$html .= $esc( $host_name ) . '<br>';
+			if ( $venue_label ) {
+				$html .= $esc( $venue_label ) . '<br>';
 			}
 			if ( $location_name ) {
 				$html .= $esc( $location_name ) . '<br>';

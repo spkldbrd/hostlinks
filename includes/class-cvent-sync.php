@@ -637,6 +637,19 @@ class Hostlinks_CVENT_Sync {
 			$update_format,
 			array( '%d' )
 		);
+
+		// Append a snapshot to the sync log so we can compute average daily
+		// registrations over time. One row per sync per event.
+		$wpdb->insert(
+			$wpdb->prefix . 'hostlinks_cvent_sync_log',
+			array(
+				'eve_id'    => $eve_id,
+				'synced_at' => current_time( 'mysql' ),
+				'paid'      => $paid,
+				'free'      => $free,
+			),
+			array( '%d', '%s', '%d', '%d' )
+		);
 	}
 
 		$msg = $dry_run

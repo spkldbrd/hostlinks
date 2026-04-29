@@ -148,6 +148,13 @@ $all_pending_bookings = $wpdb->get_results(
 	ARRAY_A
 );
 $tot1 = count( $all_pending_bookings );
+
+// Pre-fetch average daily registration rates for all displayed events in one query.
+$_hl_avg_regs = array();
+if ( $tot1 > 0 ) {
+	$_hl_eve_ids  = array_map( fn( $r ) => (int) $r['eve_id'], $all_pending_bookings );
+	$_hl_avg_regs = Hostlinks_DB::get_avg_daily_regs_bulk( $_hl_eve_ids );
+}
 ?>
 <div id="wpbody">
 <?php echo $sucessmsgnew; ?>
@@ -226,7 +233,7 @@ $tot1 = count( $all_pending_bookings );
           <tr>
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
             <th style="width:40px;"></th>
-            <th>Location</th><th>Paid</th><th>Free</th><th style="width:90px;">Date</th>
+            <th>Location</th><th>Paid</th><th>Free</th><th style="width:52px;" title="Average daily registrations tracked since first CVENT sync">Avg/day</th><th style="width:90px;">Date</th>
             <th style="width:60px;">Type</th><th>Zoom</th><th>Marketer</th>
             <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th>
           </tr>
@@ -254,6 +261,10 @@ $tot1 = count( $all_pending_bookings );
               <input type="number" value="<?php echo esc_attr( $alldriver['eve_paid'] ?? '' ); ?>" name="eve_paid[]" required style="width:50px;"></td>
             <td><p class="hidder"><?php echo esc_html( $alldriver['eve_free'] ?? '' ); ?></p>
               <input type="number" value="<?php echo esc_attr( $alldriver['eve_free'] ?? '' ); ?>" name="eve_free[]" required style="width:50px;"></td>
+            <td style="text-align:center;font-size:12px;color:#555;" title="Avg daily registrations since first CVENT sync"><?php
+              $_avg = $_hl_avg_regs[ (int) $alldriver['eve_id'] ] ?? null;
+              echo $_avg !== null ? esc_html( number_format( $_avg, 1 ) ) : '<span style="color:#bbb;">—</span>';
+            ?></td>
             <td>
               <p class="hidder"><?php echo esc_html( $alldriver['eve_start'] ?? '' ); ?></p>
               <?php
@@ -379,12 +390,12 @@ jQuery(function() {
 <script type="text/javascript">
 jQuery(document).ready(function(){
   jQuery('#myTable').dataTable({
-    "aoColumns": [null,null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null,null,null,null],
-    "order": [[5,"asc"]],
+    "aoColumns": [null,null,null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null,null,null,null],
+    "order": [[6,"asc"]],
     "bPaginate": true, "bLengthChange": true, "bFilter": true, "bSort": true,
     "bInfo": true, "bAutoWidth": true, "stateSave": true, "searching": true,
     "dom": 'lfrtip', "pageLength": 25, "lengthChange": true,
-    "columnDefs": [{"targets":[0,1,3,4,6,7,8,9,10,11,12,13,14,15,16],"orderable":false}],
+    "columnDefs": [{"targets":[0,1,3,4,5,7,8,9,10,11,12,13,14,15,16,17],"orderable":false}],
     // Keep sort/pagination state persisted across loads, but always start
     // with an empty search box. Clears both the saved value and any
     // per-column search state before DataTables applies it on init.

@@ -107,6 +107,12 @@ class Hostlinks_DB {
 		}
 	}
 
+	// v2.5 — create hostlinks_cvent_sync_log for per-sync registration snapshots.
+	// dbDelta handles CREATE TABLE idempotently, so no SHOW TABLES guard needed.
+	if ( version_compare( $installed, '2.5', '<' ) ) {
+		self::create_tables();
+	}
+
 	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
 	if ( version_compare( $installed, '2.1', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'event_details_list';
@@ -315,6 +321,19 @@ class Hostlinks_DB {
 		) $charset_collate;";
 		dbDelta( $sql );
 
+		// CVENT sync log — one row per sync per event for registration rate tracking.
+		$sql = "CREATE TABLE {$wpdb->prefix}hostlinks_cvent_sync_log (
+			id bigint(20) NOT NULL AUTO_INCREMENT,
+			eve_id bigint(20) NOT NULL,
+			synced_at datetime NOT NULL,
+			paid int(11) NOT NULL DEFAULT 0,
+			free int(11) NOT NULL DEFAULT 0,
+			PRIMARY KEY  (id),
+			KEY eve_id (eve_id),
+			KEY synced_at (synced_at)
+		) $charset_collate;";
+		dbDelta( $sql );
+
 		// Event request intake table — stores pending requests separately from live events.
 		$sql = "CREATE TABLE {$wpdb->prefix}hostlinks_event_requests (
 			id bigint(20) NOT NULL AUTO_INCREMENT,
@@ -366,5 +385,75 @@ class Hostlinks_DB {
 			PRIMARY KEY  (id)
 		) $charset_collate;";
 		dbDelta( $sql );
+	}
+
+	/**
+	 * Return average daily registrations (paid + free) for multiple events.
+	 *
+	 * Computes (latest_total - first_total) / days_tracked for each event.
+	 * Returns null for events with fewer than 2 sync snapshots or less than
+	 * 1 full day of history.
+	 *
+	 * @param int[] $eve_ids
+	 * @return array<int, float|null>  Map of eve_id => avg_daily (or null).
+	 */
+	public static function get_avg_daily_regs_bulk( array $eve_ids ): array {
+		if ( empty( $eve_ids ) ) {
+			return array();
+		}
+		global $wpdb;
+		$tbl          = $wpdb->prefix . 'hostlinks_cvent_sync_log';
+		$placeholders = implode( ',', array_fill( 0, count( $eve_ids ), '%d' ) );
+
+		// Fetch all snapshots for the requested events, oldest-first.
+		// Deliberately lean: only the three columns we need.
+		$rows = $wpdb->get_results(
+			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$wpdb->prepare(
+				"SELECT eve_id, synced_at, paid + free AS total
+				 FROM `{$tbl}`
+				 WHERE eve_id IN ($placeholders)
+				 ORDER BY eve_id ASC, synced_at ASC",
+				...$eve_ids
+			),
+			ARRAY_A
+		);
+
+		// Group rows by event id and track first/last snapshot in PHP.
+		$by_event = array();
+		foreach ( $rows as $row ) {
+			$eid = (int) $row['eve_id'];
+			if ( ! isset( $by_event[ $eid ] ) ) {
+				$by_event[ $eid ] = array( 'first' => $row, 'last' => $row );
+			} else {
+				$by_event[ $eid ]['last'] = $row; // rows are ASC, so last = newest
+			}
+		}
+
+		$tz     = wp_timezone();
+		$result = array();
+		foreach ( $by_event as $eid => $data ) {
+			$first = $data['first'];
+			$last  = $data['last'];
+
+			if ( $first['synced_at'] === $last['synced_at'] ) {
+				$result[ $eid ] = null; // only one snapshot
+				continue;
+			}
+
+			$dt1  = new DateTime( $first['synced_at'], $tz );
+			$dt2  = new DateTime( $last['synced_at'], $tz );
+			$days = (int) $dt1->diff( $dt2 )->days;
+
+			if ( $days < 1 ) {
+				$result[ $eid ] = null; // less than a full day
+				continue;
+			}
+
+			$regs_added     = max( 0, (int) $last['total'] - (int) $first['total'] );
+			$result[ $eid ] = round( $regs_added / $days, 1 );
+		}
+
+		return $result;
 	}
 }

@@ -306,8 +306,10 @@ class Hostlinks_CVENT_Sync {
 				return $r;
 			}
 
-			return self::result( $eve_id, 'matched', sprintf( 'Auto-matched to "%s" (score %d). Run sync again to update counts.', $best['title'] ?? '', $score ), null, null, $best['title'] ?? '', $stored_id, $score, hl_paid: $hl_paid, hl_free: $hl_free );
-		}
+		// Match confirmed — proceed immediately to fetch counts rather than
+		// asking the user to click Sync a second time.
+		return self::do_count_sync( $eve_id, $stored_id, $row, $dry_run, $cvent_reg_url );
+	}
 
 		// ── Step 3: fetch attendees and count PAID/FREE ───────────────────────
 		return self::do_count_sync( $eve_id, $stored_id, $row, $dry_run, $cvent_reg_url );

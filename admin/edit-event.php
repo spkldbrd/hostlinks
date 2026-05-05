@@ -305,6 +305,11 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 		}
 	}
 
+	// Bust Marketing Ops public REST cache so the front-end sees fresh data immediately.
+	if ( class_exists( 'HMO_REST', false ) && is_callable( array( 'HMO_REST', 'flush_public_events_cache' ) ) ) {
+		HMO_REST::flush_public_events_cache();
+	}
+
 	wp_safe_redirect( admin_url( 'admin.php?page=booking-menu&edit_event=' . $new_eve_id . '&saved=1' ) );
 	exit;
 }
@@ -444,6 +449,10 @@ if ( $mode === 'edit' && isset( $_POST['hl_edit_full_event'] ) ) {
 	);
 
 	$wpdb->update( $table, $update_data, array( 'eve_id' => $eve_id ) );
+	// Bust Marketing Ops public REST cache so the front-end sees fresh data immediately.
+	if ( class_exists( 'HMO_REST', false ) && is_callable( array( 'HMO_REST', 'flush_public_events_cache' ) ) ) {
+		HMO_REST::flush_public_events_cache();
+	}
 	$notice = '<div class="notice notice-success is-dismissible"><p>Event updated successfully.</p></div>';
 }
 

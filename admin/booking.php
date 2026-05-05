@@ -114,6 +114,10 @@ if ( isset( $_POST['deleteentire'] ) ) {
 				}
 			}
 			update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
+			// Bust Marketing Ops public REST cache so the front-end sees fresh data immediately.
+			if ( class_exists( 'HMO_REST', false ) && is_callable( array( 'HMO_REST', 'flush_public_events_cache' ) ) ) {
+				HMO_REST::flush_public_events_cache();
+			}
 			$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) successfully updated.</p></div>';
 		}
 	}

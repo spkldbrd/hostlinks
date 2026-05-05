@@ -612,6 +612,38 @@ foreach ( $all_marketers as $m ) {
 	if ( (int) $m['id'] === (int) $ev['eve_marketer'] ) { $marketer_name = $m['name']; break; }
 }
 
+// If the assigned marketer or instructor is not in the active list (i.e. it has
+// been archived), fetch its record so we can render it as a selectable "(archived)"
+// option. This prevents the dropdown from falling back to the blank "— select —"
+// option and blocking form submission via HTML5 `required` validation.
+$_active_mktr_ids    = array_column( $all_marketers,  'id' );
+$_active_inst_ids    = array_column( $all_instructors, 'id' );
+$archived_marketer   = null;
+$archived_instructor = null;
+
+if ( (int) $ev['eve_marketer'] > 0 && ! in_array( (string) $ev['eve_marketer'], $_active_mktr_ids ) ) {
+	$archived_marketer = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT event_marketer_id AS id, event_marketer_name AS name FROM {$wpdb->prefix}event_marketer WHERE event_marketer_id = %d",
+			(int) $ev['eve_marketer']
+		),
+		ARRAY_A
+	);
+	if ( $archived_marketer ) {
+		$marketer_name = $archived_marketer['name']; // keep header in sync
+	}
+}
+
+if ( (int) $ev['eve_instructor'] > 0 && ! in_array( (string) $ev['eve_instructor'], $_active_inst_ids ) ) {
+	$archived_instructor = $wpdb->get_row(
+		$wpdb->prepare(
+			"SELECT event_instructor_id AS id, event_instructor_name AS name FROM {$wpdb->prefix}event_instructor WHERE event_instructor_id = %d",
+			(int) $ev['eve_instructor']
+		),
+		ARRAY_A
+	);
+}
+
 // Parse JSON blobs
 $ev_contacts = array();
 if ( ! empty( $ev['host_contacts'] ) ) {
@@ -805,27 +837,37 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 			<tr>
 				<th style="padding:8px 12px;">Marketer</th>
 				<td style="padding:8px 12px;">
-					<select name="eve_marketer" required>
-						<option value="">— select —</option>
-						<?php foreach ( $all_marketers as $m ) : ?>
-						<option value="<?php echo (int) $m['id']; ?>" <?php selected( (int) $ev['eve_marketer'], (int) $m['id'] ); ?>>
-							<?php echo esc_html( $m['name'] ); ?>
-						</option>
-						<?php endforeach; ?>
-					</select>
+				<select name="eve_marketer" required>
+					<option value="">— select —</option>
+					<?php foreach ( $all_marketers as $m ) : ?>
+					<option value="<?php echo (int) $m['id']; ?>" <?php selected( (int) $ev['eve_marketer'], (int) $m['id'] ); ?>>
+						<?php echo esc_html( $m['name'] ); ?>
+					</option>
+					<?php endforeach; ?>
+					<?php if ( $archived_marketer ) : ?>
+					<option value="<?php echo (int) $archived_marketer['id']; ?>" selected style="color:#999;font-style:italic;">
+						<?php echo esc_html( $archived_marketer['name'] ); ?> (archived)
+					</option>
+					<?php endif; ?>
+				</select>
 				</td>
 			</tr>
 			<tr>
 				<th style="padding:8px 12px;">Instructor</th>
 				<td style="padding:8px 12px;">
-					<select name="eve_instructor">
-						<option value="0">— select —</option>
-						<?php foreach ( $all_instructors as $i ) : ?>
-						<option value="<?php echo (int) $i['id']; ?>" <?php selected( (int) $ev['eve_instructor'], (int) $i['id'] ); ?>>
-							<?php echo esc_html( $i['name'] ); ?>
-						</option>
-						<?php endforeach; ?>
-					</select>
+				<select name="eve_instructor">
+					<option value="0">— select —</option>
+					<?php foreach ( $all_instructors as $i ) : ?>
+					<option value="<?php echo (int) $i['id']; ?>" <?php selected( (int) $ev['eve_instructor'], (int) $i['id'] ); ?>>
+						<?php echo esc_html( $i['name'] ); ?>
+					</option>
+					<?php endforeach; ?>
+					<?php if ( $archived_instructor ) : ?>
+					<option value="<?php echo (int) $archived_instructor['id']; ?>" selected style="color:#999;font-style:italic;">
+						<?php echo esc_html( $archived_instructor['name'] ); ?> (archived)
+					</option>
+					<?php endif; ?>
+				</select>
 				</td>
 			</tr>
 			<tr>

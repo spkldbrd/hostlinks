@@ -128,6 +128,11 @@ $all_pending_toter   = $wpdb->get_results( "SELECT * FROM $table12 WHERE `event_
 $all_pending_toterx  = $wpdb->get_results( "SELECT * FROM $table13 WHERE `event_marketer_status` = '1'", ARRAY_A );
 $all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_instructor_status` = '1'", ARRAY_A );
 
+// Pre-index active IDs as plain string arrays so the per-row archived-option
+// check is a single in_array() call rather than a nested loop.
+$_active_mktr_ids = array_column( $all_pending_toterx,  'event_marketer_id' );
+$_active_inst_ids = array_column( $all_pending_toterxx, 'event_instructor_id' );
+
 // ── Single JOIN query — eliminates N+1 per-row lookups ───────────────────
 // NOTE: we deliberately DO NOT reference t.event_type_abbr here. That column
 // arrived in DB v2.4, and if the migration has not yet run on a given site
@@ -307,6 +312,9 @@ if ( $tot1 > 0 ) {
                 <?php foreach ( $all_pending_toterx as $alldriverx2 ) { ?>
                   <option value="<?php echo esc_attr( $alldriverx2['event_marketer_id'] ); ?>" <?php if ( $alldriver['eve_marketer'] == $alldriverx2['event_marketer_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx2['event_marketer_name'] ); ?></option>
                 <?php } ?>
+                <?php if ( $alldriver['eve_marketer'] && ! in_array( (string) $alldriver['eve_marketer'], $_active_mktr_ids ) && ! empty( $alldriver['event_marketer_name'] ) ) { ?>
+                  <option value="<?php echo esc_attr( $alldriver['eve_marketer'] ); ?>" selected style="color:#999;font-style:italic;"><?php echo esc_html( $alldriver['event_marketer_name'] ); ?> (archived)</option>
+                <?php } ?>
               </select>
               <p class="hidder"><?php echo esc_html( $alldriver['event_marketer_name'] ?? '' ); ?></p>
             </td>
@@ -322,6 +330,9 @@ if ( $tot1 > 0 ) {
                 <option value="">Please Choose</option>
                 <?php foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
                   <option value="<?php echo esc_attr( $alldriverx3['event_instructor_id'] ); ?>" <?php if ( $alldriver['eve_instructor'] == $alldriverx3['event_instructor_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx3['event_instructor_name'] ); ?></option>
+                <?php } ?>
+                <?php if ( $alldriver['eve_instructor'] && ! in_array( (string) $alldriver['eve_instructor'], $_active_inst_ids ) && ! empty( $alldriver['event_instructor_name'] ) ) { ?>
+                  <option value="<?php echo esc_attr( $alldriver['eve_instructor'] ); ?>" selected style="color:#999;font-style:italic;"><?php echo esc_html( $alldriver['event_instructor_name'] ); ?> (archived)</option>
                 <?php } ?>
               </select>
               <p class="hidder"><?php echo esc_html( $alldriver['event_instructor_name'] ?? '' ); ?></p>

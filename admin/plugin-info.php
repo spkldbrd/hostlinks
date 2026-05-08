@@ -20,13 +20,31 @@ $mktops_installed = Hostlinks_MktOps_Installer::is_installed();
 $mktops_active    = $mktops_installed && Hostlinks_MktOps_Installer::is_active();
 $mktops_version   = $mktops_installed ? Hostlinks_MktOps_Installer::installed_version() : null;
 
-// Install result notice (from redirect after admin-post handler)
+// Certificate Generator companion plugin status
+$cert_installed = Hostlinks_Cert_Installer::is_installed();
+$cert_active    = $cert_installed && Hostlinks_Cert_Installer::is_active();
+$cert_version   = $cert_installed ? Hostlinks_Cert_Installer::installed_version() : null;
+
+// Install result notices (from redirect after admin-post handlers)
 $hl_mktops_result = isset( $_GET['hl_mktops'] ) ? sanitize_key( $_GET['hl_mktops'] ) : '';
+$hl_cert_result   = isset( $_GET['hl_cert'] )   ? sanitize_key( $_GET['hl_cert'] )   : '';
 $install_notices  = array(
-	'installed'        => array( 'success', 'Marketing Ops installed successfully. You can now activate it on the Plugins page.' ),
-	'already_installed'=> array( 'info',    'Marketing Ops is already installed.' ),
+	'installed'        => array( 'success', '' ), // message filled per-plugin below
+	'already_installed'=> array( 'info',    '' ),
 	'github_fail'      => array( 'error',   'Could not reach GitHub to fetch the latest release. Check your server\'s outbound connectivity.' ),
 	'install_fail'     => array( 'error',   'Installation failed. WordPress could not extract or save the plugin files. Check file permissions.' ),
+);
+$mktops_notices = array(
+	'installed'         => array( 'success', 'Marketing Ops installed successfully. You can now activate it on the Plugins page.' ),
+	'already_installed' => array( 'info',    'Marketing Ops is already installed.' ),
+	'github_fail'       => array( 'error',   'Could not reach GitHub to fetch the latest release. Check your server\'s outbound connectivity.' ),
+	'install_fail'      => array( 'error',   'Installation failed. WordPress could not extract or save the plugin files. Check file permissions.' ),
+);
+$cert_notices = array(
+	'installed'         => array( 'success', 'Certificate Generator installed successfully. You can now activate it on the Plugins page.' ),
+	'already_installed' => array( 'info',    'Certificate Generator is already installed.' ),
+	'github_fail'       => array( 'error',   'Could not reach GitHub to fetch the latest release. Check your server\'s outbound connectivity.' ),
+	'install_fail'      => array( 'error',   'Installation failed. WordPress could not extract or save the plugin files. Check file permissions.' ),
 );
 ?>
 <div class="wrap">
@@ -94,14 +112,14 @@ $install_notices  = array(
 	<?php /* ── Companion Plugin: Marketing Ops ─────────────────────────── */ ?>
 	<h2 style="margin-top:2.5rem;">Companion Plugin — Marketing Ops</h2>
 
-	<?php if ( $hl_mktops_result && isset( $install_notices[ $hl_mktops_result ] ) ) :
-		[ $notice_type, $notice_msg ] = $install_notices[ $hl_mktops_result ];
+	<?php if ( $hl_mktops_result && isset( $mktops_notices[ $hl_mktops_result ] ) ) :
+		[ $notice_type, $notice_msg ] = $mktops_notices[ $hl_mktops_result ];
 		$notice_colors = array(
-			'success' => array( 'border:#00a32a;background:#f0f9f0;color:#0a4e22' ),
-			'info'    => array( 'border:#72aee6;background:#f0f5fb;color:#1d3557' ),
-			'error'   => array( 'border:#d63638;background:#fdf0f0;color:#6e2020' ),
+			'success' => 'border:#00a32a;background:#f0f9f0;color:#0a4e22',
+			'info'    => 'border:#72aee6;background:#f0f5fb;color:#1d3557',
+			'error'   => 'border:#d63638;background:#fdf0f0;color:#6e2020',
 		);
-		$notice_style = $notice_colors[ $notice_type ][0] ?? '';
+		$notice_style = $notice_colors[ $notice_type ] ?? '';
 	?>
 	<div style="<?php echo esc_attr( $notice_style ); ?>;border-left:4px solid;padding:10px 16px;margin-bottom:16px;border-radius:2px;">
 		<?php echo esc_html( $notice_msg ); ?>
@@ -154,6 +172,75 @@ $install_notices  = array(
 		   class="button button-primary"
 		   onclick="return confirm('This will download and install the Marketing Ops plugin from GitHub. Continue?');">
 			&#11015; Install Marketing Ops Now
+		</a>
+		&nbsp;
+		<span style="color:#999;font-size:12px;">Downloads the latest release directly from GitHub.</span>
+	</p>
+	<?php endif; ?>
+
+	<?php /* ── Companion Plugin: Certificate Generator ──────────────── */ ?>
+	<h2 style="margin-top:2.5rem;">Companion Plugin — Certificate Generator</h2>
+
+	<?php if ( $hl_cert_result && isset( $cert_notices[ $hl_cert_result ] ) ) :
+		[ $notice_type, $notice_msg ] = $cert_notices[ $hl_cert_result ];
+		$notice_colors = array(
+			'success' => 'border:#00a32a;background:#f0f9f0;color:#0a4e22',
+			'info'    => 'border:#72aee6;background:#f0f5fb;color:#1d3557',
+			'error'   => 'border:#d63638;background:#fdf0f0;color:#6e2020',
+		);
+		$notice_style = $notice_colors[ $notice_type ] ?? '';
+	?>
+	<div style="<?php echo esc_attr( $notice_style ); ?>;border-left:4px solid;padding:10px 16px;margin-bottom:16px;border-radius:2px;">
+		<?php echo esc_html( $notice_msg ); ?>
+	</div>
+	<?php endif; ?>
+
+	<table class="widefat striped" style="max-width:680px;">
+		<tbody>
+			<tr>
+				<th style="width:200px;">Plugin Name</th>
+				<td>Hostlinks Certificate Generator</td>
+			</tr>
+			<tr>
+				<th>Status</th>
+				<td>
+					<?php if ( $cert_active ) : ?>
+						<span style="color:#00a32a;font-weight:600;">&#10003; Active</span>
+						<?php if ( $cert_version ) : ?>
+							&nbsp;<span style="color:#666;">(v<?php echo esc_html( $cert_version ); ?>)</span>
+						<?php endif; ?>
+					<?php elseif ( $cert_installed ) : ?>
+						<span style="color:#996800;font-weight:600;">&#9888; Installed — not activated</span>
+						&nbsp;&nbsp;
+						<a href="<?php echo esc_url( Hostlinks_Cert_Installer::activate_url() ); ?>"
+						   class="button button-small button-primary">Activate</a>
+					<?php else : ?>
+						<span style="color:#999;font-weight:600;">&#10007; Not installed</span>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th>GitHub Repository</th>
+				<td>
+					<?php
+					$cert_repo_url = 'https://github.com/' . Hostlinks_Cert_Installer::GITHUB_USER . '/' . Hostlinks_Cert_Installer::GITHUB_REPO;
+					?>
+					<a href="<?php echo esc_url( $cert_repo_url ); ?>" target="_blank" rel="noopener"><?php echo esc_html( $cert_repo_url ); ?></a>
+				</td>
+			</tr>
+			<tr>
+				<th>Description</th>
+				<td>Generates and emails completion certificates for attendees. Adds the &#x1F393; Certificates button to the Hostlinks calendar toolbar.</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<?php if ( ! $cert_installed ) : ?>
+	<p style="margin-top:14px;">
+		<a href="<?php echo esc_url( Hostlinks_Cert_Installer::install_url() ); ?>"
+		   class="button button-primary"
+		   onclick="return confirm('This will download and install the Certificate Generator plugin from GitHub. Continue?');">
+			&#11015; Install Certificate Generator Now
 		</a>
 		&nbsp;
 		<span style="color:#999;font-size:12px;">Downloads the latest release directly from GitHub.</span>
@@ -264,6 +351,16 @@ $install_notices  = array(
 					Submissions are stored in a separate <em>Event Requests</em> table and reviewed under
 					<strong>Hostlinks → Event Requests</strong> — they are not published immediately.
 					<br><small style="color:#888;">Configure notification email and success message under <strong>Settings → Build Request Form</strong>.</small>
+				</td>
+			</tr>
+			<tr>
+				<td><code>[hostlinks_certificate_generator]</code></td>
+				<td><strong>Certificate Generator</strong></td>
+				<td>
+					Renders the certificate generation hub — requires the <strong>Hostlinks Certificate Generator</strong> companion plugin.
+					Once a page containing this shortcode is published, a &#x1F393; Certificates button automatically appears
+					in the Upcoming Events and Reports nav bars (visibility controlled under <strong>Settings &rarr; Certificates</strong>).
+					<br><small style="color:#888;">Configure the toolbar button visibility under <strong>Hostlinks &rarr; Settings &rarr; Certificates</strong>.</small>
 				</td>
 			</tr>
 		</tbody>

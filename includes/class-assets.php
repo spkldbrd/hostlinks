@@ -37,10 +37,11 @@ class Hostlinks_Assets {
 		$has_calendar      = has_shortcode( $post->post_content, 'eventlisto' ) ||
 		                     has_shortcode( $post->post_content, 'oldeventlisto' );
 		$has_reports       = has_shortcode( $post->post_content, 'hostlinks_reports' );
+		$has_cert_hub      = has_shortcode( $post->post_content, 'hostlinks_certificate_generator' );
 		$has_event_request = has_shortcode( $post->post_content, 'hostlinks_event_request_form' );
 		$has_public_list   = has_shortcode( $post->post_content, 'public_event_list' );
 
-		if ( ! $has_calendar && ! $has_reports && ! $has_event_request && ! $has_public_list ) {
+		if ( ! $has_calendar && ! $has_reports && ! $has_event_request && ! $has_public_list && ! $has_cert_hub ) {
 			return;
 		}
 
@@ -52,7 +53,7 @@ class Hostlinks_Assets {
 				HOSTLINKS_VERSION
 			);
 			// Public list is standalone — no other Hostlinks CSS needed on this page.
-			if ( ! $has_calendar && ! $has_reports && ! $has_event_request ) {
+			if ( ! $has_calendar && ! $has_reports && ! $has_event_request && ! $has_cert_hub ) {
 				return;
 			}
 		}

@@ -52,7 +52,7 @@ $dismissed   = get_option( 'hostlinks_mktops_prompt_dismissed' ) === '1';
 <?php echo $notice; ?>
 
 <h2 style="margin-top:0;">Marketing Ops Integration</h2>
-<p>When enabled, a <strong>&#x1F4CB; Marketing Ops</strong> button appears in the <code>[eventlisto]</code> calendar navigation bar (between Reports and + Event), linking users to your Marketing Hub page.</p>
+<p>When enabled, a <strong>&#x1F4CB; Marketing Ops</strong> button appears in the <code>[eventlisto]</code> calendar navigation bar (after Reports and Certificates), linking users to your Marketing Hub page.</p>
 
 <!-- Detection status -------------------------------------------------------->
 <h3 style="font-size:14px;margin:20px 0 8px;">Marketing Hub Page Detection</h3>
@@ -110,7 +110,7 @@ $dismissed   = get_option( 'hostlinks_mktops_prompt_dismissed' ) === '1';
 					<option value="all"            <?php selected( $btn, 'all' ); ?>>All Hostlinks users</option>
 				</select>
 				<p class="description">
-					Controls who sees the <strong>&#x1F4CB; Marketing Ops</strong> button on the upcoming events calendar. The button only appears when a Marketing Hub page is detected.<br>
+					Controls who sees the <strong>&#x1F4CB; Marketing Ops</strong> button on the upcoming events calendar (after Reports and Certificates). The button only appears when a Marketing Hub page is detected.<br>
 					<em>Admins &amp; Marketing Admins</em> requires the Marketing Ops plugin to be active; Marketing Admins are configured under Marketing Ops → Settings → User Access → Marketing Admins section.
 				</p>
 			</td>

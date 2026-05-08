@@ -33,7 +33,8 @@ if ( isset( $_POST['hostlinks_save_page_urls'] ) ) {
 		$_POST['hl_url_public_event_list']    ?? '',
 		$_POST['hl_url_roster']               ?? '',
 		$_POST['hl_url_event_request_form']   ?? '',
-		$_POST['hl_url_mktops_hub']           ?? ''
+		$_POST['hl_url_mktops_hub']           ?? '',
+		$_POST['hl_url_certificate_hub']      ?? ''
 	);
 	$page_url_notice = '<div class="notice notice-success is-dismissible"><p>Page URLs saved. URL cache cleared.</p></div>';
 }
@@ -61,6 +62,7 @@ $page_labels = array(
 	'roster'             => 'Roster <code>[hostlinks_roster]</code>',
 	'event_request_form' => 'Event Request Form <code>[hostlinks_event_request_form]</code>',
 	'mktops_hub'         => 'Marketing Hub <code>[hmo_dashboard_selector]</code>',
+	'certificate_hub'    => 'Certificate Generator <code>[hostlinks_certificate_generator]</code>',
 );
 ?>
 <?php echo $maps_notice; ?>
@@ -194,6 +196,15 @@ $page_labels = array(
 					value="<?php echo esc_attr( $overrides['mktops_hub'] ?? '' ); ?>"
 					class="regular-text" placeholder="Leave blank to auto-detect" />
 				<p class="description">Page containing <code>[hmo_dashboard_selector]</code> (Hostlinks Marketing Ops). Used for the optional "&#x1F4CB; Marketing Ops" button on the calendar.</p>
+			</td>
+		</tr>
+		<tr>
+			<th scope="row"><label for="hl_url_certificate_hub">Certificate Generator URL override</label></th>
+			<td>
+				<input type="url" id="hl_url_certificate_hub" name="hl_url_certificate_hub"
+					value="<?php echo esc_attr( $overrides['certificate_hub'] ?? '' ); ?>"
+					class="regular-text" placeholder="Leave blank to auto-detect" />
+				<p class="description">Page containing <code>[hostlinks_certificate_generator]</code> (Hostlinks Certificate Generator plugin). Used for the optional toolbar button on the calendar/reports.</p>
 			</td>
 		</tr>
 	</table>

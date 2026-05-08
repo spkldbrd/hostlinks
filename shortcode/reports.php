@@ -6,75 +6,11 @@ $table11 = $wpdb->prefix . 'event_details_list';
 $table13 = $wpdb->prefix . 'event_marketer';
 
 // ── Range filter ──────────────────────────────────────────────────────────────
-$months_options = array(
-	6  => '6 Months',
-	12 => '1 Year',
-	24 => '2 Years',
-	36 => '3 Years',
-	60 => '5 Years',
-);
-
-// Determine active range mode: 'months', 'current_year', or 'custom'.
-$range_mode  = 'months';
-$months_back = 12;
-$date_from   = '';
-$date_to     = '';
-
-if ( isset( $_GET['range'] ) && $_GET['range'] === 'current_year' ) {
-	$range_mode = 'current_year';
-} elseif ( isset( $_GET['range'] ) && $_GET['range'] === 'custom'
-	&& ! empty( $_GET['from'] ) && ! empty( $_GET['to'] ) ) {
-	$range_mode = 'custom';
-	$date_from  = sanitize_text_field( wp_unslash( $_GET['from'] ) );
-	$date_to    = sanitize_text_field( wp_unslash( $_GET['to'] ) );
-	// Validate dates — fall back to 1 year if malformed.
-	if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_from )
-		|| ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_to ) ) {
-		$range_mode = 'months';
-	}
-} elseif ( isset( $_GET['months'] ) && isset( $months_options[ (int) $_GET['months'] ] ) ) {
-	$months_back = (int) $_GET['months'];
-}
-
-// ── Nav URLs ──────────────────────────────────────────────────────────────────
-$upcoming_url    = Hostlinks_Page_URLs::get_upcoming();
-$past_events_url = Hostlinks_Page_URLs::get_past_events();
-$reports_url     = get_permalink();
-
-// Marketing Ops button
-$mktops_btn_mode = get_option( 'hostlinks_mktops_btn', 'disabled' );
-$mktops_url      = ( $mktops_btn_mode !== 'disabled' ) ? Hostlinks_Page_URLs::get_mktops_hub() : '';
-$show_mktops_btn = false;
-if ( $mktops_url ) {
-	if ( $mktops_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
-		$show_mktops_btn = true;
-	} elseif ( $mktops_btn_mode === 'admin_plus_mgr' ) {
-		if ( current_user_can( 'manage_options' ) ) {
-			$show_mktops_btn = true;
-		} elseif ( class_exists( 'HMO_Access_Service' ) && HMO_Access_Service::current_user_is_marketing_admin() ) {
-			$show_mktops_btn = true;
-		}
-	} elseif ( $mktops_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'hostlinks_reports' ) ) {
-		$show_mktops_btn = true;
-	}
-}
-
-// + Event button
-$add_event_btn_mode = get_option( 'hostlinks_add_event_btn', 'disabled' );
-$event_request_url  = ( $add_event_btn_mode !== 'disabled' ) ? Hostlinks_Page_URLs::get_event_request_form() : '';
-$show_add_event_btn = false;
-if ( $event_request_url ) {
-	if ( $add_event_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
-		$show_add_event_btn = true;
-	} elseif ( $add_event_btn_mode === 'custom' ) {
-		$custom_btn_users = get_option( 'hostlinks_add_event_btn_users', array() );
-		if ( current_user_can( 'manage_options' ) || in_array( get_current_user_id(), array_map( 'intval', (array) $custom_btn_users ), true ) ) {
-			$show_add_event_btn = true;
-		}
-	} elseif ( $add_event_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'hostlinks_reports' ) ) {
-		$show_add_event_btn = true;
-	}
-}
+$__range        = Hostlinks_Toolbar::parse_reports_range_from_request();
+$range_mode     = $__range['range_mode'];
+$months_back    = $__range['months_back'];
+$date_from      = $__range['date_from'];
+$date_to        = $__range['date_to'];
 
 // ── Resolve cutoff / end dates from mode ──────────────────────────────────────
 if ( $range_mode === 'current_year' ) {
@@ -223,79 +159,7 @@ $chart_data = array(
 <div class="hostlinks-page">
 <div class="hostlinks-container">
 
-	<div class="hostlinks-actions">
-		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn">Upcoming Events</a>
-		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
-
-		<select id="hl-reports-range" class="hostlinks-year-filter" aria-label="Date range" style="margin-left:auto;">
-			<?php foreach ( $months_options as $val => $lbl ) : ?>
-			<option value="months:<?php echo (int) $val; ?>"
-				<?php selected( $range_mode === 'months' && $months_back === $val ); ?>>
-				<?php echo esc_html( $lbl ); ?>
-			</option>
-			<?php endforeach; ?>
-			<option value="current_year" <?php selected( $range_mode, 'current_year' ); ?>>Current Year</option>
-			<option value="custom"       <?php selected( $range_mode, 'custom' ); ?>>Custom Range…</option>
-		</select>
-
-		<!-- Custom date range inputs — shown only when Custom Range is selected -->
-		<span id="hl-custom-range"
-			style="display:<?php echo $range_mode === 'custom' ? 'inline-flex' : 'none'; ?>;align-items:center;gap:6px;margin-left:6px;">
-			<input type="date" id="hl-from" value="<?php echo esc_attr( $date_from ); ?>"
-				style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:0.85rem;" />
-			<span style="color:#666;">to</span>
-			<input type="date" id="hl-to" value="<?php echo esc_attr( $date_to ); ?>"
-				style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:0.85rem;" />
-			<button id="hl-custom-go"
-				style="padding:4px 10px;background:#0da2e7;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.85rem;">Go</button>
-		</span>
-
-		<a href="<?php echo esc_url( $reports_url ); ?>" class="hostlinks-btn hostlinks-btn--active">&#x1F4CA; Reports</a>
-		<?php if ( $show_mktops_btn ) : ?>
-		<a href="<?php echo esc_url( $mktops_url ); ?>" class="hostlinks-btn hostlinks-btn--mktops">&#x1F4CB; Marketing Ops</a>
-		<?php endif; ?>
-		<?php if ( $show_add_event_btn ) : ?>
-		<a href="<?php echo esc_url( $event_request_url ); ?>" class="hostlinks-btn hostlinks-btn--add-event">&#x2B; Event</a>
-		<?php endif; ?>
-		<script>
-		(function(){
-			var sel      = document.getElementById('hl-reports-range');
-			var custom   = document.getElementById('hl-custom-range');
-			var fromEl   = document.getElementById('hl-from');
-			var toEl     = document.getElementById('hl-to');
-			var goBtn    = document.getElementById('hl-custom-go');
-			var base     = '<?php echo esc_js( $reports_url ); ?>';
-
-			sel.addEventListener('change', function() {
-				var v = this.value;
-				if (v === 'custom') {
-					custom.style.display = 'inline-flex';
-				} else if (v === 'current_year') {
-					custom.style.display = 'none';
-					window.location.href = base + '?range=current_year';
-				} else {
-					custom.style.display = 'none';
-					var months = v.replace('months:', '');
-					window.location.href = base + '?months=' + months;
-				}
-			});
-
-			goBtn.addEventListener('click', function() {
-				var from = fromEl.value;
-				var to   = toEl.value;
-				if (!from || !to) { alert('Please select both a start and end date.'); return; }
-				if (from > to)    { alert('Start date must be before end date.'); return; }
-				window.location.href = base + '?range=custom&from=' + from + '&to=' + to;
-			});
-		})();
-		</script>
-		<?php
-		$_upd_raw     = get_option( 'last_data_updation', '' );
-		$_upd_dt      = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;
-		$last_updated = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->format( 'm/d' );
-		?>
-		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
-	</div>
+	<?php Hostlinks_Toolbar::render_reports_style_actions_bar( 'reports', 'hostlinks_reports' ); ?>
 
 	<?php /* ── Summary stat cards ── */ ?>
 	<div class="hl-stat-row">

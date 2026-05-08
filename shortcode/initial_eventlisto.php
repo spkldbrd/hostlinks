@@ -151,6 +151,23 @@ if ( $mktops_url ) {
 		$show_mktops_btn = true;
 	}
 }
+
+// Certificate Generator toolbar button
+$cert_btn_mode = get_option( 'hostlinks_cert_btn', 'disabled' );
+$cert_url      = ( $cert_btn_mode !== 'disabled' ) ? Hostlinks_Page_URLs::get_certificate_hub() : '';
+$show_cert_btn = false;
+if ( $cert_url ) {
+	if ( $cert_btn_mode === 'admin' && current_user_can( 'manage_options' ) ) {
+		$show_cert_btn = true;
+	} elseif ( $cert_btn_mode === 'custom' ) {
+		$cert_btn_users = get_option( 'hostlinks_cert_btn_users', array() );
+		if ( current_user_can( 'manage_options' ) || in_array( get_current_user_id(), array_map( 'intval', (array) $cert_btn_users ), true ) ) {
+			$show_cert_btn = true;
+		}
+	} elseif ( $cert_btn_mode === 'all' && Hostlinks_Access::can_view_shortcode( 'eventlisto' ) ) {
+		$show_cert_btn = true;
+	}
+}
 ?>
 <?php if ( $hl_a1_on || $hl_a2_on ) : ?>
 <style>
@@ -206,11 +223,14 @@ if ( $mktops_url ) {
 		});
 		</script>
 
-		<?php if ( $reports_page_url || $show_mktops_btn || $show_add_event_btn ) : ?>
+		<?php if ( $reports_page_url || $show_mktops_btn || $show_cert_btn || $show_add_event_btn ) : ?>
 		<span style="margin-left:auto;"></span>
 		<?php endif; ?>
 		<?php if ( $reports_page_url ) : ?>
 		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn">&#x1F4CA; Reports</a>
+		<?php endif; ?>
+		<?php if ( $show_cert_btn ) : ?>
+		<a href="<?php echo esc_url( $cert_url ); ?>" class="hostlinks-btn hostlinks-btn--cert">&#x1F393; Certificates</a>
 		<?php endif; ?>
 		<?php if ( $show_mktops_btn ) : ?>
 		<a href="<?php echo esc_url( $mktops_url ); ?>" class="hostlinks-btn hostlinks-btn--mktops">&#x1F4CB; Marketing Ops</a>

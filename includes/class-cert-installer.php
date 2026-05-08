@@ -13,10 +13,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Hostlinks_Cert_Installer {
 
-	const PLUGIN_FILE = 'hostlinks-certificates/hostlinks-certificates.php';
+	const PLUGIN_FILE = 'hostlinks-certificate-generator/hostlinks-certificate-generator.php';
 	const GITHUB_USER = 'spkldbrd';
-	const GITHUB_REPO = 'hostlinks-certificates';
-	const API_URL     = 'https://api.github.com/repos/spkldbrd/hostlinks-certificates/releases/latest';
+	const GITHUB_REPO = 'hostlinks-certificate-generator';
+	const API_URL     = 'https://api.github.com/repos/spkldbrd/hostlinks-certificate-generator/releases/latest';
 
 	public static function init(): void {
 		add_action( 'admin_post_hostlinks_install_cert', array( static::class, 'handle_install' ) );

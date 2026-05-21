@@ -736,15 +736,19 @@ $old_event_timezones = (array) ( $old['hl_event_timezone']  ?? array() );
 		ac.addListener('place_changed', function() {
 			var place = ac.getPlace();
 			if ( !place || !place.address_components ) return;
-			var streetNum = '', route = '', city = '', state = '', zip = '';
+			var streetNum = '', route = '', city = '', neighborhood = '', state = '', zip = '';
 			place.address_components.forEach(function(c) {
 				var t = c.types[0];
-				if      ( t === 'street_number' )                streetNum = c.long_name;
-				else if ( t === 'route' )                        route     = c.short_name;
-				else if ( t === 'locality' )                     city      = c.long_name;
-				else if ( t === 'administrative_area_level_1' )  state     = c.short_name;
-				else if ( t === 'postal_code' )                  zip       = c.long_name;
+				if      ( t === 'street_number' )                streetNum    = c.long_name;
+				else if ( t === 'route' )                        route        = c.short_name;
+				else if ( t === 'locality' )                     city         = c.long_name;
+				else if ( t === 'neighborhood' )                 neighborhood = c.long_name;
+				else if ( t === 'sublocality_level_1' )          neighborhood = neighborhood || c.long_name;
+				else if ( t === 'administrative_area_level_1' )  state        = c.short_name;
+				else if ( t === 'postal_code' )                  zip          = c.long_name;
 			});
+			// Prefer the most-specific place name: neighborhood/sublocality beats locality
+			city = neighborhood || city;
 			addr1Field.value = (streetNum + ' ' + route).trim();
 			var cityField  = document.getElementById('hl_city');
 			var stateField = document.getElementById('hl_state');
@@ -925,15 +929,19 @@ function initShippingAutocomplete() {
 	ac.addListener('place_changed', function() {
 		var place = ac.getPlace();
 		if (!place || !place.address_components) return;
-		var streetNum = '', route = '', city = '', state = '', zip = '';
+		var streetNum = '', route = '', city = '', neighborhood = '', state = '', zip = '';
 		place.address_components.forEach(function(c) {
 			var t = c.types[0];
-			if      ( t === 'street_number' )               streetNum = c.long_name;
-			else if ( t === 'route' )                       route     = c.short_name;
-			else if ( t === 'locality' )                    city      = c.long_name;
-			else if ( t === 'administrative_area_level_1' ) state     = c.short_name;
-			else if ( t === 'postal_code' )                 zip       = c.long_name;
+			if      ( t === 'street_number' )               streetNum    = c.long_name;
+			else if ( t === 'route' )                       route        = c.short_name;
+			else if ( t === 'locality' )                    city         = c.long_name;
+			else if ( t === 'neighborhood' )                neighborhood = c.long_name;
+			else if ( t === 'sublocality_level_1' )         neighborhood = neighborhood || c.long_name;
+			else if ( t === 'administrative_area_level_1' ) state        = c.short_name;
+			else if ( t === 'postal_code' )                 zip          = c.long_name;
 		});
+		// Prefer the most-specific place name: neighborhood/sublocality beats locality
+		city = neighborhood || city;
 		shipAddr1.value = (streetNum + ' ' + route).trim();
 		var cityField  = document.getElementById('ship_city');
 		var stateField = document.getElementById('ship_state');

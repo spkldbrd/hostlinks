@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.10.8
+ * Version:     2.10.9
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.10.8' );
+define( 'HOSTLINKS_VERSION',    '2.10.9' );
 define( 'HOSTLINKS_DB_VERSION', '2.5' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -40,6 +40,7 @@ require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-sync.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-scheduler.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-mktops-installer.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cert-installer.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-instructor-api.php';
 
 // Activation: create DB tables + detect theme conflict in one hook
 register_activation_hook( __FILE__, array( 'Hostlinks_Activation', 'on_activate' ) );
@@ -65,6 +66,9 @@ Hostlinks_MktOps_Installer::init();
 
 // Certificate Generator one-click installer (admin-post action)
 Hostlinks_Cert_Installer::init();
+
+// Automation REST API (instructor assignment + read endpoints)
+Hostlinks_Instructor_API::init();
 
 // Marketing Ops integration: one-time detection notice + dismiss handler.
 add_action( 'admin_init',    'hostlinks_handle_mktops_dismiss' );

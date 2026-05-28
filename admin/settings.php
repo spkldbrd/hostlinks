@@ -20,6 +20,7 @@ $valid_tabs = array(
 	'alerts'            => 'Alerts',
 	'marketing-ops'     => 'Marketing Ops',
 	'certificates'        => 'Certificates',
+	'automation-api'      => 'Automation API',
 );
 
 $current_tab = sanitize_key( $_GET['tab'] ?? 'general' );
@@ -86,6 +87,9 @@ switch ( $current_tab ) {
 		break;
 	case 'certificates':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/settings-certificates.php';
+		break;
+	case 'automation-api':
+		include HOSTLINKS_PLUGIN_DIR . 'admin/settings-api.php';
 		break;
 }
 ?>

@@ -40,6 +40,12 @@ class Hostlinks_Instructor_API {
 			'permission_callback' => array( static::class, 'check_api_key' ),
 		) );
 
+		register_rest_route( self::NAMESPACE, '/create-event-request', array(
+			'methods'             => 'POST',
+			'callback'            => array( static::class, 'create_event_request' ),
+			'permission_callback' => array( static::class, 'check_api_key' ),
+		) );
+
 		register_rest_route( self::NAMESPACE, '/upcoming-events', array(
 			'methods'             => 'GET',
 			'callback'            => array( static::class, 'get_upcoming_events' ),
@@ -172,6 +178,217 @@ class Hostlinks_Instructor_API {
 		}
 
 		return new WP_REST_Response( array( 'results' => $results, 'summary' => $summary ), 200 );
+	}
+
+	// ── POST /create-event-request ──────────────────────────────────────────
+
+	/**
+	 * Accept a pre-parsed (by n8n + AI) event email and insert it into the
+	 * Hostlinks event request queue — exactly as if it were submitted through
+	 * the front-end [hostlinks_event_request_form] shortcode.
+	 *
+	 * Expected JSON body:
+	 * {
+	 *   "events": [
+	 *     { "category": "Management", "start_date": "2026-08-19",
+	 *       "end_date": "2026-08-20", "trainer": "TBA", "is_zoom": false,
+	 *       "timezone": "" }
+	 *   ],
+	 *   "marketer":         "Nikki",
+	 *   "city":             "Billings",
+	 *   "state":            "MT",
+	 *   "zip_code":         "59101",
+	 *   "street_address_1": "4810 Midland Road",
+	 *   "street_address_2": "",
+	 *   "location_name":    "Billings Police Department",
+	 *   "host_name":        "",
+	 *   "displayed_as":     "",
+	 *   "special_instructions": "",
+	 *   "max_attendees":    null,
+	 *   "host_contacts": [
+	 *     { "name":"Brad Mansur","title":"Administrative Sergeant",
+	 *       "agency":"Billings Police Department",
+	 *       "email":"mansurb@billingsmt.gov","phone":"406-247-8557",
+	 *       "phone2":"" }
+	 *   ],
+	 *   "hotels": [
+	 *     { "name":"Comfort Suites","address":"4908 Southgate Dr, Billings, MT 59101",
+	 *       "phone":"406-969-2300","url":"" }
+	 *   ],
+	 *   "ship_name":      "Sgt. Brad Mansur",
+	 *   "ship_address_1": "220 North 27th Street",
+	 *   "ship_city":      "Billings",
+	 *   "ship_state":     "MT",
+	 *   "ship_zip":       "59101",
+	 *   "ship_phone":     "406-247-8557",
+	 *   "ship_notes":     "",
+	 *   "source":         "email-forward"
+	 * }
+	 */
+	public static function create_event_request( WP_REST_Request $request ): WP_REST_Response {
+		$body = $request->get_json_params();
+
+		// ── Validate minimum requirements ─────────────────────────────────────
+		$events = $body['events'] ?? array();
+		if ( ! is_array( $events ) || empty( $events ) ) {
+			return new WP_REST_Response(
+				array( 'error' => '"events" array is required and must contain at least one entry.' ),
+				400
+			);
+		}
+
+		$valid_categories = array( 'Management', 'Writing', 'Subaward' );
+		foreach ( $events as $i => $ev ) {
+			$cat   = trim( $ev['category']   ?? '' );
+			$start = trim( $ev['start_date'] ?? '' );
+			$end   = trim( $ev['end_date']   ?? '' );
+			if ( $cat === '' ) {
+				return new WP_REST_Response( array( 'error' => "events[$i].category is required." ), 400 );
+			}
+			if ( ! in_array( $cat, $valid_categories, true ) ) {
+				return new WP_REST_Response(
+					array( 'error' => "events[$i].category must be one of: " . implode( ', ', $valid_categories ) . ". Got: \"$cat\"." ),
+					400
+				);
+			}
+			if ( ! self::is_valid_ymd( $start ) ) {
+				return new WP_REST_Response( array( 'error' => "events[$i].start_date must be YYYY-MM-DD. Got: \"$start\"." ), 400 );
+			}
+			if ( ! self::is_valid_ymd( $end ) ) {
+				return new WP_REST_Response( array( 'error' => "events[$i].end_date must be YYYY-MM-DD. Got: \"$end\"." ), 400 );
+			}
+		}
+
+		// ── Normalise and sanitize shared fields ──────────────────────────────
+		$now              = current_time( 'mysql' );
+		$submission_group = wp_generate_uuid4();
+		$city             = sanitize_text_field( $body['city']             ?? '' );
+		$state            = sanitize_text_field( $body['state']            ?? '' );
+
+		// Hotels
+		$hotels = array();
+		foreach ( (array) ( $body['hotels'] ?? array() ) as $h ) {
+			$name = sanitize_text_field( $h['name'] ?? '' );
+			if ( $name === '' ) continue;
+			$hotels[] = array(
+				'name'    => $name,
+				'address' => sanitize_text_field( $h['address'] ?? '' ),
+				'phone'   => sanitize_text_field( $h['phone']   ?? '' ),
+				'url'     => esc_url_raw( trim( $h['url'] ?? '' ) ),
+			);
+		}
+
+		// Host contacts
+		$host_contacts = array();
+		foreach ( (array) ( $body['host_contacts'] ?? array() ) as $c ) {
+			$name = sanitize_text_field( $c['name'] ?? '' );
+			if ( $name === '' ) continue;
+			$host_contacts[] = array(
+				'name'             => $name,
+				'agency'           => sanitize_text_field( $c['agency']  ?? '' ),
+				'title'            => sanitize_text_field( $c['title']   ?? '' ),
+				'email'            => sanitize_email(      $c['email']   ?? '' ),
+				'phone'            => Hostlinks_Event_Request::normalize_phone( sanitize_text_field( $c['phone']  ?? '' ) ),
+				'phone2'           => Hostlinks_Event_Request::normalize_phone( sanitize_text_field( $c['phone2'] ?? '' ) ),
+				'dnl_phone'        => false,
+				'dnl_phone2'       => false,
+				'include_in_email' => true,
+				'cc_on_alerts'     => false,
+			);
+		}
+
+		$has_shipping = ! empty( $body['ship_name'] ) || ! empty( $body['ship_address_1'] );
+
+		$shared = array(
+			'submission_group'    => $submission_group,
+			'request_status'      => Hostlinks_Event_Request::STATUS_NEW,
+			'submitted_at'        => $now,
+			'updated_at'          => $now,
+			'event_title'         => '',
+			'hostlinks_title'     => '',
+			'description'         => '',
+			'custom_email_intro'  => sanitize_textarea_field( $body['custom_email_intro'] ?? '' ),
+			'format'              => '',
+			'timezone'            => sanitize_text_field( $body['timezone'] ?? '' ),
+			'marketer'            => sanitize_text_field( $body['marketer'] ?? '' ),
+			'host_name'           => sanitize_text_field( $body['host_name']           ?? '' ),
+			'displayed_as'        => sanitize_text_field( $body['displayed_as']        ?? '' ),
+			'location_name'       => sanitize_text_field( $body['location_name']       ?? '' ),
+			'street_address_1'    => sanitize_text_field( $body['street_address_1']    ?? '' ),
+			'street_address_2'    => sanitize_text_field( $body['street_address_2']    ?? '' ),
+			'street_address_3'    => sanitize_text_field( $body['street_address_3']    ?? '' ),
+			'city'                => $city,
+			'state'               => $state,
+			'zip_code'            => sanitize_text_field( $body['zip_code']            ?? '' ),
+			'special_instructions'=> sanitize_textarea_field( $body['special_instructions'] ?? '' ),
+			'parking_file_url'    => '',
+			'max_attendees'       => is_numeric( $body['max_attendees'] ?? '' ) ? (int) $body['max_attendees'] : null,
+			'special_message'     => sanitize_text_field( $body['source'] ?? 'api' ),
+			'cc_emails'           => '[]',
+			'start_time'          => '',
+			'end_time'            => '',
+			'hotels'              => wp_json_encode( $hotels ),
+			'host_contacts'       => wp_json_encode( $host_contacts ),
+			'ship_name'      => $has_shipping ? sanitize_text_field( $body['ship_name']      ?? '' ) : '',
+			'ship_email'     => $has_shipping ? sanitize_email(      $body['ship_email']     ?? '' ) : '',
+			'ship_phone'     => $has_shipping ? Hostlinks_Event_Request::normalize_phone( sanitize_text_field( $body['ship_phone'] ?? '' ) ) : '',
+			'ship_address_1' => $has_shipping ? sanitize_text_field( $body['ship_address_1'] ?? '' ) : '',
+			'ship_address_2' => $has_shipping ? sanitize_text_field( $body['ship_address_2'] ?? '' ) : '',
+			'ship_address_3' => $has_shipping ? sanitize_text_field( $body['ship_address_3'] ?? '' ) : '',
+			'ship_city'      => $has_shipping ? sanitize_text_field( $body['ship_city']      ?? '' ) : '',
+			'ship_state'     => $has_shipping ? sanitize_text_field( $body['ship_state']     ?? '' ) : '',
+			'ship_zip'       => $has_shipping ? sanitize_text_field( $body['ship_zip']       ?? '' ) : '',
+			'ship_workbooks' => null,
+			'ship_notes'     => $has_shipping ? sanitize_textarea_field( $body['ship_notes']  ?? '' ) : '',
+		);
+
+		// ── Insert one row per event ───────────────────────────────────────────
+		$inserted_ids = array();
+		foreach ( $events as $ev ) {
+			$cat     = sanitize_text_field( $ev['category']   ?? '' );
+			$start   = sanitize_text_field( $ev['start_date'] ?? '' );
+			$end     = sanitize_text_field( $ev['end_date']   ?? '' );
+			$trainer = sanitize_text_field( $ev['trainer']    ?? 'TBA' );
+			$is_zoom = ! empty( $ev['is_zoom'] );
+			$row_tz  = $is_zoom ? sanitize_text_field( $ev['timezone'] ?? $shared['timezone'] ) : $shared['timezone'];
+
+			$hl_title = Hostlinks_Event_Request::build_hostlinks_title( $city, $state, $cat, $start );
+
+			$row = array_merge( $shared, array(
+				'category'        => $cat,
+				'trainer'         => $trainer ?: 'TBA',
+				'start_date'      => $start,
+				'end_date'        => $end,
+				'format'          => $is_zoom ? 'virtual' : 'in-person',
+				'timezone'        => $row_tz,
+				'price'           => null,
+				'hostlinks_title' => $hl_title,
+				'event_title'     => $hl_title,
+			) );
+
+			$id = Hostlinks_Event_Request_Storage::insert( $row );
+			if ( $id ) {
+				$inserted_ids[] = $id;
+			}
+		}
+
+		if ( empty( $inserted_ids ) ) {
+			return new WP_REST_Response( array( 'error' => 'All inserts failed — check server logs.' ), 500 );
+		}
+
+		return new WP_REST_Response( array(
+			'status'          => 'created',
+			'submission_group'=> $submission_group,
+			'request_ids'     => $inserted_ids,
+			'events_created'  => count( $inserted_ids ),
+			'queue_url'       => admin_url( 'admin.php?page=hostlinks-event-requests' ),
+		), 201 );
+	}
+
+	/** Simple YYYY-MM-DD date sanity check. */
+	private static function is_valid_ymd( string $date ): bool {
+		$d = DateTime::createFromFormat( 'Y-m-d', $date );
+		return $d && $d->format( 'Y-m-d' ) === $date;
 	}
 
 	// ── GET /upcoming-events ─────────────────────────────────────────────────

@@ -6,12 +6,20 @@
  * Base URL  : /wp-json/hostlinks/v1/
  *
  * Endpoints:
- *   POST /assign-instructor   — bulk-assign instructors to upcoming events
- *   GET  /upcoming-events     — list upcoming events with current instructor
- *   GET  /instructors         — list all active instructors
+ *   POST /assign-instructor      — bulk-assign instructors to upcoming events
+ *   POST /create-event-request   — insert a parsed email into the event queue
+ *   GET  /upcoming-events        — list upcoming events with current instructor
+ *   GET  /instructors            — list all active instructors
  *
  * Auth: every request must include the header
  *   X-HL-Key: {value of option hostlinks_automation_api_key}
+ *
+ * Dry-run / test mode (no DB writes):
+ *   Per-request : add "dry_run": true to the JSON body.
+ *   Global      : enable "API Test Mode" in Settings → Automation API
+ *                 (option hostlinks_api_test_mode = 1).
+ *   When active, write endpoints return the payload they WOULD have written
+ *   under the key "would_write" / "would_insert" instead of touching the DB.
  *
  * The API key is generated and managed under
  * Hostlinks → Settings → Automation API.
@@ -73,6 +81,22 @@ class Hostlinks_Instructor_API {
 		return true;
 	}
 
+	// ── Dry-run detection ────────────────────────────────────────────────────
+
+	/**
+	 * Returns true when the current request should be treated as a dry run.
+	 *
+	 * Triggers:
+	 *   1. Request body contains "dry_run": true  (per-request control).
+	 *   2. WP option hostlinks_api_test_mode is truthy  (global toggle).
+	 */
+	private static function is_dry_run( array $body ): bool {
+		if ( ! empty( $body['dry_run'] ) ) {
+			return true;
+		}
+		return (bool) get_option( 'hostlinks_api_test_mode', 0 );
+	}
+
 	// ── POST /assign-instructor ──────────────────────────────────────────────
 
 	public static function assign_instructor( WP_REST_Request $request ): WP_REST_Response {
@@ -81,6 +105,7 @@ class Hostlinks_Instructor_API {
 		$inst = $wpdb->prefix . 'event_instructor';
 
 		$body        = $request->get_json_params();
+		$dry_run     = self::is_dry_run( $body );
 		$assignments = $body['assignments'] ?? null;
 
 		// Accept a single assignment object as well as an array.
@@ -105,7 +130,7 @@ class Hostlinks_Instructor_API {
 
 		$today   = current_time( 'Y-m-d' );
 		$results = array();
-		$summary = array( 'total' => 0, 'updated' => 0, 'no_change' => 0, 'not_found' => 0, 'needs_review' => 0 );
+		$summary = array( 'total' => 0, 'updated' => 0, 'no_change' => 0, 'not_found' => 0, 'needs_review' => 0, 'dry_run' => $dry_run );
 
 		foreach ( $assignments as $assignment ) {
 			$input_city       = trim( $assignment['city']       ?? '' );
@@ -157,7 +182,23 @@ class Hostlinks_Instructor_API {
 				continue;
 			}
 
-			// ── Update ────────────────────────────────────────────────────────
+			// ── Update (or dry-run preview) ───────────────────────────────────
+			$warning = $fuzzy ? 'City matched by fuzzy search — please verify.' : null;
+
+			if ( $dry_run ) {
+				$result             = self::result( $input_city, $input_instructor, 'would_update',
+					$event, $matched_instructor, $fuzzy, $warning );
+				$result['dry_run']  = true;
+				$result['would_write'] = array(
+					'table'   => $edl,
+					'where'   => array( 'eve_id' => $eve_id ),
+					'set'     => array( 'eve_instructor' => (int) $matched_instructor['id'] ),
+				);
+				$results[] = $result;
+				$summary['updated']++;
+				continue;
+			}
+
 			$wpdb->update(
 				$edl,
 				array( 'eve_instructor' => (int) $matched_instructor['id'] ),
@@ -171,13 +212,17 @@ class Hostlinks_Instructor_API {
 				HMO_REST::flush_public_events_cache();
 			}
 
-			$warning = $fuzzy ? 'City matched by fuzzy search — please verify.' : null;
 			$results[] = self::result( $input_city, $input_instructor, 'updated',
 				$event, $matched_instructor, $fuzzy, $warning );
 			$summary['updated']++;
 		}
 
-		return new WP_REST_Response( array( 'results' => $results, 'summary' => $summary ), 200 );
+		$response = array( 'results' => $results, 'summary' => $summary );
+		if ( $dry_run ) {
+			$response['dry_run'] = true;
+			$response['notice']  = 'DRY RUN — no database writes performed.';
+		}
+		return new WP_REST_Response( $response, 200 );
 	}
 
 	// ── POST /create-event-request ──────────────────────────────────────────
@@ -226,7 +271,8 @@ class Hostlinks_Instructor_API {
 	 * }
 	 */
 	public static function create_event_request( WP_REST_Request $request ): WP_REST_Response {
-		$body = $request->get_json_params();
+		$body    = $request->get_json_params();
+		$dry_run = self::is_dry_run( $body );
 
 		// ── Validate minimum requirements ─────────────────────────────────────
 		$events = $body['events'] ?? array();
@@ -342,8 +388,10 @@ class Hostlinks_Instructor_API {
 			'ship_notes'     => $has_shipping ? sanitize_textarea_field( $body['ship_notes']  ?? '' ) : '',
 		);
 
-		// ── Insert one row per event ───────────────────────────────────────────
-		$inserted_ids = array();
+		// ── Build rows (and optionally insert) ────────────────────────────────
+		$inserted_ids  = array();
+		$preview_rows  = array();
+
 		foreach ( $events as $ev ) {
 			$cat     = sanitize_text_field( $ev['category']   ?? '' );
 			$start   = sanitize_text_field( $ev['start_date'] ?? '' );
@@ -366,10 +414,28 @@ class Hostlinks_Instructor_API {
 				'event_title'     => $hl_title,
 			) );
 
+			if ( $dry_run ) {
+				$preview_rows[] = $row;
+				continue;
+			}
+
 			$id = Hostlinks_Event_Request_Storage::insert( $row );
 			if ( $id ) {
 				$inserted_ids[] = $id;
 			}
+		}
+
+		// ── Dry-run response ──────────────────────────────────────────────────
+		if ( $dry_run ) {
+			return new WP_REST_Response( array(
+				'dry_run'         => true,
+				'notice'          => 'DRY RUN — no database writes performed.',
+				'status'          => 'would_insert',
+				'submission_group'=> $submission_group,
+				'events_count'    => count( $preview_rows ),
+				'would_insert'    => $preview_rows,
+				'queue_url'       => admin_url( 'admin.php?page=hostlinks-event-requests' ),
+			), 200 );
 		}
 
 		if ( empty( $inserted_ids ) ) {

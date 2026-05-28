@@ -12,9 +12,21 @@ if ( ! current_user_can( 'manage_options' ) ) {
 	wp_die( 'Unauthorized' );
 }
 
-$notice   = '';
-$api_key  = get_option( 'hostlinks_automation_api_key', '' );
-$base_url = rest_url( 'hostlinks/v1' );
+$notice    = '';
+$api_key   = get_option( 'hostlinks_automation_api_key', '' );
+$base_url  = rest_url( 'hostlinks/v1' );
+$test_mode = (bool) get_option( 'hostlinks_api_test_mode', 0 );
+
+// ── Handle global test-mode toggle save ───────────────────────────────────
+if ( isset( $_POST['hostlinks_save_api_test_mode'] ) ) {
+	check_admin_referer( 'hostlinks_api_test_mode' );
+	$new_mode = ! empty( $_POST['hostlinks_api_test_mode'] ) ? 1 : 0;
+	update_option( 'hostlinks_api_test_mode', $new_mode );
+	$test_mode = (bool) $new_mode;
+	$notice    = $new_mode
+		? '<div class="notice notice-warning is-dismissible"><p><strong>API Test Mode ON</strong> — all write endpoints will preview their payload without touching the database.</p></div>'
+		: '<div class="notice notice-success is-dismissible"><p>API Test Mode disabled — write endpoints are live again.</p></div>';
+}
 
 if ( isset( $_GET['hl_key_regen'] ) ) {
 	$api_key = get_option( 'hostlinks_automation_api_key', '' ); // re-read after regeneration
@@ -62,6 +74,37 @@ if ( isset( $_GET['hl_key_regen'] ) ) {
 	<?php if ( $api_key ) : ?>
 		<span style="color:#666;font-size:12px;margin-left:10px;line-height:30px;">Regenerating invalidates the current key immediately.</span>
 	<?php endif; ?>
+</form>
+
+<?php /* ── Global Test Mode toggle ─────────────────────────────────────── */ ?>
+<hr style="margin:28px 0;" />
+
+<h3 style="font-size:14px;margin:0 0 8px;">
+	<?php if ( $test_mode ) : ?>
+		<span style="display:inline-block;background:#d63638;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;vertical-align:middle;margin-right:6px;letter-spacing:.04em;">TEST MODE ON</span>
+	<?php endif; ?>
+	API Test Mode (Global Dry Run)
+</h3>
+<p style="color:#555;max-width:700px;">
+	When enabled, <strong>all write endpoints</strong> (<code>/assign-instructor</code>, <code>/create-event-request</code>) will return the payload they <em>would</em> write instead of touching the database — regardless of what the caller sends. Use this as a safety switch while building or debugging automation workflows.
+	You can also trigger a single dry run per-request by including <code>"dry_run": true</code> in the JSON body without enabling this global toggle.
+</p>
+
+<form method="post">
+	<?php wp_nonce_field( 'hostlinks_api_test_mode' ); ?>
+	<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;">
+		<input type="checkbox" name="hostlinks_api_test_mode" value="1"
+		       style="width:18px;height:18px;accent-color:#d63638;"
+		       <?php checked( $test_mode ); ?>>
+		Enable global API Test Mode (dry run for all write endpoints)
+	</label>
+	<p style="margin:10px 0 0;">
+		<input type="hidden" name="hostlinks_save_api_test_mode" value="1">
+		<button type="submit" class="button button-secondary">Save Test Mode Setting</button>
+		<?php if ( $test_mode ) : ?>
+			<span style="color:#d63638;font-size:12px;margin-left:10px;line-height:30px;font-weight:600;">&#x26A0; Currently active — no API writes will reach the database.</span>
+		<?php endif; ?>
+	</p>
 </form>
 
 <hr style="margin:28px 0;" />
@@ -153,9 +196,14 @@ if ( isset( $_GET['hl_key_regen'] ) ) {
 			</td>
 		</tr>
 		<tr>
+			<th>Dry run</th>
+			<td>Add <code>"dry_run": true</code> to the body to preview without writing. Per-item status will be <code>would_update</code> instead of <code>updated</code>. The response also includes a top-level <code>"dry_run": true</code> flag and <code>"notice"</code> string.</td>
+		</tr>
+		<tr>
 			<th>Status values</th>
 			<td>
 				<code>updated</code> — matched and saved<br>
+				<code>would_update</code> — dry run: would have updated<br>
 				<code>no_change</code> — event already had this instructor<br>
 				<code>not_found_event</code> — no upcoming event matched the city<br>
 				<code>not_found_instructor</code> — instructor name not in the active list<br>
@@ -256,6 +304,10 @@ if ( isset( $_GET['hl_key_regen'] ) ) {
   "queue_url":        "https://yoursite.com/wp-admin/admin.php?page=hostlinks-event-requests"
 }</pre>
 			</td>
+		</tr>
+		<tr>
+			<th>Dry run</th>
+			<td>Add <code>"dry_run": true</code> to the body. The endpoint returns HTTP 200 with <code>"status": "would_insert"</code> and a <code>"would_insert"</code> array showing the exact rows that would have been written — nothing is saved to the database.</td>
 		</tr>
 		<tr>
 			<th>category values</th>

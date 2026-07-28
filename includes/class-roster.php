@@ -106,23 +106,26 @@ class Hostlinks_Roster {
 		$rows          = array();
 
 		foreach ( $attendees_map as $uuid => $att ) {
-			$status = $att['status'] ?? $att['inviteeStatus'] ?? $att['attendeeStatus'] ?? '';
+			$status = $att['status'] ?? $att['attendeeStatus'] ?? '';
 			if ( in_array( $status, self::SKIP_STATUSES, true ) ) {
 				continue;
 			}
 
-			$meta = $meta_by_id[ $uuid ] ?? self::empty_order_meta();
+			$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
+			$meta    = $meta_by_id[ $uuid ] ?? self::empty_order_meta();
 
-			list( $work_city, $work_state ) = self::extract_work_location( $att );
+			// Work city/state: CVENT returns these as top-level fields on the attendee record.
+			$work_city  = trim( (string) ( $att['workCity']  ?? $contact['workCity']  ?? '' ) );
+			$work_state = self::format_work_state( $att['workState'] ?? $contact['workState'] ?? '' );
 
 			$rows[] = array(
-				'last'              => self::pick_field( $att, array( 'lastName' ) ),
-				'first'             => self::pick_field( $att, array( 'firstName' ) ),
-				'company'           => self::pick_field( $att, array( 'companyName', 'company', 'organizationName' ) ),
-				'title'             => self::pick_field( $att, array( 'title', 'jobTitle' ) ),
-				'email'             => self::pick_field( $att, array( 'email', 'emailAddress' ) ),
-				'work_phone'        => self::format_phone( self::extract_phone( $att, 'work' ) ),
-				'mobile_phone'      => self::format_phone( self::extract_phone( $att, 'mobile' ) ),
+				'last'              => $att['lastName']    ?? $contact['lastName']    ?? '',
+				'first'             => $att['firstName']   ?? $contact['firstName']   ?? '',
+				'company'           => $att['companyName'] ?? $contact['company']     ?? $contact['companyName'] ?? '',
+				'title'             => $att['title']       ?? $contact['title']       ?? '',
+				'email'             => $att['email']       ?? $contact['email']       ?? '',
+				'work_phone'        => self::format_phone( $att['workPhone'] ?? $contact['workPhone'] ?? $att['phone'] ?? '' ),
+				'mobile_phone'      => self::format_phone( $att['mobilePhone'] ?? $contact['mobilePhone'] ?? '' ),
 				'status'            => $status,
 				'participant'       => $is_past ? self::participant_label( $att ) : '',
 				'amount_ordered'    => self::format_money( $meta['amount_ordered'], true ),
@@ -144,6 +147,15 @@ class Hostlinks_Roster {
 		return $rows;
 	}
 
+	/**
+	 * Resolve full attendee records keyed by UUID — mirrors the v2.11.2 approach that worked.
+	 *
+	 * Strategy:
+	 *  1. Pull attendee stubs out of order items (expand=attendee may already include names).
+	 *  2. If the first item's attendee already has firstName/lastName, use those directly.
+	 *  3. Otherwise fall back to GET /attendees/{uuid} (no expand) which returns top-level
+	 *     firstName, lastName, email, workPhone, workCity, workState etc.
+	 */
 	public static function resolve_attendees_map( array $order_items, string $cvent_id = '', int $cache_ttl = 86400 ): array {
 		if ( $cvent_id !== '' ) {
 			$att_key = self::ATTENDEES_CACHE_PREFIX . md5( $cvent_id );
@@ -161,28 +173,32 @@ class Hostlinks_Roster {
 			if ( $uuid === '' ) {
 				continue;
 			}
-			if ( ! isset( $map[ $uuid ] ) ) {
+			if ( ! empty( $att['firstName'] ) || ! empty( $att['lastName'] ) || ! empty( $att['contact'] ) ) {
 				$map[ $uuid ] = $att;
-			} else {
-				$map[ $uuid ] = self::merge_preserving_nonempty( $map[ $uuid ], $att );
+			} elseif ( ! isset( $map[ $uuid ] ) ) {
+				$map[ $uuid ] = $att;
 			}
 		}
 
-		// Order-item expand=attendee often returns only a stub contact {id} — fetch full records.
-		self::enrich_missing_identities( $map );
+		// Check if expand=attendee gave us real name data.
+		$sample       = $order_items[0]['attendee'] ?? array();
+		$expand_works = isset( $sample['firstName'] ) || isset( $sample['lastName'] ) || isset( $sample['contact'] );
 
-		foreach ( array_keys( $map ) as $uuid ) {
-			if ( ! self::needs_contact_enrich( $map[ $uuid ] ) ) {
-				continue;
+		if ( ! $expand_works ) {
+			// Fallback: fetch each attendee individually (no expand — top-level fields include names).
+			foreach ( array_keys( $map ) as $uuid ) {
+				$fetched = Hostlinks_CVENT_API::get_attendee( $uuid );
+				if ( is_wp_error( $fetched ) ) {
+					continue;
+				}
+				if ( isset( $fetched['data'] ) && is_array( $fetched['data'] ) ) {
+					$fetched = $fetched['data'];
+				}
+				if ( is_array( $fetched ) ) {
+					$map[ $uuid ] = $fetched;
+				}
 			}
-			$fetched = Hostlinks_CVENT_API::get_attendee( $uuid, 'contact' );
-			if ( is_wp_error( $fetched ) ) {
-				continue;
-			}
-			$map[ $uuid ] = self::merge_attendee_enrichment( $map[ $uuid ], self::unwrap_api_record( $fetched ) );
 		}
-
-		self::enrich_work_location_from_contacts( $map );
 
 		if ( $cvent_id !== '' && ! empty( $map ) ) {
 			set_transient( self::ATTENDEES_CACHE_PREFIX . md5( $cvent_id ), $map, $cache_ttl );
@@ -191,325 +207,26 @@ class Hostlinks_Roster {
 		return $map;
 	}
 
-	/** Whether an attendee/contact payload includes a usable name or email. */
+	/** Whether an attendee payload includes a usable name or email. */
 	public static function attendee_has_identity( array $att ): bool {
-		$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-		foreach ( array( $att, $contact ) as $src ) {
-			if ( ! empty( $src['firstName'] ) || ! empty( $src['lastName'] ) || ! empty( $src['email'] ) || ! empty( $src['emailAddress'] ) ) {
-				return true;
-			}
-		}
-		return false;
+		return ! empty( $att['firstName'] ) || ! empty( $att['lastName'] ) || ! empty( $att['email'] );
 	}
 
 	/**
-	 * Fetch attendee + contact records when order-item expand omitted registrant fields.
-	 *
-	 * @param array<string,array> $map
-	 */
-	private static function enrich_missing_identities( array &$map ): void {
-		foreach ( array_keys( $map ) as $uuid ) {
-			if ( self::attendee_has_identity( $map[ $uuid ] ) ) {
-				continue;
-			}
-			$fetched = Hostlinks_CVENT_API::get_attendee( $uuid, 'contact' );
-			if ( is_wp_error( $fetched ) ) {
-				continue;
-			}
-			$map[ $uuid ] = self::merge_preserving_nonempty( $map[ $uuid ], self::unwrap_api_record( $fetched ) );
-		}
-
-		self::enrich_identity_from_contacts( $map );
-	}
-
-	/**
-	 * Last-resort identity lookup via GET /contacts/{id}.
-	 *
-	 * @param array<string,array> $map
-	 */
-	private static function enrich_identity_from_contacts( array &$map ): void {
-		static $contact_cache = array();
-
-		foreach ( array_keys( $map ) as $uuid ) {
-			if ( self::attendee_has_identity( $map[ $uuid ] ) ) {
-				continue;
-			}
-
-			$att     = $map[ $uuid ];
-			$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-			$cid     = Hostlinks_CVENT_API::sanitize_uuid( (string) ( $contact['id'] ?? $att['contactId'] ?? '' ) );
-			if ( $cid === '' ) {
-				continue;
-			}
-
-			if ( ! isset( $contact_cache[ $cid ] ) ) {
-				$fetched = Hostlinks_CVENT_API::get_contact( $cid );
-				$contact_cache[ $cid ] = is_wp_error( $fetched ) ? null : self::unwrap_api_record( $fetched );
-			}
-
-			if ( empty( $contact_cache[ $cid ] ) ) {
-				continue;
-			}
-
-			$map[ $uuid ] = self::merge_attendee_contact( $att, array( 'contact' => $contact_cache[ $cid ] ) );
-		}
-	}
-
-	/** Normalize single-record API responses (top-level or wrapped in data). */
-	private static function unwrap_api_record( $response ): array {
-		if ( ! is_array( $response ) ) {
-			return array();
-		}
-		if ( isset( $response['data'] ) && is_array( $response['data'] ) ) {
-			if ( isset( $response['data']['id'] ) || isset( $response['data']['firstName'] ) || isset( $response['data']['contact'] ) ) {
-				return $response['data'];
-			}
-		}
-		return $response;
-	}
-
-	/** Read the first non-empty field from attendee or nested contact. */
-	private static function pick_field( array $att, array $keys ): string {
-		$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-		foreach ( array( $att, $contact ) as $src ) {
-			foreach ( $keys as $key ) {
-				if ( ! empty( $src[ $key ] ) ) {
-					return trim( (string) $src[ $key ] );
-				}
-			}
-		}
-		return '';
-	}
-
-	/**
-	 * Merge enrichment payload without clobbering names already present from order-item expand.
-	 */
-	private static function merge_attendee_enrichment( array $existing, array $fetched ): array {
-		$overlay = array();
-		if ( ! empty( $fetched['contact'] ) && is_array( $fetched['contact'] ) ) {
-			$overlay['contact'] = $fetched['contact'];
-		}
-		if ( ! empty( $fetched['answers'] ) && is_array( $fetched['answers'] ) ) {
-			$overlay['answers'] = $fetched['answers'];
-		}
-		if ( empty( $overlay ) ) {
-			return self::merge_preserving_nonempty( $existing, $fetched );
-		}
-		return self::merge_preserving_nonempty( $existing, $overlay );
-	}
-
-	/**
-	 * Deep merge that never replaces a non-empty value with an empty one.
-	 */
-	private static function merge_preserving_nonempty( array $base, array $overlay ): array {
-		foreach ( $overlay as $key => $value ) {
-			if ( is_array( $value ) && isset( $base[ $key ] ) && is_array( $base[ $key ] ) ) {
-				$base[ $key ] = self::merge_preserving_nonempty( $base[ $key ], $value );
-				continue;
-			}
-			if ( ! array_key_exists( $key, $base ) || self::is_empty_merge_value( $base[ $key ] ) ) {
-				if ( ! self::is_empty_merge_value( $value ) ) {
-					$base[ $key ] = $value;
-				} elseif ( ! array_key_exists( $key, $base ) ) {
-					$base[ $key ] = $value;
-				}
-			}
-		}
-		return $base;
-	}
-
-	private static function is_empty_merge_value( $value ): bool {
-		if ( $value === null || $value === '' || $value === array() ) {
-			return true;
-		}
-		return false;
-	}
-
-	/**
-	 * Fetch full contact records when work city/state are still missing.
-	 *
-	 * @param array<string,array> $map Attendee map keyed by UUID (modified in place).
-	 */
-	private static function enrich_work_location_from_contacts( array &$map ): void {
-		static $contact_cache = array();
-
-		foreach ( $map as $uuid => $att ) {
-			list( $city, $state ) = self::extract_work_location( $att );
-			if ( $city !== '' || $state !== '' ) {
-				continue;
-			}
-
-			$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-			$cid     = Hostlinks_CVENT_API::sanitize_uuid( (string) ( $contact['id'] ?? $att['contactId'] ?? '' ) );
-			if ( $cid === '' ) {
-				continue;
-			}
-
-			if ( ! isset( $contact_cache[ $cid ] ) ) {
-				$fetched = Hostlinks_CVENT_API::get_contact( $cid );
-				if ( is_wp_error( $fetched ) ) {
-					$contact_cache[ $cid ] = null;
-					continue;
-				}
-				$contact_cache[ $cid ] = self::unwrap_api_record( $fetched );
-			}
-
-			if ( empty( $contact_cache[ $cid ] ) ) {
-				continue;
-			}
-
-			$map[ $uuid ] = self::merge_attendee_contact( $att, array( 'contact' => $contact_cache[ $cid ] ) );
-		}
-	}
-
-	/**
-	 * Merge a fetched contact record into an existing attendee row.
-	 */
-	private static function merge_attendee_contact( array $existing, array $fetched ): array {
-		$exist_contact = is_array( $existing['contact'] ?? null ) ? $existing['contact'] : array();
-		$fetch_contact = is_array( $fetched['contact'] ?? null ) ? $fetched['contact'] : array();
-		if ( empty( $fetch_contact ) ) {
-			return $existing;
-		}
-		$existing['contact'] = self::merge_preserving_nonempty( $exist_contact, $fetch_contact );
-		return $existing;
-	}
-
-	private static function needs_contact_enrich( array $att ): bool {
-		list( $city, $state ) = self::extract_work_location( $att );
-		if ( $city !== '' || $state !== '' ) {
-			return false;
-		}
-		$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-		return empty( $contact['workAddress'] ) && empty( $contact['workCity'] );
-	}
-
-	/**
-	 * Work city/state from contact.workAddress (CVENT REST standard).
-	 *
-	 * @return array{0:string,1:string} city, state (2-letter when possible)
-	 */
-	public static function extract_work_location( array $att ): array {
-		$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-
-		foreach ( array( $att, $contact ) as $src ) {
-			if ( empty( $src['workAddress'] ) ) {
-				continue;
-			}
-			$first = self::first_address_entry( $src['workAddress'] );
-			$city  = trim( (string) ( $first['city'] ?? $first['locality'] ?? '' ) );
-			$state = trim( (string) ( $first['regionCode'] ?? $first['region'] ?? $first['stateCode'] ?? '' ) );
-			if ( $city !== '' || $state !== '' ) {
-				return array( $city, self::format_work_state( $state ) );
-			}
-		}
-
-		foreach ( array( $att, $contact ) as $src ) {
-			$city  = trim( (string) ( $src['workCity'] ?? '' ) );
-			$state = trim( (string) ( $src['workState'] ?? $src['workStateCode'] ?? '' ) );
-			if ( $city !== '' || $state !== '' ) {
-				return array( $city, self::format_work_state( $state ) );
-			}
-		}
-
-		list( $ans_city, $ans_state ) = self::extract_work_location_from_answers( $att );
-		if ( $ans_city !== '' || $ans_state !== '' ) {
-			return array( $ans_city, self::format_work_state( $ans_state ) );
-		}
-
-		return array( '', '' );
-	}
-
-	/** @param mixed $address CVENT workAddress object or array of objects. */
-	private static function first_address_entry( $address ): array {
-		if ( ! is_array( $address ) ) {
-			return array();
-		}
-		if ( isset( $address[0] ) && is_array( $address[0] ) ) {
-			return $address[0];
-		}
-		if ( isset( $address['city'] ) || isset( $address['region'] ) || isset( $address['regionCode'] ) ) {
-			return $address;
-		}
-		return array();
-	}
-
-	/**
-	 * Some events store work city/state as registration answers instead of contact fields.
+	 * Work city/state — read top-level fields returned by GET /attendees/{uuid}.
 	 *
 	 * @return array{0:string,1:string}
 	 */
-	private static function extract_work_location_from_answers( array $att ): array {
-		$answers = $att['answers'] ?? array();
-		if ( ! is_array( $answers ) ) {
-			return array( '', '' );
-		}
-
-		$city  = '';
-		$state = '';
-
-		foreach ( $answers as $answer ) {
-			if ( ! is_array( $answer ) ) {
-				continue;
-			}
-			$q_text = strtolower( trim( (string) (
-				$answer['question']['name']
-				?? $answer['question']['text']
-				?? $answer['questionText']
-				?? ''
-			) ) );
-			if ( $q_text === '' ) {
-				continue;
-			}
-
-			$value = self::answer_value( $answer );
-			if ( $value === '' ) {
-				continue;
-			}
-
-			if ( $city === '' && ( false !== strpos( $q_text, 'work city' ) || $q_text === 'city' ) ) {
-				$city = $value;
-			}
-			if ( $state === '' && (
-				false !== strpos( $q_text, 'work state' )
-				|| false !== strpos( $q_text, 'state/province' )
-				|| $q_text === 'state'
-			) ) {
-				$state = $value;
-			}
-		}
-
-		return array( $city, $state );
-	}
-
-	private static function answer_value( array $answer ): string {
-		if ( ! empty( $answer['value'] ) ) {
-			if ( is_array( $answer['value'] ) ) {
-				return trim( implode( ', ', array_filter( array_map( 'strval', $answer['value'] ) ) ) );
-			}
-			return trim( (string) $answer['value'] );
-		}
-		if ( ! empty( $answer['values'] ) && is_array( $answer['values'] ) ) {
-			return trim( implode( ', ', array_filter( array_map( 'strval', $answer['values'] ) ) ) );
-		}
-		return '';
-	}
-
-	private static function extract_phone( array $att, string $type ): string {
+	public static function extract_work_location( array $att ): array {
 		$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-		$key     = ( $type === 'mobile' ) ? 'mobilePhone' : 'workPhone';
-
 		foreach ( array( $att, $contact ) as $src ) {
-			if ( ! empty( $src[ $key ] ) ) {
-				return (string) $src[ $key ];
+			$city  = trim( (string) ( $src['workCity']  ?? '' ) );
+			$state = self::format_work_state( $src['workState'] ?? '' );
+			if ( $city !== '' || $state !== '' ) {
+				return array( $city, $state );
 			}
 		}
-
-		if ( $type === 'work' && ! empty( $att['phone'] ) ) {
-			return (string) $att['phone'];
-		}
-
-		return '';
+		return array( '', '' );
 	}
 
 	private static function empty_order_meta(): array {

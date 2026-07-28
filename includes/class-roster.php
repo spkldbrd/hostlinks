@@ -8,9 +8,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Hostlinks_Roster {
 
-	const CACHE_PREFIX = 'hostlinks_roster_v2_';
+	const CACHE_PREFIX = 'hostlinks_roster_v3_';
 
-	const ATTENDEES_CACHE_PREFIX = 'hostlinks_roster_att_v1_';
+	const ATTENDEES_CACHE_PREFIX = 'hostlinks_roster_att_v2_';
 
 	const REFRESH_LOCK_PREFIX = 'hostlinks_roster_lock_v1_';
 
@@ -167,7 +167,7 @@ class Hostlinks_Roster {
 				'discount_code'     => implode( ', ', $meta['discounts'] ),
 				'work_city'         => $work_city,
 				'work_state'        => $work_state,
-				'reg_date'          => $meta['reg_date'] ?? '',
+				'reg_date'          => self::pick_reg_date( $meta['reg_date'] ?? '', $att ),
 			);
 		}
 
@@ -329,11 +329,14 @@ class Hostlinks_Roster {
 			$meta[ $uuid ]['order_nums'][ $order_num ] = $order_num;
 		}
 
-		// Registration date — take the earliest date seen across all order items for this attendee.
-		$item_date = trim( (string) ( $item['createdDate'] ?? $item['registrationDate'] ?? $item['orderDate'] ?? '' ) );
-		if ( $item_date !== '' ) {
-			if ( $meta[ $uuid ]['reg_date'] === '' || $item_date < $meta[ $uuid ]['reg_date'] ) {
-				$meta[ $uuid ]['reg_date'] = $item_date;
+		// Registration date — try every field name CVENT might use on an order item.
+		foreach ( array( 'createdDate', 'registrationDate', 'orderDate', 'dateCreated', 'registeredDate', 'orderCreatedDate' ) as $_df ) {
+			$item_date = trim( (string) ( $item[ $_df ] ?? '' ) );
+			if ( $item_date !== '' ) {
+				if ( $meta[ $uuid ]['reg_date'] === '' || $item_date < $meta[ $uuid ]['reg_date'] ) {
+					$meta[ $uuid ]['reg_date'] = $item_date;
+				}
+				break;
 			}
 		}
 	}
@@ -389,6 +392,24 @@ class Hostlinks_Roster {
 			}
 		}
 		return $raw;
+	}
+
+	/**
+	 * Pick the best registration date from the order-item meta and the attendee record.
+	 * Order-item meta takes priority (already the earliest date seen across items).
+	 * Falls back to date fields on the attendee object itself.
+	 */
+	private static function pick_reg_date( string $meta_date, array $att ): string {
+		if ( $meta_date !== '' ) {
+			return $meta_date;
+		}
+		foreach ( array( 'registrationDate', 'createdDate', 'dateCreated', 'registeredDate', 'orderDate' ) as $f ) {
+			$v = trim( (string) ( $att[ $f ] ?? '' ) );
+			if ( $v !== '' ) {
+				return $v;
+			}
+		}
+		return '';
 	}
 
 	public static function participant_label( array $att ): string {

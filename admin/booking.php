@@ -244,7 +244,7 @@ if ( $tot1 > 0 ) {
             <th style="width:40px;"></th>
             <th>Location</th><th>Paid</th><th>Free</th><th style="width:90px;">Date</th>
             <th style="width:60px;">Type</th><th>Zoom</th><th>Marketer</th>
-            <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th><th style="width:52px;" title="Average daily registrations tracked since first CVENT sync">Avg/day</th>
+            <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th><th style="width:64px;" title="Projected total registrations at event date, based on avg daily pace since first CVENT sync">Proj. Total</th>
           </tr>
         </thead>
         <tbody id="the-list">
@@ -337,9 +337,17 @@ if ( $tot1 > 0 ) {
               </select>
               <p class="hidder"><?php echo esc_html( $alldriver['event_instructor_name'] ?? '' ); ?></p>
             </td>
-            <td style="text-align:center;font-size:12px;color:#555;" title="Avg daily registrations since first CVENT sync"><?php
-              $_avg = $_hl_avg_regs[ (int) $alldriver['eve_id'] ] ?? null;
-              echo $_avg !== null ? esc_html( number_format( $_avg, 1 ) ) : '<span style="color:#bbb;">—</span>';
+            <td style="text-align:center;font-size:12px;" title="Projected total registrations at event date"><?php
+              $_stat      = $_hl_avg_regs[ (int) $alldriver['eve_id'] ] ?? null;
+              $_eve_start = ! empty( $alldriver['eve_start'] ) ? strtotime( $alldriver['eve_start'] ) : 0;
+              if ( $_stat !== null && $_eve_start > 0 ) {
+                  $_days_left = max( 0, (int) floor( ( $_eve_start - time() ) / DAY_IN_SECONDS ) );
+                  $_projected = (int) round( $_stat['latest_total'] + $_stat['avg'] * $_days_left );
+                  $_tip       = 'Now: ' . $_stat['latest_total'] . ' + (' . number_format( $_stat['avg'], 2 ) . '/day × ' . $_days_left . ' days)';
+                  echo '<span title="' . esc_attr( $_tip ) . '" style="font-weight:600;color:' . ( $_days_left > 0 ? '#0a6b00' : '#555' ) . ';">' . esc_html( $_projected ) . '</span>';
+              } else {
+                  echo '<span style="color:#bbb;">—</span>';
+              }
             ?></td>
           </tr>
                   <?php

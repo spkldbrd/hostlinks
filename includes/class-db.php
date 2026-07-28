@@ -388,14 +388,17 @@ class Hostlinks_DB {
 	}
 
 	/**
-	 * Return average daily registrations (paid + free) for multiple events.
+	 * Return registration pace data for multiple events.
 	 *
-	 * Computes (latest_total - first_total) / days_tracked for each event.
+	 * Each entry contains:
+	 *   avg          float  — registrations per day (first-to-latest sync window)
+	 *   latest_total int    — most recent known paid+free count
+	 *
 	 * Returns null for events with fewer than 2 sync snapshots or less than
 	 * 1 full day of history.
 	 *
 	 * @param int[] $eve_ids
-	 * @return array<int, float|null>  Map of eve_id => avg_daily (or null).
+	 * @return array<int, array{avg:float,latest_total:int}|null>
 	 */
 	public static function get_avg_daily_regs_bulk( array $eve_ids ): array {
 		if ( empty( $eve_ids ) ) {
@@ -405,8 +408,6 @@ class Hostlinks_DB {
 		$tbl          = $wpdb->prefix . 'hostlinks_cvent_sync_log';
 		$placeholders = implode( ',', array_fill( 0, count( $eve_ids ), '%d' ) );
 
-		// Fetch all snapshots for the requested events, oldest-first.
-		// Deliberately lean: only the three columns we need.
 		$rows = $wpdb->get_results(
 			// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
 			$wpdb->prepare(
@@ -419,14 +420,13 @@ class Hostlinks_DB {
 			ARRAY_A
 		);
 
-		// Group rows by event id and track first/last snapshot in PHP.
 		$by_event = array();
 		foreach ( $rows as $row ) {
 			$eid = (int) $row['eve_id'];
 			if ( ! isset( $by_event[ $eid ] ) ) {
 				$by_event[ $eid ] = array( 'first' => $row, 'last' => $row );
 			} else {
-				$by_event[ $eid ]['last'] = $row; // rows are ASC, so last = newest
+				$by_event[ $eid ]['last'] = $row;
 			}
 		}
 
@@ -437,7 +437,7 @@ class Hostlinks_DB {
 			$last  = $data['last'];
 
 			if ( $first['synced_at'] === $last['synced_at'] ) {
-				$result[ $eid ] = null; // only one snapshot
+				$result[ $eid ] = null;
 				continue;
 			}
 
@@ -446,12 +446,15 @@ class Hostlinks_DB {
 			$days = (int) $dt1->diff( $dt2 )->days;
 
 			if ( $days < 1 ) {
-				$result[ $eid ] = null; // less than a full day
+				$result[ $eid ] = null;
 				continue;
 			}
 
 			$regs_added     = max( 0, (int) $last['total'] - (int) $first['total'] );
-			$result[ $eid ] = round( $regs_added / $days, 1 );
+			$result[ $eid ] = array(
+				'avg'          => round( $regs_added / $days, 2 ),
+				'latest_total' => (int) $last['total'],
+			);
 		}
 
 		return $result;

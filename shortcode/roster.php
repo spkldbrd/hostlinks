@@ -47,11 +47,18 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 ?>
 <div id="hl-roster-shell">
 <div id="hl-roster-admin-bar" style="display:none;margin-bottom:12px;">
-	<div style="display:flex;justify-content:flex-end;gap:6px;align-items:center;flex-wrap:wrap;">
-		<button id="hl-roster-print-btn" class="hl-roster-admin-btn hl-roster-admin-btn--primary">&#x1F5A8; Print</button>
-		<?php if ( current_user_can( 'manage_options' ) ) : ?>
-		<button id="hl-roster-refresh-btn" class="hl-roster-admin-btn">&#x21BB; Refresh Roster</button>
-		<?php endif; ?>
+	<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+		<div id="hl-roster-view-presets" style="display:none;align-items:center;gap:8px;font-size:13px;color:#555;flex-wrap:wrap;">
+			<span>View:</span>
+			<button type="button" id="hl-roster-view-signin" class="hl-roster-admin-btn hl-roster-admin-btn--primary">Sign-in sheet</button>
+			<button type="button" id="hl-roster-view-details" class="hl-roster-admin-btn">Registrant details</button>
+		</div>
+		<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+			<button id="hl-roster-print-btn" class="hl-roster-admin-btn hl-roster-admin-btn--primary">&#x1F5A8; Print</button>
+			<?php if ( current_user_can( 'manage_options' ) ) : ?>
+			<button id="hl-roster-refresh-btn" class="hl-roster-admin-btn">&#x21BB; Refresh Roster</button>
+			<?php endif; ?>
+		</div>
 	</div>
 	<?php require HOSTLINKS_PLUGIN_DIR . 'shortcode/roster-toggles.php'; ?>
 </div>

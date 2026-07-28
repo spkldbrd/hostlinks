@@ -1,9 +1,4 @@
-	<div id="hl-roster-view-presets" style="display:none;justify-content:flex-end;align-items:center;gap:8px;font-size:13px;color:#555;padding-top:8px;flex-wrap:wrap;">
-		<span>View:</span>
-		<button type="button" id="hl-roster-view-signin" class="hl-roster-admin-btn hl-roster-admin-btn--primary">Sign-in sheet</button>
-		<button type="button" id="hl-roster-view-details" class="hl-roster-admin-btn">Registrant details</button>
-	</div>
-	<div id="hl-roster-col-toggles" style="display:none;justify-content:flex-end;align-items:center;gap:12px;font-size:13px;color:#555;padding-top:6px;flex-wrap:wrap;">
+	<div id="hl-roster-col-toggles" style="display:none;justify-content:flex-start;align-items:center;gap:12px;font-size:13px;color:#555;padding-top:6px;flex-wrap:wrap;">
 		<span>Show columns:</span>
 		<?php
 		$toggle_labels = array(

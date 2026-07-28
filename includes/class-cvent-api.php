@@ -19,7 +19,7 @@ class Hostlinks_CVENT_API {
 
 	const TOKEN_URL    = 'https://api-platform.cvent.com/ea/oauth2/token';
 	const BASE_URL     = 'https://api-platform.cvent.com/ea/';
-	const TOKEN_KEY    = 'hostlinks_cvent_token_v3'; // v3: includes orders scope
+	const TOKEN_KEY    = 'hostlinks_cvent_token_v4'; // v4: contacts:read for roster work city/state
 	const SETTINGS_KEY = 'hostlinks_cvent_settings';
 	const MAX_RETRIES  = 3;
 
@@ -91,7 +91,7 @@ class Hostlinks_CVENT_API {
 				),
 				'body'    => http_build_query( array(
 					'grant_type' => 'client_credentials',
-					'scope'      => 'event/events:read event/attendees:read event/orders:read',
+					'scope'      => self::REQUESTED_SCOPE,
 				) ),
 				'timeout' => 20,
 			)
@@ -136,7 +136,7 @@ class Hostlinks_CVENT_API {
 	/**
 	 * The OAuth scope string we request — exposed so the diagnostic can display it.
 	 */
-	const REQUESTED_SCOPE = 'event/events:read event/attendees:read event/orders:read';
+	const REQUESTED_SCOPE = 'event/events:read event/attendees:read event/orders:read contact/contacts:read';
 
 	// -------------------------------------------------------------------------
 	// HTTP layer
@@ -427,8 +427,22 @@ class Hostlinks_CVENT_API {
 	 * @param string $attendee_id  CVENT attendee UUID.
 	 * @return array|WP_Error      Attendee record array, or WP_Error on failure.
 	 */
-	public static function get_attendee( $attendee_id ) {
-		return self::request( 'attendees/' . self::sanitize_uuid( $attendee_id ) );
+	public static function get_attendee( $attendee_id, $expand = '' ) {
+		$params = array();
+		if ( $expand !== '' ) {
+			$params['expand'] = $expand;
+		}
+		return self::request( 'attendees/' . self::sanitize_uuid( $attendee_id ), $params );
+	}
+
+	/**
+	 * Fetch a contact record (work city/state live on contact.workAddress).
+	 *
+	 * @param string $contact_id CVENT contact UUID.
+	 * @return array|WP_Error
+	 */
+	public static function get_contact( $contact_id ) {
+		return self::request( 'contacts/' . self::sanitize_uuid( $contact_id ) );
 	}
 
 	/**

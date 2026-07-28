@@ -1,8 +1,6 @@
 <?php
 /**
  * Roster inner content — shared by both the AJAX handler and direct include paths.
- *
- * Expects $eve_id (int) and $wpdb (global) to be available.
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -36,7 +34,6 @@ if ( is_wp_error( $_rc_loaded ) ) {
 }
 
 $_rc_is_past    = $_rc_loaded['is_past'];
-$_rc_from_cache = $_rc_loaded['from_cache'];
 $_rc_items      = $_rc_loaded['items'];
 $_rc_attendees  = Hostlinks_Roster::build_rows( $_rc_items, $_rc_is_past );
 
@@ -49,14 +46,14 @@ $_rc_end_date   = ! empty( $_rc_row['eve_end'] ) && $_rc_row['eve_end'] !== $_rc
                   ? ' – ' . date( 'F j, Y', strtotime( $_rc_row['eve_end'] ) ) : '';
 $_rc_logo       = get_option( 'hostlinks_roster_logo_url', '' );
 ?>
-<div class="hl-fe-roster">
+<div class="hl-fe-roster" data-is-past="<?php echo $_rc_is_past ? '1' : '0'; ?>">
 
 	<div class="hl-fe-roster-header">
 		<div>
 			<h2 class="hl-fe-roster-title"><?php echo esc_html( $_rc_title ); ?></h2>
 			<p class="hl-fe-roster-meta">
 				<?php if ( $_rc_start_date ) echo esc_html( $_rc_start_date . $_rc_end_date ) . ' &nbsp;|&nbsp; '; ?>
-				<?php echo (int) $_rc_count; ?> attendee<?php echo $_rc_count !== 1 ? 's' : ''; ?>
+				<?php echo (int) $_rc_count; ?> registrant<?php echo $_rc_count !== 1 ? 's' : ''; ?>
 			</p>
 		</div>
 		<?php if ( $_rc_logo ) : ?>
@@ -66,54 +63,9 @@ $_rc_logo       = get_option( 'hostlinks_roster_logo_url', '' );
 		<?php endif; ?>
 	</div>
 
-	<?php if ( empty( $_rc_attendees ) ) : ?>
-	<p style="color:#888;padding:20px 0;">No registered attendees found for this event.</p>
-	<?php else : ?>
-	<table class="hl-fe-roster-table">
-		<thead>
-			<tr>
-				<th>#</th>
-				<th>Last Name</th>
-				<th>First Name</th>
-				<th>Company / Agency</th>
-				<th>Title</th>
-				<th class="hl-fe-col-work-city">Work City</th>
-				<th class="hl-fe-col-work-state">Work State</th>
-				<th class="hl-fe-col-discount">Discount Code</th>
-				<th class="hl-fe-col-balance">Balance Due</th>
-				<?php if ( $_rc_is_past ) : ?>
-				<th class="hl-fe-col-participant">Participant</th>
-				<?php endif; ?>
-				<th class="hl-fe-col-email">Email</th>
-				<th class="hl-fe-col-phone">Phone</th>
-				<th class="hl-fe-sign-in">Sign In</th>
-			</tr>
-		</thead>
-		<tbody>
-		<?php foreach ( $_rc_attendees as $_rc_i => $_rc_att ) : ?>
-			<tr>
-				<td class="hl-fe-num"><?php echo $_rc_i + 1; ?></td>
-				<td><?php echo esc_html( $_rc_att['last'] ); ?></td>
-				<td><?php echo esc_html( $_rc_att['first'] ); ?></td>
-				<td><?php echo esc_html( $_rc_att['company'] ); ?></td>
-				<td><?php echo esc_html( $_rc_att['title'] ); ?></td>
-				<td class="hl-fe-col-work-city"><?php echo esc_html( $_rc_att['work_city'] ); ?></td>
-				<td class="hl-fe-col-work-state"><?php echo esc_html( $_rc_att['work_state'] ); ?></td>
-				<td class="hl-fe-col-discount"><?php echo esc_html( $_rc_att['discounts'] ); ?></td>
-				<td class="hl-fe-col-balance"><?php echo esc_html( $_rc_att['balance_due'] ); ?></td>
-				<?php if ( $_rc_is_past ) : ?>
-				<td class="hl-fe-col-participant"><?php echo esc_html( $_rc_att['participant'] ); ?></td>
-				<?php endif; ?>
-				<td class="hl-fe-col-email"><?php echo esc_html( $_rc_att['email'] ); ?></td>
-				<td class="hl-fe-col-phone"><?php echo esc_html( $_rc_att['phone'] ); ?></td>
-				<td class="hl-fe-sign-in">&nbsp;</td>
-			</tr>
-		<?php endforeach; ?>
-		</tbody>
-	</table>
-	<?php endif; ?>
+	<?php echo Hostlinks_Roster::render_table( $_rc_attendees, $_rc_is_past, 'hl-fe' ); ?>
 
-</div><!-- .hl-fe-roster -->
+</div>
 
 <style>
 .hl-fe-roster { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
@@ -123,35 +75,32 @@ $_rc_logo       = get_option( 'hostlinks_roster_logo_url', '' );
 .hl-fe-roster-actions { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
 .hl-fe-roster-logo { max-height:72px; max-width:240px; object-fit:contain; display:block; }
 .hl-fe-roster-table { width:100%; border-collapse:collapse; font-size:13px; }
-.hl-fe-roster-table th { background:#1d2327; color:#fff; padding:7px 10px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; border:1px solid #3c434a; }
+.hl-fe-roster-table th { background:#1d2327; color:#fff; padding:7px 10px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; border:1px solid #3c434a; white-space:nowrap; }
 .hl-fe-roster-table td { padding:6px 10px; border:1px solid #ddd; vertical-align:top; }
 .hl-fe-roster-table tr:nth-child(even) td { background:#f9f9f9; }
 .hl-fe-num { color:#aaa; font-size:11px; width:30px; }
 .hl-fe-sign-in { width:260px; min-width:160px; }
-.hl-fe-col-email, .hl-fe-col-phone,
-.hl-fe-col-discount, .hl-fe-col-balance,
-.hl-fe-col-participant, .hl-fe-col-work-city, .hl-fe-col-work-state { display:none; }
+.hl-fe-roster-totals { display:none; gap:10px; flex-wrap:wrap; margin-top:14px; }
+.hl-fe-roster-total-card { display:none; flex:1 1 180px; border:1px solid #ddd; border-radius:4px; padding:8px 10px; font-size:12px; background:#fafafa; }
+.hl-fe-roster-total-card strong { display:block; margin-bottom:4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+.hl-fe-roster-total-card span { display:block; color:#555; line-height:1.5; }
+<?php echo Hostlinks_Roster::optional_col_css( 'hl-fe' ); ?>
 .hl-fe-error { color:#d63638; padding:20px 0; }
 @media print {
-	@page                           { size: landscape; margin: 0.5in; }
-	body *                          { visibility:hidden; }
-	body                            { background:#fff !important; margin:0 !important; padding:0 !important; }
-	.hl-fe-roster                   { visibility:visible; position:absolute; left:0; top:0; width:100%; padding:0 16px; box-sizing:border-box; }
-	.hl-fe-roster *                 { visibility:visible; }
-	.hl-fe-roster-actions           { display:flex !important; justify-content:flex-end; border-bottom:none !important; padding-bottom:0 !important; }
-	.hl-fe-roster-btn, .hl-fe-roster-toggles { display:none !important; }
-	.hl-fe-roster-logo              { display:block !important; max-height:72px; max-width:240px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-	.hl-fe-roster-table             { width:100%; border-collapse:collapse; }
-	.hl-fe-roster-table th          { background:#000 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-	.hl-fe-roster-table td,
-	.hl-fe-roster-table th          { border:1px solid #666 !important; padding:5px 8px; }
-	.hl-fe-col-email.hl-fe-col-visible,
-	.hl-fe-col-phone.hl-fe-col-visible,
-	.hl-fe-col-discount.hl-fe-col-visible,
-	.hl-fe-col-balance.hl-fe-col-visible,
-	.hl-fe-col-participant.hl-fe-col-visible,
-	.hl-fe-col-work-city.hl-fe-col-visible,
-	.hl-fe-col-work-state.hl-fe-col-visible { display:table-cell !important; }
-	.hl-fe-sign-in                  { width:200pt; }
+	@page { size: landscape; margin: 0.5in; }
+	body * { visibility:hidden; }
+	body { background:#fff !important; margin:0 !important; padding:0 !important; }
+	.hl-fe-roster { visibility:visible; position:absolute; left:0; top:0; width:100%; padding:0 16px; box-sizing:border-box; }
+	.hl-fe-roster * { visibility:visible; }
+	.hl-fe-roster-actions { display:flex !important; justify-content:flex-end; }
+	.hl-fe-roster-btn, .hl-fe-roster-toggles, #hl-roster-col-toggles { display:none !important; }
+	.hl-fe-roster-logo { display:block !important; max-height:72px; max-width:240px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+	.hl-fe-roster-table { width:100%; border-collapse:collapse; }
+	.hl-fe-roster-table th { background:#000 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+	.hl-fe-roster-table td, .hl-fe-roster-table th { border:1px solid #666 !important; padding:5px 8px; }
+	<?php echo Hostlinks_Roster::optional_col_visible_css( 'hl-fe' ); ?>
+	.hl-fe-sign-in { width:200pt; }
+	.hl-fe-roster-totals { display:flex !important; }
+	.hl-fe-roster-total-card.hl-fe-col-visible { display:block !important; }
 }
 </style>

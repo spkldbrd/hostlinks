@@ -171,12 +171,19 @@ body {
 	font-size: 13px;
 }
 .hl-roster-table tr:nth-child(even) td { background: #f9f9f9; }
-.hl-sign-in-col { width: 280px; min-width: 200px; }
+.hl-sign-in { width: 280px; min-width: 200px; }
 
 /* Hidden columns — toggled by JS */
-.hl-col-email, .hl-col-phone,
-.hl-col-discount, .hl-col-balance,
-.hl-col-participant, .hl-col-work-city, .hl-col-work-state { display: none; }
+<?php echo Hostlinks_Roster::optional_col_css( 'hl' ); ?>
+
+.hl-roster-totals { display: none; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.hl-roster-total-card { display: none; flex: 1 1 180px; border: 1px solid #dcdcde; border-radius: 4px; padding: 8px 10px; font-size: 12px; background: #fafafa; }
+.hl-roster-total-card strong { display: block; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.hl-roster-total-card span { display: block; color: #555; line-height: 1.5; }
+
+.hl-view-presets { display: flex; gap: 8px; align-items: center; padding: 8px 0 0; font-size: 13px; color: #444; flex-wrap: wrap; }
+.hl-view-presets .hl-roster-btn { margin: 0; }
+.hl-view-presets .hl-roster-btn--active { background: #0da2e7; color: #fff; border-color: #0b8fcf; }
 
 .hl-roster-empty { text-align: center; padding: 40px; color: #666; }
 .hl-debug-box {
@@ -193,7 +200,7 @@ body {
 	@page { size: landscape; margin: 0.5in; }
 	body { background: #fff; font-size: 11pt; }
 	.hl-roster-wrap { border: none; box-shadow: none; padding: 0; max-width: 100%; margin: 0; }
-	.hl-roster-btn, .hl-col-toggles,
+	.hl-roster-btn, .hl-col-toggles, .hl-view-presets,
 	.hl-cache-note, .hl-debug-box { display: none !important; }
 	.hl-roster-controls { display: flex !important; justify-content: flex-end; gap: 0; }
 	.hl-roster-logo { display: block !important; max-height: 72px; max-width: 240px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -202,13 +209,11 @@ body {
 	.hl-roster-table { width: 100%; }
 	.hl-roster-table th { background: #000 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 	.hl-roster-table td, .hl-roster-table th { border: 1px solid #666 !important; padding: 5px 7px; }
-	.hl-sign-in-col { width: 240pt; }
+	.hl-sign-in { width: 240pt; }
+	<?php echo Hostlinks_Roster::optional_col_visible_css( 'hl' ); ?>
+	.hl-roster-totals { display: flex !important; }
+	.hl-roster-total-card.hl-col-visible { display: block !important; }
 	tr { page-break-inside: avoid; }
-	/* When printing, show whichever optional columns are currently visible */
-	.hl-col-email.hl-col-visible, .hl-col-phone.hl-col-visible,
-	.hl-col-discount.hl-col-visible, .hl-col-balance.hl-col-visible,
-	.hl-col-participant.hl-col-visible, .hl-col-work-city.hl-col-visible,
-	.hl-col-work-state.hl-col-visible { display: table-cell !important; }
 }
 </style>
 </head>
@@ -247,18 +252,37 @@ body {
 	</div>
 
 	<?php if ( ! empty( $attendees ) ) : ?>
+	<div class="hl-view-presets">
+		<span style="color:#888;font-size:12px;">View:</span>
+		<button type="button" id="hl-view-signin" class="hl-roster-btn hl-roster-btn--active">Sign-in sheet</button>
+		<button type="button" id="hl-view-details" class="hl-roster-btn hl-roster-btn--secondary">Registrant details</button>
+	</div>
 	<div class="hl-col-toggles">
 		<span style="color:#888;font-size:12px;">Show columns:</span>
-		<label><input type="checkbox" id="hl-toggle-work-city"> Work City</label>
-		<label><input type="checkbox" id="hl-toggle-work-state"> Work State</label>
-		<label><input type="checkbox" id="hl-toggle-discount"> Discount Code</label>
-		<label><input type="checkbox" id="hl-toggle-balance"> Balance Due</label>
-		<?php if ( $is_past_event ) : ?>
-		<label><input type="checkbox" id="hl-toggle-participant"> Participant</label>
-		<?php endif; ?>
-		<label><input type="checkbox" id="hl-toggle-email"> Email</label>
-		<label><input type="checkbox" id="hl-toggle-phone"> Phone</label>
-		<em style="color:#aaa;font-size:11px;margin-left:4px;">(not for public view)</em>
+		<?php
+		$toggle_labels = array(
+			'participant'       => 'Participant',
+			'email'             => 'Email',
+			'status'            => 'Invitee Status',
+			'work_phone'        => 'Work Phone',
+			'mobile_phone'      => 'Mobile Phone',
+			'amount_ordered'    => 'Amount Ordered',
+			'amount_paid'       => 'Amount Paid',
+			'discounts_applied' => 'Discounts Applied',
+			'balance_due'       => 'Amount Due',
+			'payment_type'      => 'Payment Type',
+			'work_city'         => 'Work City',
+			'work_state'        => 'Work State',
+			'discount_code'     => 'Discount Code',
+		);
+		foreach ( $toggle_labels as $slug => $label ) :
+			$id = 'hl-toggle-' . str_replace( '_', '-', $slug );
+		?>
+		<label id="<?php echo esc_attr( $id ); ?>-wrap"<?php echo ( $slug === 'participant' && ! $is_past_event ) ? ' style="display:none;"' : ''; ?>>
+			<input type="checkbox" id="<?php echo esc_attr( $id ); ?>" data-col="<?php echo esc_attr( $slug ); ?>"> <?php echo esc_html( $label ); ?>
+		</label>
+		<?php endforeach; ?>
+		<em style="color:#aaa;font-size:11px;margin-left:4px;">(staff only)</em>
 	</div>
 	<?php endif; ?>
 
@@ -268,48 +292,7 @@ body {
 		<p style="font-size:12px;color:#aaa;">Total raw records fetched: <?php echo count( $attendees_raw ); ?></p>
 	</div>
 	<?php else : ?>
-	<table class="hl-roster-table">
-		<thead>
-			<tr>
-				<th>#</th>
-				<th>Last Name</th>
-				<th>First Name</th>
-				<th>Company / Agency</th>
-				<th>Title</th>
-				<th class="hl-col-work-city">Work City</th>
-				<th class="hl-col-work-state">Work State</th>
-				<th class="hl-col-discount">Discount Code</th>
-				<th class="hl-col-balance">Balance Due</th>
-				<?php if ( $is_past_event ) : ?>
-				<th class="hl-col-participant">Participant</th>
-				<?php endif; ?>
-				<th class="hl-col-email">Email</th>
-				<th class="hl-col-phone">Phone</th>
-				<th class="hl-sign-in-col">Sign In</th>
-			</tr>
-		</thead>
-		<tbody>
-		<?php foreach ( $attendees as $i => $att ) : ?>
-			<tr>
-				<td style="color:#aaa;font-size:12px;"><?php echo $i + 1; ?></td>
-				<td><?php echo esc_html( $att['last'] ); ?></td>
-				<td><?php echo esc_html( $att['first'] ); ?></td>
-				<td><?php echo esc_html( $att['company'] ); ?></td>
-				<td><?php echo esc_html( $att['title'] ); ?></td>
-				<td class="hl-col-work-city"><?php echo esc_html( $att['work_city'] ); ?></td>
-				<td class="hl-col-work-state"><?php echo esc_html( $att['work_state'] ); ?></td>
-				<td class="hl-col-discount"><?php echo esc_html( $att['discounts'] ); ?></td>
-				<td class="hl-col-balance"><?php echo esc_html( $att['balance_due'] ); ?></td>
-				<?php if ( $is_past_event ) : ?>
-				<td class="hl-col-participant"><?php echo esc_html( $att['participant'] ); ?></td>
-				<?php endif; ?>
-				<td class="hl-col-email"><?php echo esc_html( $att['email'] ); ?></td>
-				<td class="hl-col-phone"><?php echo esc_html( $att['phone'] ); ?></td>
-				<td class="hl-sign-in-col">&nbsp;</td>
-			</tr>
-		<?php endforeach; ?>
-		</tbody>
-	</table>
+	<?php echo Hostlinks_Roster::render_table( $attendees, $is_past_event, 'hl' ); ?>
 	<?php endif; ?>
 
 	<?php if ( $do_debug ) : ?>
@@ -336,6 +319,13 @@ body {
 		<?php if ( ! empty( $attendees_raw ) ) : ?>
 			<strong>First raw attendee record:</strong>
 			<pre><?php echo esc_html( wp_json_encode( reset( $attendees_raw ), JSON_PRETTY_PRINT ) ); ?></pre>
+			<?php
+			$sample_att = reset( $attendees_raw );
+			list( $dbg_city, $dbg_state ) = Hostlinks_Roster::extract_work_location( $sample_att );
+			?>
+			<strong>Extracted work location (first attendee):</strong>
+			city=<?php echo esc_html( $dbg_city ?: '(empty)' ); ?>,
+			state=<?php echo esc_html( $dbg_state ?: '(empty)' ); ?>
 		<?php else : ?>
 			<em style="color:#c00;">No attendee records — either order items were empty or no attendee UUIDs could be extracted.</em>
 		<?php endif; ?>
@@ -346,32 +336,76 @@ body {
 
 <script>
 (function() {
-	function toggleCol(cls, show) {
+	var detailsCols = <?php echo wp_json_encode( Hostlinks_Roster::DETAILS_PRESET ); ?>;
+	var prefix = 'hl';
+
+	function colClass(slug) {
+		return prefix + '-col-' + slug.replace(/_/g, '-');
+	}
+
+	function toggleCol(slug, show) {
+		var cls = colClass(slug);
 		var els = document.querySelectorAll('.' + cls);
 		for (var i = 0; i < els.length; i++) {
-			if (show) {
-				els[i].style.display = 'table-cell';
-				els[i].classList.add('hl-col-visible');
-			} else {
-				els[i].style.display = 'none';
-				els[i].classList.remove('hl-col-visible');
+			els[i].style.display = show ? 'table-cell' : 'none';
+			els[i].classList[show ? 'add' : 'remove'](prefix + '-col-visible');
+		}
+		updateTotalsVisibility();
+	}
+
+	function updateTotalsVisibility() {
+		var totals = document.querySelector('.hl-roster-totals');
+		if (!totals) return;
+		var amountSlugs = ['amount_ordered', 'amount_paid', 'discounts_applied', 'balance_due'];
+		var any = false;
+		for (var i = 0; i < amountSlugs.length; i++) {
+			var card = totals.querySelector('.' + colClass(amountSlugs[i]));
+			var chk = document.querySelector('[data-col="' + amountSlugs[i] + '"]');
+			var on = chk && chk.checked;
+			if (card) {
+				card.style.display = on ? 'block' : 'none';
+				card.classList[on ? 'add' : 'remove'](prefix + '-col-visible');
 			}
+			if (on) any = true;
+		}
+		totals.style.display = any ? 'flex' : 'none';
+	}
+
+	function setPreset(cols) {
+		var checks = document.querySelectorAll('.hl-col-toggles [data-col]');
+		for (var i = 0; i < checks.length; i++) {
+			var slug = checks[i].getAttribute('data-col');
+			var show = cols.indexOf(slug) !== -1;
+			checks[i].checked = show;
+			toggleCol(slug, show);
 		}
 	}
-	var emailChk = document.getElementById('hl-toggle-email');
-	var phoneChk = document.getElementById('hl-toggle-phone');
-	if (emailChk) emailChk.addEventListener('change', function() { toggleCol('hl-col-email', this.checked); });
-	if (phoneChk) phoneChk.addEventListener('change', function() { toggleCol('hl-col-phone', this.checked); });
-	[
-		['hl-toggle-work-city', 'hl-col-work-city'],
-		['hl-toggle-work-state', 'hl-col-work-state'],
-		['hl-toggle-discount', 'hl-col-discount'],
-		['hl-toggle-balance', 'hl-col-balance'],
-		['hl-toggle-participant', 'hl-col-participant'],
-	].forEach(function(pair) {
-		var el = document.getElementById(pair[0]);
-		if (el) el.addEventListener('change', function() { toggleCol(pair[1], this.checked); });
-	});
+
+	var checks = document.querySelectorAll('.hl-col-toggles [data-col]');
+	for (var i = 0; i < checks.length; i++) {
+		(function(el) {
+			el.addEventListener('change', function() {
+				toggleCol(el.getAttribute('data-col'), el.checked);
+			});
+		})(checks[i]);
+	}
+
+	var signinBtn = document.getElementById('hl-view-signin');
+	var detailsBtn = document.getElementById('hl-view-details');
+	if (signinBtn) {
+		signinBtn.addEventListener('click', function() {
+			setPreset([]);
+			signinBtn.classList.add('hl-roster-btn--active');
+			if (detailsBtn) detailsBtn.classList.remove('hl-roster-btn--active');
+		});
+	}
+	if (detailsBtn) {
+		detailsBtn.addEventListener('click', function() {
+			setPreset(detailsCols);
+			detailsBtn.classList.add('hl-roster-btn--active');
+			if (signinBtn) signinBtn.classList.remove('hl-roster-btn--active');
+		});
+	}
 })();
 </script>
 </body>

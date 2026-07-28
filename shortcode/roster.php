@@ -52,17 +52,7 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 		<button id="hl-roster-refresh-btn" class="hl-roster-admin-btn">&#x21BB; Refresh Roster</button>
 		<?php endif; ?>
 	</div>
-	<div id="hl-roster-col-toggles" style="display:none;justify-content:flex-end;align-items:center;gap:14px;font-size:13px;color:#555;padding-top:6px;flex-wrap:wrap;">
-		<span>Show columns:</span>
-		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-work-city" style="width:14px;height:14px;"> Work City</label>
-		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-work-state" style="width:14px;height:14px;"> Work State</label>
-		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-discount" style="width:14px;height:14px;"> Discount Code</label>
-		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-balance" style="width:14px;height:14px;"> Balance Due</label>
-		<label id="hl-fe-participant-wrap" style="cursor:pointer;display:none;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-participant" style="width:14px;height:14px;"> Participant</label>
-		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-email" style="width:14px;height:14px;"> Email</label>
-		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-phone" style="width:14px;height:14px;"> Phone</label>
-		<em style="color:#aaa;font-size:11px;">(not for public view)</em>
-	</div>
+	<?php require HOSTLINKS_PLUGIN_DIR . 'shortcode/roster-toggles.php'; ?>
 </div>
 
 <div id="hl-roster-loader">
@@ -111,6 +101,91 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	var eveId    = <?php echo (int) $eve_id; ?>;
 	var nonce    = <?php echo wp_json_encode( $_sh_nonce ); ?>;
 	var refresh  = <?php echo $_sh_do_refresh ? 'true' : 'false'; ?>;
+	var detailsCols = <?php echo wp_json_encode( Hostlinks_Roster::DETAILS_PRESET ); ?>;
+	var prefix = 'hl-fe';
+
+	function colClass( slug ) {
+		return prefix + '-col-' + slug.replace( /_/g, '-' );
+	}
+
+	function toggleCol( slug, show ) {
+		var cls = colClass( slug );
+		var els = document.querySelectorAll( '.' + cls );
+		for ( var i = 0; i < els.length; i++ ) {
+			els[i].style.display = show ? 'table-cell' : 'none';
+			els[i].classList[ show ? 'add' : 'remove' ]( prefix + '-col-visible' );
+		}
+		updateTotalsVisibility();
+	}
+
+	function updateTotalsVisibility() {
+		var totals = document.querySelector( '.hl-fe-roster-totals' );
+		if ( ! totals ) return;
+		var amountSlugs = [ 'amount_ordered', 'amount_paid', 'discounts_applied', 'balance_due' ];
+		var any = false;
+		for ( var i = 0; i < amountSlugs.length; i++ ) {
+			var card = totals.querySelector( '.' + colClass( amountSlugs[i] ) );
+			var chk  = document.querySelector( '[data-col="' + amountSlugs[i] + '"]' );
+			var on   = chk && chk.checked;
+			if ( card ) {
+				card.style.display = on ? 'block' : 'none';
+				card.classList[ on ? 'add' : 'remove' ]( prefix + '-col-visible' );
+			}
+			if ( on ) any = true;
+		}
+		totals.style.display = any ? 'flex' : 'none';
+	}
+
+	function setPreset( cols ) {
+		var checks = document.querySelectorAll( '#hl-roster-col-toggles [data-col]' );
+		for ( var i = 0; i < checks.length; i++ ) {
+			var slug = checks[i].getAttribute( 'data-col' );
+			var show = cols.indexOf( slug ) !== -1;
+			checks[i].checked = show;
+			toggleCol( slug, show );
+		}
+	}
+
+	function initRosterToggles( output ) {
+		var viewPresets = document.getElementById( 'hl-roster-view-presets' );
+		var colToggles  = document.getElementById( 'hl-roster-col-toggles' );
+		if ( colToggles && output.querySelector( '.hl-fe-roster-table' ) ) {
+			if ( viewPresets ) viewPresets.style.display = 'flex';
+			colToggles.style.display = 'flex';
+		}
+
+		var partWrap = document.getElementById( 'hl-fe-participant-wrap' );
+		if ( partWrap && output.querySelector( '.hl-fe-col-participant' ) ) {
+			partWrap.style.display = 'flex';
+		}
+
+		var checks = document.querySelectorAll( '#hl-roster-col-toggles [data-col]' );
+		for ( var i = 0; i < checks.length; i++ ) {
+			( function ( el ) {
+				el.checked = false;
+				el.addEventListener( 'change', function () {
+					toggleCol( el.getAttribute( 'data-col' ), el.checked );
+				} );
+			} )( checks[i] );
+		}
+
+		var signinBtn = document.getElementById( 'hl-roster-view-signin' );
+		var detailsBtn = document.getElementById( 'hl-roster-view-details' );
+		if ( signinBtn ) {
+			signinBtn.addEventListener( 'click', function () {
+				setPreset( [] );
+				signinBtn.classList.add( 'hl-roster-admin-btn--primary' );
+				if ( detailsBtn ) detailsBtn.classList.remove( 'hl-roster-admin-btn--primary' );
+			} );
+		}
+		if ( detailsBtn ) {
+			detailsBtn.addEventListener( 'click', function () {
+				setPreset( detailsCols );
+				detailsBtn.classList.add( 'hl-roster-admin-btn--primary' );
+				if ( signinBtn ) signinBtn.classList.remove( 'hl-roster-admin-btn--primary' );
+			} );
+		}
+	}
 
 	function buildUrl( withRefresh ) {
 		var u = ajaxUrl + '?action=hostlinks_get_roster&eve_id=' + eveId + '&_nonce=' + encodeURIComponent( nonce );
@@ -124,6 +199,8 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 		var output   = document.getElementById( 'hl-roster-output' );
 			if ( loader )   { loader.style.display = 'block'; loader.style.animation = 'none'; loader.style.opacity = '0'; setTimeout(function(){ loader.style.animation = 'hl-loader-fadein 0.4s ease 0.6s forwards'; }, 10); }
 			if ( adminBar ) adminBar.style.display = 'none';
+			var viewPresets = document.getElementById( 'hl-roster-view-presets' );
+			if ( viewPresets ) viewPresets.style.display = 'none';
 			var colToggles = document.getElementById( 'hl-roster-col-toggles' );
 			if ( colToggles ) colToggles.style.display = 'none';
 			if ( output )   output.innerHTML = '';
@@ -136,37 +213,7 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 				if ( output ) {
 					if ( data.success ) {
 						output.innerHTML = data.data.html;
-						// Show the column toggles if there are attendee rows.
-						var colToggles = document.getElementById( 'hl-roster-col-toggles' );
-						if ( colToggles && output.querySelector( '.hl-fe-roster-table' ) ) {
-							colToggles.style.display = 'flex';
-						}
-						(function () {
-							function tog( cls, show ) {
-								var els = output.querySelectorAll( '.' + cls );
-								for ( var i = 0; i < els.length; i++ ) {
-									els[i].style.display = show ? 'table-cell' : 'none';
-									els[i].classList[ show ? 'add' : 'remove' ]( 'hl-fe-col-visible' );
-								}
-							}
-							function bindToggle( id, cls ) {
-								var el = document.getElementById( id );
-								if ( ! el ) return;
-								el.checked = false;
-								el.addEventListener( 'change', function () { tog( cls, this.checked ); } );
-							}
-							bindToggle( 'hl-fe-work-city', 'hl-fe-col-work-city' );
-							bindToggle( 'hl-fe-work-state', 'hl-fe-col-work-state' );
-							bindToggle( 'hl-fe-discount', 'hl-fe-col-discount' );
-							bindToggle( 'hl-fe-balance', 'hl-fe-col-balance' );
-							bindToggle( 'hl-fe-participant', 'hl-fe-col-participant' );
-							bindToggle( 'hl-fe-email', 'hl-fe-col-email' );
-							bindToggle( 'hl-fe-phone', 'hl-fe-col-phone' );
-							var partWrap = document.getElementById( 'hl-fe-participant-wrap' );
-							if ( partWrap && output.querySelector( '.hl-fe-col-participant' ) ) {
-								partWrap.style.display = 'flex';
-							}
-						})();
+						initRosterToggles( output );
 					} else {
 						output.innerHTML = '<p style="color:#d63638;padding:20px 0;">' +
 							( data.data || 'Could not load roster. Please try again.' ) + '</p>';

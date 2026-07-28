@@ -8,9 +8,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Hostlinks_Roster {
 
-	const CACHE_PREFIX = 'hostlinks_roster_v3_';
+	const CACHE_PREFIX = 'hostlinks_roster_v4_';
 
-	const ATTENDEES_CACHE_PREFIX = 'hostlinks_roster_att_v2_';
+	const ATTENDEES_CACHE_PREFIX = 'hostlinks_roster_att_v3_';
 
 	const REFRESH_LOCK_PREFIX = 'hostlinks_roster_lock_v1_';
 
@@ -142,12 +142,13 @@ class Hostlinks_Roster {
 				continue;
 			}
 
-			$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-			$meta    = $meta_by_id[ $uuid ] ?? self::empty_order_meta();
+		$contact   = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
+		$meta      = $meta_by_id[ $uuid ] ?? self::empty_order_meta();
 
-			// Work city/state: CVENT returns these as top-level fields on the attendee record.
-			$work_city  = trim( (string) ( $att['workCity']  ?? $contact['workCity']  ?? '' ) );
-			$work_state = self::format_work_state( $att['workState'] ?? $contact['workState'] ?? '' );
+		// Work city/state: CVENT nests these inside contact.workAddress (confirmed from live API).
+		$work_addr  = is_array( $contact['workAddress'] ?? null ) ? $contact['workAddress'] : array();
+		$work_city  = trim( (string) ( $att['workCity'] ?? $work_addr['city'] ?? $contact['workCity'] ?? '' ) );
+		$work_state = self::format_work_state( $att['workState'] ?? $work_addr['regionCode'] ?? $work_addr['region'] ?? $contact['workState'] ?? '' );
 
 			$rows[] = array(
 				'last'              => $att['lastName']    ?? $contact['lastName']    ?? '',
@@ -250,14 +251,25 @@ class Hostlinks_Roster {
 	 * @return array{0:string,1:string}
 	 */
 	public static function extract_work_location( array $att ): array {
-		$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-		foreach ( array( $att, $contact ) as $src ) {
-			$city  = trim( (string) ( $src['workCity']  ?? '' ) );
+		$contact   = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
+		$work_addr = is_array( $contact['workAddress'] ?? null ) ? $contact['workAddress'] : array();
+
+		// Primary: top-level attendee fields (some CVENT configs return these directly).
+		foreach ( array( $att ) as $src ) {
+			$city  = trim( (string) ( $src['workCity'] ?? '' ) );
 			$state = self::format_work_state( $src['workState'] ?? '' );
 			if ( $city !== '' || $state !== '' ) {
 				return array( $city, $state );
 			}
 		}
+
+		// Confirmed from live API: CVENT nests work location in contact.workAddress.
+		$city  = trim( (string) ( $work_addr['city'] ?? '' ) );
+		$state = self::format_work_state( $work_addr['regionCode'] ?? $work_addr['region'] ?? '' );
+		if ( $city !== '' || $state !== '' ) {
+			return array( $city, $state );
+		}
+
 		return array( '', '' );
 	}
 
@@ -329,8 +341,8 @@ class Hostlinks_Roster {
 			$meta[ $uuid ]['order_nums'][ $order_num ] = $order_num;
 		}
 
-		// Registration date — try every field name CVENT might use on an order item.
-		foreach ( array( 'createdDate', 'registrationDate', 'orderDate', 'dateCreated', 'registeredDate', 'orderCreatedDate' ) as $_df ) {
+		// Registration date — CVENT order items use "created"; keep fallbacks for older data.
+		foreach ( array( 'created', 'createdDate', 'registrationDate', 'orderDate', 'dateCreated', 'registeredDate' ) as $_df ) {
 			$item_date = trim( (string) ( $item[ $_df ] ?? '' ) );
 			if ( $item_date !== '' ) {
 				if ( $meta[ $uuid ]['reg_date'] === '' || $item_date < $meta[ $uuid ]['reg_date'] ) {
@@ -399,11 +411,15 @@ class Hostlinks_Roster {
 	 * Order-item meta takes priority (already the earliest date seen across items).
 	 * Falls back to date fields on the attendee object itself.
 	 */
+	/**
+	 * Pick the best registration date from the order-item meta and the attendee record.
+	 * CVENT attendee records use "registeredAt"; order items use "created".
+	 */
 	private static function pick_reg_date( string $meta_date, array $att ): string {
 		if ( $meta_date !== '' ) {
 			return $meta_date;
 		}
-		foreach ( array( 'registrationDate', 'createdDate', 'dateCreated', 'registeredDate', 'orderDate' ) as $f ) {
+		foreach ( array( 'registeredAt', 'created', 'registrationDate', 'createdDate', 'dateCreated', 'registeredDate' ) as $f ) {
 			$v = trim( (string) ( $att[ $f ] ?? '' ) );
 			if ( $v !== '' ) {
 				return $v;

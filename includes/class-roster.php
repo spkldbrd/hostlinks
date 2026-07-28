@@ -12,6 +12,8 @@ class Hostlinks_Roster {
 
 	const ATTENDEES_CACHE_PREFIX = 'hostlinks_roster_att_v1_';
 
+	const REFRESH_LOCK_PREFIX = 'hostlinks_roster_lock_v1_';
+
 	const SKIP_STATUSES = array(
 		'Cancelled', 'Declined', 'Deleted', 'TestAttendee', 'Waitlisted',
 		'cancelled', 'declined', 'deleted', 'testattendee', 'waitlisted',
@@ -47,23 +49,51 @@ class Hostlinks_Roster {
 	 * @return array{items:array,is_past:bool,from_cache:bool}|WP_Error
 	 */
 	public static function load_order_items( string $cvent_id, array $event_row, bool $force_refresh = false ) {
-		$cvent_id    = Hostlinks_CVENT_API::sanitize_uuid( $cvent_id );
-		$end_ts      = ! empty( $event_row['eve_end'] ) ? strtotime( $event_row['eve_end'] ) : 0;
-		$is_past     = $end_ts > 0 && $end_ts < strtotime( 'today midnight' );
-		$cache_ttl   = $is_past ? 0 : 24 * HOUR_IN_SECONDS;
-		$cache_key   = self::CACHE_PREFIX . md5( $cvent_id );
+		$cvent_id  = Hostlinks_CVENT_API::sanitize_uuid( $cvent_id );
+		$end_ts    = ! empty( $event_row['eve_end'] ) ? strtotime( $event_row['eve_end'] ) : 0;
+		$is_past   = $end_ts > 0 && $end_ts < strtotime( 'today midnight' );
+		$days_old  = $end_ts > 0 ? ( time() - $end_ts ) / DAY_IN_SECONDS : 0;
+		$cache_key = self::CACHE_PREFIX . md5( $cvent_id );
+		$lock_key  = self::REFRESH_LOCK_PREFIX . md5( $cvent_id );
+
+		// Three-tier cache TTL:
+		//   30+ days past → 30-day cache (roster is final, never refreshed)
+		//   Recent past   → 6-hour cache
+		//   Future        → 24-hour cache
+		if ( $days_old >= 30 ) {
+			$cache_ttl = 30 * DAY_IN_SECONDS;
+		} elseif ( $is_past ) {
+			$cache_ttl = 6 * HOUR_IN_SECONDS;
+		} else {
+			$cache_ttl = 24 * HOUR_IN_SECONDS;
+		}
 
 		if ( $force_refresh ) {
-			delete_transient( $cache_key );
-			delete_transient( self::ATTENDEES_CACHE_PREFIX . md5( $cvent_id ) );
+			if ( $days_old >= 30 ) {
+				// Events 30+ days old are considered final — silently ignore refresh.
+				$force_refresh = false;
+			} elseif ( get_transient( $lock_key ) ) {
+				// 30-minute server-side cooldown is active — ignore refresh.
+				$force_refresh = false;
+			} else {
+				// Allow refresh; set 30-minute cooldown (shared across all users).
+				$lock_expires = time() + ( 30 * MINUTE_IN_SECONDS );
+				set_transient( $lock_key, $lock_expires, 30 * MINUTE_IN_SECONDS );
+				delete_transient( $cache_key );
+				delete_transient( self::ATTENDEES_CACHE_PREFIX . md5( $cvent_id ) );
+			}
 		}
+
+		// Always read current lock state for the response.
+		$lock_expires = (int) get_transient( $lock_key );
 
 		$cached = get_transient( $cache_key );
 		if ( $cached !== false && is_array( $cached ) ) {
 			return array(
-				'items'      => $cached,
-				'is_past'    => $is_past,
-				'from_cache' => true,
+				'items'                => $cached,
+				'is_past'              => $is_past,
+				'from_cache'           => true,
+				'refresh_locked_until' => $lock_expires,
 			);
 		}
 
@@ -75,9 +105,10 @@ class Hostlinks_Roster {
 		set_transient( $cache_key, $items, $cache_ttl );
 
 		return array(
-			'items'      => $items,
-			'is_past'    => $is_past,
-			'from_cache' => false,
+			'items'                => $items,
+			'is_past'              => $is_past,
+			'from_cache'           => false,
+			'refresh_locked_until' => $lock_expires,
 		);
 	}
 

@@ -236,6 +236,42 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 		}
 	}
 
+	var refreshLockTimer = null;
+
+	function applyRefreshLock( lockedUntil ) {
+		var btn = document.getElementById( 'hl-roster-refresh-btn' );
+		if ( ! btn ) return;
+		if ( refreshLockTimer ) { clearInterval( refreshLockTimer ); refreshLockTimer = null; }
+		var remaining = lockedUntil - Math.floor( Date.now() / 1000 );
+		if ( remaining <= 0 ) {
+			btn.disabled = false;
+			btn.style.opacity = '';
+			btn.style.cursor = '';
+			btn.innerHTML = '&#x21BB; Refresh Roster';
+			return;
+		}
+		btn.disabled = true;
+		btn.style.opacity = '0.55';
+		btn.style.cursor = 'not-allowed';
+		function tick() {
+			var rem = lockedUntil - Math.floor( Date.now() / 1000 );
+			if ( rem <= 0 ) {
+				clearInterval( refreshLockTimer );
+				refreshLockTimer = null;
+				btn.disabled = false;
+				btn.style.opacity = '';
+				btn.style.cursor = '';
+				btn.innerHTML = '&#x21BB; Refresh Roster';
+				return;
+			}
+			var m = Math.floor( rem / 60 );
+			var s = rem % 60;
+			btn.innerHTML = '&#x21BB; ' + m + ':' + ( s < 10 ? '0' : '' ) + s;
+		}
+		tick();
+		refreshLockTimer = setInterval( tick, 1000 );
+	}
+
 	function buildUrl( withRefresh ) {
 		var u = ajaxUrl + '?action=hostlinks_get_roster&eve_id=' + eveId + '&_nonce=' + encodeURIComponent( nonce );
 		if ( withRefresh ) u += '&refresh=1';
@@ -264,6 +300,7 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 				if ( data.success ) {
 					writeRosterFrame( data.data.html );
 					initRosterToggles();
+					applyRefreshLock( data.data.refresh_locked_until || 0 );
 				} else {
 					writeRosterFrame(
 						'<p style="color:#d63638;padding:20px 0;">' +

@@ -81,7 +81,15 @@ class Hostlinks_Shortcodes {
 		include HOSTLINKS_PLUGIN_DIR . 'shortcode/roster-content.php';
 		$html = ob_get_clean();
 
-		wp_send_json_success( array( 'html' => $html ) );
+		$lock_until = 0;
+		if ( isset( $_rc_loaded ) && is_array( $_rc_loaded ) ) {
+			$lock_until = (int) ( $_rc_loaded['refresh_locked_until'] ?? 0 );
+		}
+
+		wp_send_json_success( array(
+			'html'                 => $html,
+			'refresh_locked_until' => $lock_until,
+		) );
 	}
 }
 

@@ -169,7 +169,7 @@ class Hostlinks_Roster {
 				if ( isset( $att['data'] ) && is_array( $att['data'] ) ) {
 					$att = $att['data'];
 				}
-				$map[ $uuid ] = self::merge_attendee_contact( $map[ $uuid ], $att );
+				$map[ $uuid ] = self::merge_preserving_nonempty( $map[ $uuid ], $att );
 			}
 			self::enrich_work_location_from_contacts( $map );
 			return $map;
@@ -187,12 +187,56 @@ class Hostlinks_Roster {
 			if ( isset( $att['data'] ) && is_array( $att['data'] ) ) {
 				$att = $att['data'];
 			}
-			$map[ $uuid ] = self::merge_attendee_contact( $map[ $uuid ], $att );
+			$map[ $uuid ] = self::merge_attendee_enrichment( $map[ $uuid ], $att );
 		}
 
 		self::enrich_work_location_from_contacts( $map );
 
 		return $map;
+	}
+
+	/**
+	 * Merge enrichment payload without clobbering names already present from order-item expand.
+	 */
+	private static function merge_attendee_enrichment( array $existing, array $fetched ): array {
+		$overlay = array();
+		if ( ! empty( $fetched['contact'] ) && is_array( $fetched['contact'] ) ) {
+			$overlay['contact'] = $fetched['contact'];
+		}
+		if ( ! empty( $fetched['answers'] ) && is_array( $fetched['answers'] ) ) {
+			$overlay['answers'] = $fetched['answers'];
+		}
+		if ( empty( $overlay ) ) {
+			return self::merge_preserving_nonempty( $existing, $fetched );
+		}
+		return self::merge_preserving_nonempty( $existing, $overlay );
+	}
+
+	/**
+	 * Deep merge that never replaces a non-empty value with an empty one.
+	 */
+	private static function merge_preserving_nonempty( array $base, array $overlay ): array {
+		foreach ( $overlay as $key => $value ) {
+			if ( is_array( $value ) && isset( $base[ $key ] ) && is_array( $base[ $key ] ) ) {
+				$base[ $key ] = self::merge_preserving_nonempty( $base[ $key ], $value );
+				continue;
+			}
+			if ( ! array_key_exists( $key, $base ) || self::is_empty_merge_value( $base[ $key ] ) ) {
+				if ( ! self::is_empty_merge_value( $value ) ) {
+					$base[ $key ] = $value;
+				} elseif ( ! array_key_exists( $key, $base ) ) {
+					$base[ $key ] = $value;
+				}
+			}
+		}
+		return $base;
+	}
+
+	private static function is_empty_merge_value( $value ): bool {
+		if ( $value === null || $value === '' || $value === array() ) {
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -236,16 +280,16 @@ class Hostlinks_Roster {
 	}
 
 	/**
-	 * Merge a fetched attendee/contact payload into an existing attendee row.
+	 * Merge a fetched contact record into an existing attendee row.
 	 */
 	private static function merge_attendee_contact( array $existing, array $fetched ): array {
-		$merged = array_merge( $existing, $fetched );
 		$exist_contact = is_array( $existing['contact'] ?? null ) ? $existing['contact'] : array();
 		$fetch_contact = is_array( $fetched['contact'] ?? null ) ? $fetched['contact'] : array();
-		if ( ! empty( $fetch_contact ) ) {
-			$merged['contact'] = array_merge( $exist_contact, $fetch_contact );
+		if ( empty( $fetch_contact ) ) {
+			return $existing;
 		}
-		return $merged;
+		$existing['contact'] = self::merge_preserving_nonempty( $exist_contact, $fetch_contact );
+		return $existing;
 	}
 
 	private static function needs_contact_enrich( array $att ): bool {

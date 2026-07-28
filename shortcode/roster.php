@@ -45,9 +45,10 @@ $_sh_do_refresh = ! empty( $_GET['refresh'] ) && current_user_can( 'manage_optio
 $_sh_nonce      = wp_create_nonce( 'hostlinks_roster_fetch' );
 $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 ?>
+<div id="hl-roster-shell">
 <div id="hl-roster-admin-bar" style="display:none;margin-bottom:12px;">
 	<div style="display:flex;justify-content:flex-end;gap:6px;align-items:center;flex-wrap:wrap;">
-		<button id="hl-roster-print-btn" class="hl-roster-admin-btn hl-roster-admin-btn--primary" onclick="window.print()">&#x1F5A8; Print</button>
+		<button id="hl-roster-print-btn" class="hl-roster-admin-btn hl-roster-admin-btn--primary">&#x1F5A8; Print</button>
 		<?php if ( current_user_can( 'manage_options' ) ) : ?>
 		<button id="hl-roster-refresh-btn" class="hl-roster-admin-btn">&#x21BB; Refresh Roster</button>
 		<?php endif; ?>
@@ -60,9 +61,30 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	<p>Updating the roster, this can take a moment. Please wait&hellip;</p>
 </div>
 
-<div id="hl-roster-output"></div>
+<div id="hl-roster-frame-wrap">
+	<iframe id="hl-roster-frame" title="Event roster" scrolling="auto"></iframe>
+</div>
+</div>
 
 <style>
+#hl-roster-shell {
+	width: 100%;
+	max-width: 100%;
+	margin: 0 auto;
+	overflow-x: hidden;
+	box-sizing: border-box;
+}
+#hl-roster-frame-wrap {
+	width: 100%;
+	overflow: hidden;
+}
+#hl-roster-frame {
+	display: block;
+	width: 100%;
+	border: 0;
+	min-height: 420px;
+	background: #fff;
+}
 #hl-roster-loader {
 	text-align: center;
 	padding: 60px 20px;
@@ -92,7 +114,9 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 .hl-roster-admin-btn:hover { background: #e0e0e0; }
 .hl-roster-admin-btn--primary { background: #0da2e7; color: #fff; border-color: #0b8fcf; }
 .hl-roster-admin-btn--primary:hover { background: #0b8fcf; color: #fff; }
-@media print { #hl-roster-admin-bar { display: none !important; } }
+@media print {
+	#hl-roster-admin-bar, #hl-roster-frame-wrap { display: none !important; }
+}
 </style>
 
 <script>
@@ -104,22 +128,64 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	var detailsCols = <?php echo wp_json_encode( Hostlinks_Roster::DETAILS_PRESET ); ?>;
 	var prefix = 'hl-fe';
 
+	function rosterFrame() {
+		return document.getElementById( 'hl-roster-frame' );
+	}
+
+	function rosterDoc() {
+		var frame = rosterFrame();
+		if ( frame && frame.contentDocument ) {
+			return frame.contentDocument;
+		}
+		return document;
+	}
+
+	function resizeRosterFrame() {
+		var frame = rosterFrame();
+		if ( ! frame || ! frame.contentDocument ) return;
+		var doc = frame.contentDocument;
+		var h = Math.max(
+			doc.body ? doc.body.scrollHeight : 0,
+			doc.documentElement ? doc.documentElement.scrollHeight : 0
+		);
+		frame.style.height = Math.max( 420, h + 24 ) + 'px';
+	}
+
+	function writeRosterFrame( html ) {
+		var frame = rosterFrame();
+		if ( ! frame ) return;
+		var doc = frame.contentDocument || frame.contentWindow.document;
+		doc.open();
+		doc.write(
+			'<!DOCTYPE html><html><head><meta charset="utf-8">' +
+			'<meta name="viewport" content="width=device-width,initial-scale=1">' +
+			'<style>html,body{margin:0;padding:0;background:#fff;}body{overflow-x:auto;overflow-y:visible;}</style>' +
+			'</head><body>' + html + '</body></html>'
+		);
+		doc.close();
+		resizeRosterFrame();
+		if ( frame.contentWindow ) {
+			frame.contentWindow.addEventListener( 'resize', resizeRosterFrame );
+		}
+	}
+
 	function colClass( slug ) {
 		return prefix + '-col-' + slug.replace( /_/g, '-' );
 	}
 
 	function toggleCol( slug, show ) {
 		var cls = colClass( slug );
-		var els = document.querySelectorAll( '.' + cls );
+		var els = rosterDoc().querySelectorAll( '.' + cls );
 		for ( var i = 0; i < els.length; i++ ) {
 			els[i].style.display = show ? 'table-cell' : 'none';
 			els[i].classList[ show ? 'add' : 'remove' ]( prefix + '-col-visible' );
 		}
 		updateTotalsVisibility();
+		resizeRosterFrame();
 	}
 
 	function updateTotalsVisibility() {
-		var totals = document.querySelector( '.hl-fe-roster-totals' );
+		var totals = rosterDoc().querySelector( '.hl-fe-roster-totals' );
 		if ( ! totals ) return;
 		var amountSlugs = [ 'amount_ordered', 'amount_paid', 'discounts_applied', 'balance_due' ];
 		var any = false;
@@ -146,39 +212,50 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 		}
 	}
 
-	function initRosterToggles( output ) {
+	function initRosterToggles() {
+		var doc = rosterDoc();
 		var viewPresets = document.getElementById( 'hl-roster-view-presets' );
 		var colToggles  = document.getElementById( 'hl-roster-col-toggles' );
-		if ( colToggles && output.querySelector( '.hl-fe-roster-table' ) ) {
+		if ( colToggles && doc.querySelector( '.hl-fe-roster-table' ) ) {
 			if ( viewPresets ) viewPresets.style.display = 'flex';
 			colToggles.style.display = 'flex';
 		}
 
 		var partWrap = document.getElementById( 'hl-fe-participant-wrap' );
-		if ( partWrap && output.querySelector( '.hl-fe-col-participant' ) ) {
+		if ( partWrap && doc.querySelector( '.hl-fe-col-participant' ) ) {
 			partWrap.style.display = 'flex';
 		}
 
 		var checks = document.querySelectorAll( '#hl-roster-col-toggles [data-col]' );
 		for ( var i = 0; i < checks.length; i++ ) {
-			( function ( el ) {
-				el.checked = false;
-				el.addEventListener( 'change', function () {
-					toggleCol( el.getAttribute( 'data-col' ), el.checked );
-				} );
-			} )( checks[i] );
+			checks[i].checked = false;
+		}
+	}
+
+	function bindRosterControlsOnce() {
+		var colToggles = document.getElementById( 'hl-roster-col-toggles' );
+		if ( colToggles && ! colToggles.dataset.hlBound ) {
+			colToggles.dataset.hlBound = '1';
+			colToggles.addEventListener( 'change', function ( e ) {
+				var t = e.target;
+				if ( t && t.getAttribute( 'data-col' ) ) {
+					toggleCol( t.getAttribute( 'data-col' ), t.checked );
+				}
+			} );
 		}
 
 		var signinBtn = document.getElementById( 'hl-roster-view-signin' );
 		var detailsBtn = document.getElementById( 'hl-roster-view-details' );
-		if ( signinBtn ) {
+		if ( signinBtn && ! signinBtn.dataset.hlBound ) {
+			signinBtn.dataset.hlBound = '1';
 			signinBtn.addEventListener( 'click', function () {
 				setPreset( [] );
 				signinBtn.classList.add( 'hl-roster-admin-btn--primary' );
 				if ( detailsBtn ) detailsBtn.classList.remove( 'hl-roster-admin-btn--primary' );
 			} );
 		}
-		if ( detailsBtn ) {
+		if ( detailsBtn && ! detailsBtn.dataset.hlBound ) {
+			detailsBtn.dataset.hlBound = '1';
 			detailsBtn.addEventListener( 'click', function () {
 				setPreset( detailsCols );
 				detailsBtn.classList.add( 'hl-roster-admin-btn--primary' );
@@ -196,28 +273,30 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	function loadRoster( withRefresh ) {
 		var loader   = document.getElementById( 'hl-roster-loader' );
 		var adminBar = document.getElementById( 'hl-roster-admin-bar' );
-		var output   = document.getElementById( 'hl-roster-output' );
+		var frame    = rosterFrame();
 			if ( loader )   { loader.style.display = 'block'; loader.style.animation = 'none'; loader.style.opacity = '0'; setTimeout(function(){ loader.style.animation = 'hl-loader-fadein 0.4s ease 0.6s forwards'; }, 10); }
 			if ( adminBar ) adminBar.style.display = 'none';
 			var viewPresets = document.getElementById( 'hl-roster-view-presets' );
 			if ( viewPresets ) viewPresets.style.display = 'none';
 			var colToggles = document.getElementById( 'hl-roster-col-toggles' );
 			if ( colToggles ) colToggles.style.display = 'none';
-			if ( output )   output.innerHTML = '';
+			if ( frame ) {
+				writeRosterFrame( '' );
+			}
 
 		fetch( buildUrl( withRefresh ) )
 			.then( function ( r ) { return r.json(); } )
 			.then( function ( data ) {
 				if ( loader )   loader.style.display = 'none';
 				if ( adminBar ) adminBar.style.display = 'block';
-				if ( output ) {
-					if ( data.success ) {
-						output.innerHTML = data.data.html;
-						initRosterToggles( output );
-					} else {
-						output.innerHTML = '<p style="color:#d63638;padding:20px 0;">' +
-							( data.data || 'Could not load roster. Please try again.' ) + '</p>';
-					}
+				if ( data.success ) {
+					writeRosterFrame( data.data.html );
+					initRosterToggles();
+				} else {
+					writeRosterFrame(
+						'<p style="color:#d63638;padding:20px 0;">' +
+						( data.data || 'Could not load roster. Please try again.' ) + '</p>'
+					);
 				}
 			} )
 			.catch( function () {
@@ -226,7 +305,19 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	}
 
 	// Initial load.
+	bindRosterControlsOnce();
 	loadRoster( refresh );
+
+	var printBtn = document.getElementById( 'hl-roster-print-btn' );
+	if ( printBtn ) {
+		printBtn.addEventListener( 'click', function () {
+			var frame = rosterFrame();
+			if ( frame && frame.contentWindow ) {
+				frame.contentWindow.focus();
+				frame.contentWindow.print();
+			}
+		} );
+	}
 
 	// Refresh button (admin only — button may not exist for non-admins).
 	var refreshBtn = document.getElementById( 'hl-roster-refresh-btn' );

@@ -63,12 +63,15 @@ $_rc_logo       = get_option( 'hostlinks_roster_logo_url', '' );
 		<?php endif; ?>
 	</div>
 
-	<?php echo Hostlinks_Roster::render_table( $_rc_attendees, $_rc_is_past, 'hl-fe' ); ?>
+	<div class="hl-fe-roster-scroll">
+		<?php echo Hostlinks_Roster::render_table( $_rc_attendees, $_rc_is_past, 'hl-fe' ); ?>
+	</div>
 
 </div>
 
 <style>
-.hl-fe-roster { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.hl-fe-roster { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; min-width: 0; }
+.hl-fe-roster-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
 .hl-fe-roster-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
 .hl-fe-roster-title { font-size:1.3em; margin:0 0 4px; }
 .hl-fe-roster-meta { font-size:.85em; color:#666; margin:0; }

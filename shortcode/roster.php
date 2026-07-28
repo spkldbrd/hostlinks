@@ -82,7 +82,7 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	display: block;
 	width: 100%;
 	border: 0;
-	min-height: 420px;
+	height: 600px;
 	background: #fff;
 }
 #hl-roster-loader {
@@ -140,17 +140,6 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 		return document;
 	}
 
-	function resizeRosterFrame() {
-		var frame = rosterFrame();
-		if ( ! frame || ! frame.contentDocument ) return;
-		var doc = frame.contentDocument;
-		var h = Math.max(
-			doc.body ? doc.body.scrollHeight : 0,
-			doc.documentElement ? doc.documentElement.scrollHeight : 0
-		);
-		frame.style.height = Math.max( 420, h + 24 ) + 'px';
-	}
-
 	function writeRosterFrame( html ) {
 		var frame = rosterFrame();
 		if ( ! frame ) return;
@@ -159,14 +148,10 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 		doc.write(
 			'<!DOCTYPE html><html><head><meta charset="utf-8">' +
 			'<meta name="viewport" content="width=device-width,initial-scale=1">' +
-			'<style>html,body{margin:0;padding:0;background:#fff;}body{overflow-x:auto;overflow-y:visible;}</style>' +
+			'<style>html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#fff;}</style>' +
 			'</head><body>' + html + '</body></html>'
 		);
 		doc.close();
-		resizeRosterFrame();
-		if ( frame.contentWindow ) {
-			frame.contentWindow.addEventListener( 'resize', resizeRosterFrame );
-		}
 	}
 
 	function colClass( slug ) {
@@ -181,7 +166,6 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 			els[i].classList[ show ? 'add' : 'remove' ]( prefix + '-col-visible' );
 		}
 		updateTotalsVisibility();
-		resizeRosterFrame();
 	}
 
 	function updateTotalsVisibility() {

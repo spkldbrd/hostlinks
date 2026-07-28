@@ -63,16 +63,18 @@ $_rc_logo       = get_option( 'hostlinks_roster_logo_url', '' );
 		<?php endif; ?>
 	</div>
 
-	<div class="hl-fe-roster-scroll">
+	<div class="hl-fe-table-scroll">
 		<?php echo Hostlinks_Roster::render_table( $_rc_attendees, $_rc_is_past, 'hl-fe' ); ?>
 	</div>
+
+	<?php echo Hostlinks_Roster::render_totals( $_rc_attendees, 'hl-fe' ); ?>
 
 </div>
 
 <style>
-.hl-fe-roster { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; min-width: 0; }
-.hl-fe-roster-scroll { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
-.hl-fe-roster-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; }
+.hl-fe-roster { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display:flex; flex-direction:column; height:100%; padding:8px 12px; box-sizing:border-box; min-width:0; }
+.hl-fe-table-scroll { flex:1; overflow:auto; min-height:0; -webkit-overflow-scrolling:touch; }
+.hl-fe-roster-header { display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px; flex-shrink:0; }
 .hl-fe-roster-title { font-size:1.3em; margin:0 0 4px; }
 .hl-fe-roster-meta { font-size:.85em; color:#666; margin:0; }
 .hl-fe-roster-actions { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
@@ -83,7 +85,7 @@ $_rc_logo       = get_option( 'hostlinks_roster_logo_url', '' );
 .hl-fe-roster-table tr:nth-child(even) td { background:#f9f9f9; }
 .hl-fe-num { color:#aaa; font-size:11px; width:30px; }
 .hl-fe-sign-in { width:260px; min-width:160px; }
-.hl-fe-roster-totals { display:none; gap:10px; flex-wrap:wrap; margin-top:14px; }
+.hl-fe-roster-totals { display:none; gap:10px; flex-wrap:wrap; margin-top:10px; flex-shrink:0; }
 .hl-fe-roster-total-card { display:none; flex:1 1 180px; border:1px solid #ddd; border-radius:4px; padding:8px 10px; font-size:12px; background:#fafafa; }
 .hl-fe-roster-total-card strong { display:block; margin-bottom:4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
 .hl-fe-roster-total-card span { display:block; color:#555; line-height:1.5; }

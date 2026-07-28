@@ -294,6 +294,7 @@ body {
 	</div>
 	<?php else : ?>
 	<?php echo Hostlinks_Roster::render_table( $attendees, $is_past_event, 'hl' ); ?>
+	<?php echo Hostlinks_Roster::render_totals( $attendees, 'hl' ); ?>
 	<?php endif; ?>
 
 	<?php if ( $do_debug ) : ?>

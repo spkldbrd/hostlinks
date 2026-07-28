@@ -495,7 +495,6 @@ class Hostlinks_Roster {
 			<?php endforeach; ?>
 			</tbody>
 		</table>
-		<?php echo self::render_totals( $rows, $prefix ); ?>
 		<?php
 		return (string) ob_get_clean();
 	}

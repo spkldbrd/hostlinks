@@ -89,7 +89,7 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	display: block;
 	width: 100%;
 	border: 0;
-	height: 600px;
+	height: 820px;
 	background: #fff;
 }
 #hl-roster-loader {

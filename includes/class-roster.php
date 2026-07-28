@@ -136,6 +136,7 @@ class Hostlinks_Roster {
 				'discount_code'     => implode( ', ', $meta['discounts'] ),
 				'work_city'         => $work_city,
 				'work_state'        => $work_state,
+				'reg_date'          => $meta['reg_date'] ?? '',
 			);
 		}
 
@@ -238,6 +239,7 @@ class Hostlinks_Roster {
 			'discount_applied'=> 0.0,
 			'payment_types'   => array(),
 			'order_nums'      => array(),
+			'reg_date'        => '',
 		);
 	}
 
@@ -291,13 +293,21 @@ class Hostlinks_Roster {
 				}
 			}
 
-			$order_num = trim( (string) ( $item['orderNumber'] ?? $item['orderId'] ?? '' ) );
-			if ( $order_num !== '' ) {
-				$meta[ $uuid ]['order_nums'][ $order_num ] = $order_num;
-			}
+		$order_num = trim( (string) ( $item['orderNumber'] ?? $item['orderId'] ?? '' ) );
+		if ( $order_num !== '' ) {
+			$meta[ $uuid ]['order_nums'][ $order_num ] = $order_num;
 		}
 
-		return $meta;
+		// Registration date — take the earliest date seen across all order items for this attendee.
+		$item_date = trim( (string) ( $item['createdDate'] ?? $item['registrationDate'] ?? $item['orderDate'] ?? '' ) );
+		if ( $item_date !== '' ) {
+			if ( $meta[ $uuid ]['reg_date'] === '' || $item_date < $meta[ $uuid ]['reg_date'] ) {
+				$meta[ $uuid ]['reg_date'] = $item_date;
+			}
+		}
+	}
+
+	return $meta;
 	}
 
 	public static function extract_item_discounts( array $item ): array {

@@ -44,127 +44,31 @@ if ( ! $cvent_id ) {
 	wp_die( 'Event #' . $eve_id . ' does not have a linked CVENT ID. Link it via CVENT Sync first.' );
 }
 
-// ── Determine cache TTL based on whether event is in the past ────────────────
-// Past events: cache permanently (TTL = 0) — roster won't change.
-// Future / today: cache 24 hours.
-$event_end_ts  = ! empty( $row['eve_end'] ) ? strtotime( $row['eve_end'] ) : 0;
-$is_past_event = $event_end_ts > 0 && $event_end_ts < strtotime( 'today midnight' );
-$cache_ttl     = $is_past_event ? 0 : 24 * HOUR_IN_SECONDS;
-
 // ── Attendee fetch ────────────────────────────────────────────────────────────
-$cache_key = 'hostlinks_roster_' . md5( $cvent_id );
+$do_refresh = ! empty( $_GET['refresh'] );
 
-if ( $do_refresh ) {
-	delete_transient( $cache_key );
+$loaded = Hostlinks_Roster::load_order_items( $cvent_id, $row, $do_refresh );
+if ( is_wp_error( $loaded ) ) {
+	wp_die( 'CVENT API error: ' . esc_html( $loaded->get_error_message() ) );
 }
 
-$attendees_raw = get_transient( $cache_key );
-$from_cache    = ( $attendees_raw !== false );
-$debug_order_items = array();
+$from_cache    = $loaded['from_cache'];
+$is_past_event = $loaded['is_past'];
+$order_items   = $loaded['items'];
+$attendees     = Hostlinks_Roster::build_rows( $order_items, $is_past_event );
+$attendees_raw = Hostlinks_Roster::resolve_attendees_map( $order_items );
 
-if ( ! $from_cache ) {
-	$attendees_raw = Hostlinks_CVENT_API::get_roster_attendees( $cvent_id );
-	if ( is_wp_error( $attendees_raw ) ) {
-		wp_die( 'CVENT API error: ' . esc_html( $attendees_raw->get_error_message() ) );
-	}
-	set_transient( $cache_key, $attendees_raw, $cache_ttl );
+Hostlinks_Roster::maybe_schedule_finalize( $cvent_id, $eve_id, $row, $is_past_event );
 
-	// ── Schedule the 5-day auto-pull for events that just ended ──────────────
-	// Fires once, 5 days after eve_end, to capture final cancellations.
-	// Only schedule if: event has ended AND 5-day window hasn't passed AND not yet scheduled.
-	if ( $is_past_event && $event_end_ts > strtotime( '-5 days' ) ) {
-		$cron_hook = 'hostlinks_roster_finalize';
-		$cron_args = array( $cvent_id, $eve_id );
-		if ( ! wp_next_scheduled( $cron_hook, $cron_args ) ) {
-			$fire_at = $event_end_ts + ( 5 * DAY_IN_SECONDS );
-			wp_schedule_single_event( $fire_at, $cron_hook, $cron_args );
-		}
-	}
-}
-
-// In debug mode, fetch raw order items for inspection.
-if ( $do_debug ) {
-	$debug_order_items = Hostlinks_CVENT_API::get_order_items( $cvent_id );
-	if ( is_wp_error( $debug_order_items ) ) {
-		$debug_order_items = array( 'error' => $debug_order_items->get_error_message() );
-	}
-}
-
-// ── Phone number formatter ────────────────────────────────────────────────────
-function hl_roster_format_phone( $raw ) {
-	$digits = preg_replace( '/\D/', '', $raw );
-	// Strip leading country code 1 if 11 digits.
-	if ( strlen( $digits ) === 11 && $digits[0] === '1' ) {
-		$digits = substr( $digits, 1 );
-	}
-	if ( strlen( $digits ) === 10 ) {
-		return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6 );
-	}
-	return $raw; // Return as-is if not a standard 10-digit number.
-}
-
-// ── Filter out non-attending statuses ────────────────────────────────────────
-$skip_statuses = array( 'Cancelled', 'Declined', 'Deleted', 'TestAttendee', 'Waitlisted',
-                        'cancelled', 'declined', 'deleted', 'testattendee', 'waitlisted' );
-
-$attendees = array();
-foreach ( $attendees_raw as $att ) {
-	$status = $att['status'] ?? $att['attendeeStatus'] ?? '';
-	if ( in_array( $status, $skip_statuses, true ) ) {
-		continue;
-	}
-	// CVENT nests contact fields under 'contact'; handle both flat and nested.
-	$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-
-	$first = $att['firstName']   ?? $contact['firstName']   ?? '';
-	$last  = $att['lastName']    ?? $contact['lastName']    ?? '';
-	$co    = $att['companyName'] ?? $contact['company']     ?? $contact['companyName'] ?? '';
-	$title = $att['title']       ?? $contact['title']       ?? '';
-	$email = $att['email']       ?? $contact['email']       ?? '';
-	$phone = hl_roster_format_phone( $att['workPhone'] ?? $contact['workPhone'] ?? $att['phone'] ?? $contact['phone'] ?? '' );
-
-	$attendees[] = array(
-		'last'    => $last,
-		'first'   => $first,
-		'company' => $co,
-		'title'   => $title,
-		'email'   => $email,
-		'phone'   => $phone,
-		'status'  => $status,
-	);
-}
-
-// ── Sort by last name, then first name ────────────────────────────────────────
-usort( $attendees, function( $a, $b ) {
-	$cmp = strcasecmp( $a['last'], $b['last'] );
-	return $cmp !== 0 ? $cmp : strcasecmp( $a['first'], $b['first'] );
-} );
+// In debug mode, order items are already available from the fetch above.
+$debug_order_items = $do_debug ? $order_items : array();
 
 $count      = count( $attendees );
 $start_date = ! empty( $row['eve_start'] ) ? date( 'F j, Y', strtotime( $row['eve_start'] ) ) : '';
 $end_date   = ! empty( $row['eve_end'] ) && $row['eve_end'] !== $row['eve_start']
               ? ' – ' . date( 'F j, Y', strtotime( $row['eve_end'] ) ) : '';
 
-// ── Build header title: "Roster – {Location} – {Type label}" ─────────────────
-$type_name_raw = strtolower( trim( (string) $wpdb->get_var( $wpdb->prepare(
-	"SELECT event_type_name FROM `{$wpdb->prefix}event_type` WHERE event_type_id = %d",
-	(int) ( $row['eve_type'] ?? 0 )
-) ) ) );
-$is_zoom = ( strtolower( trim( $row['eve_zoom'] ?? '' ) ) === 'yes' );
-
-if ( $is_zoom ) {
-	$type_label = 'ZOOM';
-} elseif ( strpos( $type_name_raw, 'management' ) !== false ) {
-	$type_label = 'Management';
-} elseif ( strpos( $type_name_raw, 'writing' ) !== false ) {
-	$type_label = 'Writing';
-} else {
-	$type_label = ''; // Subaward and anything else get no label
-}
-
-$location    = $row['eve_location'] ?? 'Event #' . $eve_id;
-$header_parts = array_filter( array( 'Roster', $location, $type_label ) );
-$event_title  = implode( ' – ', $header_parts );
+$event_title = Hostlinks_Roster::build_title( $row, $eve_id, $wpdb );
 
 $back_url    = admin_url( 'admin.php?page=booking-menu' );
 $refresh_url = admin_url( 'admin.php?page=hostlinks-roster&eve_id=' . $eve_id . '&refresh=1' );
@@ -270,7 +174,9 @@ body {
 .hl-sign-in-col { width: 280px; min-width: 200px; }
 
 /* Hidden columns — toggled by JS */
-.hl-col-email, .hl-col-phone { display: none; }
+.hl-col-email, .hl-col-phone,
+.hl-col-discount, .hl-col-balance,
+.hl-col-participant, .hl-col-work-city, .hl-col-work-state { display: none; }
 
 .hl-roster-empty { text-align: center; padding: 40px; color: #666; }
 .hl-debug-box {
@@ -299,7 +205,10 @@ body {
 	.hl-sign-in-col { width: 240pt; }
 	tr { page-break-inside: avoid; }
 	/* When printing, show whichever optional columns are currently visible */
-	.hl-col-email.hl-col-visible, .hl-col-phone.hl-col-visible { display: table-cell !important; }
+	.hl-col-email.hl-col-visible, .hl-col-phone.hl-col-visible,
+	.hl-col-discount.hl-col-visible, .hl-col-balance.hl-col-visible,
+	.hl-col-participant.hl-col-visible, .hl-col-work-city.hl-col-visible,
+	.hl-col-work-state.hl-col-visible { display: table-cell !important; }
 }
 </style>
 </head>
@@ -340,6 +249,13 @@ body {
 	<?php if ( ! empty( $attendees ) ) : ?>
 	<div class="hl-col-toggles">
 		<span style="color:#888;font-size:12px;">Show columns:</span>
+		<label><input type="checkbox" id="hl-toggle-work-city"> Work City</label>
+		<label><input type="checkbox" id="hl-toggle-work-state"> Work State</label>
+		<label><input type="checkbox" id="hl-toggle-discount"> Discount Code</label>
+		<label><input type="checkbox" id="hl-toggle-balance"> Balance Due</label>
+		<?php if ( $is_past_event ) : ?>
+		<label><input type="checkbox" id="hl-toggle-participant"> Participant</label>
+		<?php endif; ?>
 		<label><input type="checkbox" id="hl-toggle-email"> Email</label>
 		<label><input type="checkbox" id="hl-toggle-phone"> Phone</label>
 		<em style="color:#aaa;font-size:11px;margin-left:4px;">(not for public view)</em>
@@ -360,6 +276,13 @@ body {
 				<th>First Name</th>
 				<th>Company / Agency</th>
 				<th>Title</th>
+				<th class="hl-col-work-city">Work City</th>
+				<th class="hl-col-work-state">Work State</th>
+				<th class="hl-col-discount">Discount Code</th>
+				<th class="hl-col-balance">Balance Due</th>
+				<?php if ( $is_past_event ) : ?>
+				<th class="hl-col-participant">Participant</th>
+				<?php endif; ?>
 				<th class="hl-col-email">Email</th>
 				<th class="hl-col-phone">Phone</th>
 				<th class="hl-sign-in-col">Sign In</th>
@@ -373,6 +296,13 @@ body {
 				<td><?php echo esc_html( $att['first'] ); ?></td>
 				<td><?php echo esc_html( $att['company'] ); ?></td>
 				<td><?php echo esc_html( $att['title'] ); ?></td>
+				<td class="hl-col-work-city"><?php echo esc_html( $att['work_city'] ); ?></td>
+				<td class="hl-col-work-state"><?php echo esc_html( $att['work_state'] ); ?></td>
+				<td class="hl-col-discount"><?php echo esc_html( $att['discounts'] ); ?></td>
+				<td class="hl-col-balance"><?php echo esc_html( $att['balance_due'] ); ?></td>
+				<?php if ( $is_past_event ) : ?>
+				<td class="hl-col-participant"><?php echo esc_html( $att['participant'] ); ?></td>
+				<?php endif; ?>
 				<td class="hl-col-email"><?php echo esc_html( $att['email'] ); ?></td>
 				<td class="hl-col-phone"><?php echo esc_html( $att['phone'] ); ?></td>
 				<td class="hl-sign-in-col">&nbsp;</td>
@@ -396,7 +326,7 @@ body {
 			<pre><?php echo esc_html( wp_json_encode( $debug_order_items[0], JSON_PRETTY_PRINT ) ); ?></pre>
 		<?php endif; ?>
 
-		<br><strong>Attendee Records (<?php echo count( $attendees_raw ); ?> fetched, <?php echo count( $attendees ); ?> after status filter)
+		<br><strong>Attendee Records (<?php echo count( $attendees_raw ); ?> resolved, <?php echo count( $attendees ); ?> after status filter)
 		— strategy: <?php
 			$sample = $debug_order_items[0]['attendee'] ?? array();
 			echo ( isset( $sample['firstName'] ) || isset( $sample['lastName'] ) || isset( $sample['contact'] ) )
@@ -405,7 +335,7 @@ body {
 		?>:</strong><br>
 		<?php if ( ! empty( $attendees_raw ) ) : ?>
 			<strong>First raw attendee record:</strong>
-			<pre><?php echo esc_html( wp_json_encode( $attendees_raw[0], JSON_PRETTY_PRINT ) ); ?></pre>
+			<pre><?php echo esc_html( wp_json_encode( reset( $attendees_raw ), JSON_PRETTY_PRINT ) ); ?></pre>
 		<?php else : ?>
 			<em style="color:#c00;">No attendee records — either order items were empty or no attendee UUIDs could be extracted.</em>
 		<?php endif; ?>
@@ -432,6 +362,16 @@ body {
 	var phoneChk = document.getElementById('hl-toggle-phone');
 	if (emailChk) emailChk.addEventListener('change', function() { toggleCol('hl-col-email', this.checked); });
 	if (phoneChk) phoneChk.addEventListener('change', function() { toggleCol('hl-col-phone', this.checked); });
+	[
+		['hl-toggle-work-city', 'hl-col-work-city'],
+		['hl-toggle-work-state', 'hl-col-work-state'],
+		['hl-toggle-discount', 'hl-col-discount'],
+		['hl-toggle-balance', 'hl-col-balance'],
+		['hl-toggle-participant', 'hl-col-participant'],
+	].forEach(function(pair) {
+		var el = document.getElementById(pair[0]);
+		if (el) el.addEventListener('change', function() { toggleCol(pair[1], this.checked); });
+	});
 })();
 </script>
 </body>

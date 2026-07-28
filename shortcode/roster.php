@@ -54,6 +54,11 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 	</div>
 	<div id="hl-roster-col-toggles" style="display:none;justify-content:flex-end;align-items:center;gap:14px;font-size:13px;color:#555;padding-top:6px;flex-wrap:wrap;">
 		<span>Show columns:</span>
+		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-work-city" style="width:14px;height:14px;"> Work City</label>
+		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-work-state" style="width:14px;height:14px;"> Work State</label>
+		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-discount" style="width:14px;height:14px;"> Discount Code</label>
+		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-balance" style="width:14px;height:14px;"> Balance Due</label>
+		<label id="hl-fe-participant-wrap" style="cursor:pointer;display:none;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-participant" style="width:14px;height:14px;"> Participant</label>
 		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-email" style="width:14px;height:14px;"> Email</label>
 		<label style="cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="hl-fe-phone" style="width:14px;height:14px;"> Phone</label>
 		<em style="color:#aaa;font-size:11px;">(not for public view)</em>
@@ -144,11 +149,23 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 									els[i].classList[ show ? 'add' : 'remove' ]( 'hl-fe-col-visible' );
 								}
 							}
-							// Checkboxes now live in the shell, not the injected content.
-							var ec = document.getElementById( 'hl-fe-email' );
-							var pc = document.getElementById( 'hl-fe-phone' );
-							if ( ec ) { ec.checked = false; ec.addEventListener( 'change', function () { tog( 'hl-fe-col-email', this.checked ); } ); }
-							if ( pc ) { pc.checked = false; pc.addEventListener( 'change', function () { tog( 'hl-fe-col-phone', this.checked ); } ); }
+							function bindToggle( id, cls ) {
+								var el = document.getElementById( id );
+								if ( ! el ) return;
+								el.checked = false;
+								el.addEventListener( 'change', function () { tog( cls, this.checked ); } );
+							}
+							bindToggle( 'hl-fe-work-city', 'hl-fe-col-work-city' );
+							bindToggle( 'hl-fe-work-state', 'hl-fe-col-work-state' );
+							bindToggle( 'hl-fe-discount', 'hl-fe-col-discount' );
+							bindToggle( 'hl-fe-balance', 'hl-fe-col-balance' );
+							bindToggle( 'hl-fe-participant', 'hl-fe-col-participant' );
+							bindToggle( 'hl-fe-email', 'hl-fe-col-email' );
+							bindToggle( 'hl-fe-phone', 'hl-fe-col-phone' );
+							var partWrap = document.getElementById( 'hl-fe-participant-wrap' );
+							if ( partWrap && output.querySelector( '.hl-fe-col-participant' ) ) {
+								partWrap.style.display = 'flex';
+							}
 						})();
 					} else {
 						output.innerHTML = '<p style="color:#d63638;padding:20px 0;">' +

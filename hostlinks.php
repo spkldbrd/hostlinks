@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.11.1
+ * Version:     2.11.2
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.11.1' );
+define( 'HOSTLINKS_VERSION',    '2.11.2' );
 define( 'HOSTLINKS_DB_VERSION', '2.5' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -41,6 +41,7 @@ require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-scheduler.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-mktops-installer.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cert-installer.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-instructor-api.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-roster.php';
 
 // Activation: create DB tables + detect theme conflict in one hook
 register_activation_hook( __FILE__, array( 'Hostlinks_Activation', 'on_activate' ) );
@@ -117,10 +118,10 @@ function hostlinks_mktops_detection_notice() {
 
 // Roster finalize cron: re-fetch and permanently cache attendees 5 days after event end.
 add_action( 'hostlinks_roster_finalize', function( $cvent_id, $eve_id ) {
-	$cache_key     = 'hostlinks_roster_' . md5( $cvent_id );
+	$cache_key = Hostlinks_Roster::CACHE_PREFIX . md5( $cvent_id );
 	delete_transient( $cache_key );
-	$attendees_raw = Hostlinks_CVENT_API::get_roster_attendees( $cvent_id );
-	if ( ! is_wp_error( $attendees_raw ) ) {
-		set_transient( $cache_key, $attendees_raw, 0 ); // 0 = permanent
+	$items = Hostlinks_CVENT_API::get_roster_order_items( $cvent_id );
+	if ( ! is_wp_error( $items ) ) {
+		set_transient( $cache_key, $items, 0 ); // 0 = permanent
 	}
 }, 10, 2 );

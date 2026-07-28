@@ -432,27 +432,16 @@ class Hostlinks_CVENT_API {
 	}
 
 	/**
-	 * Build a roster for an event.
+	 * Fetch all order items for roster reports (expand=attendee for inline contact fields).
 	 *
-	 * Strategy (cheapest first):
-	 *   1. Fetch order items with expand=attendee — if CVENT returns name fields inline
-	 *      we are done in 1 API call (plus pagination calls for large events).
-	 *   2. If the attendee object in the first item has no firstName/lastName, CVENT does
-	 *      not support the expand; fall back to individual GET /ea/attendees/{uuid} calls
-	 *      (1 call per unique attendee).
-	 *
-	 * Results are NOT cached here — caching is handled by the caller (roster.php).
-	 *
-	 * @param string $event_id   CVENT event UUID.
-	 * @return array|WP_Error    Flat array of raw attendee records, or WP_Error on failure.
+	 * @param string $event_id CVENT event UUID.
+	 * @return array|WP_Error
 	 */
-	public static function get_roster_attendees( $event_id ) {
+	public static function get_roster_order_items( $event_id ) {
 		$event_id = self::sanitize_uuid( $event_id );
-
-		// ── Step 1: fetch order items with expand=attendee ──────────────────────
-		$all  = array();
-		$next = null;
-		$page = 0;
+		$all      = array();
+		$next     = null;
+		$page     = 0;
 
 		do {
 			$params = array( 'limit' => 200, 'expand' => 'attendee' );
@@ -468,53 +457,19 @@ class Hostlinks_CVENT_API {
 			$page++;
 		} while ( $next && $page < 20 );
 
-		if ( empty( $all ) ) {
+		return $all;
+	}
+
+	public static function get_roster_attendees( $event_id ) {
+		$items = self::get_roster_order_items( $event_id );
+		if ( is_wp_error( $items ) ) {
+			return $items;
+		}
+		if ( empty( $items ) ) {
 			return array();
 		}
 
-		// ── Step 2: check if expand worked (name fields present inline) ─────────
-		$sample_att   = $all[0]['attendee'] ?? array();
-		$expand_works = isset( $sample_att['firstName'] ) || isset( $sample_att['lastName'] )
-		                || isset( $sample_att['contact'] );
-
-		if ( $expand_works ) {
-			// Dedupe by attendee UUID and return the inline attendee objects.
-			$seen      = array();
-			$attendees = array();
-			foreach ( $all as $item ) {
-				$att  = $item['attendee'] ?? array();
-				$uuid = self::sanitize_uuid( (string) ( $att['id'] ?? '' ) );
-				if ( $uuid === '' || isset( $seen[ $uuid ] ) ) {
-					continue;
-				}
-				$seen[ $uuid ] = true;
-				$attendees[]   = $att;
-			}
-			return $attendees;
-		}
-
-		// ── Step 3: expand not supported — fall back to individual lookups ──────
-		$uuids = array();
-		foreach ( $all as $item ) {
-			$uuid = self::sanitize_uuid( (string) ( $item['attendee']['id'] ?? $item['attendeeId'] ?? '' ) );
-			if ( $uuid !== '' ) {
-				$uuids[ $uuid ] = true;
-			}
-		}
-
-		$attendees = array();
-		foreach ( array_keys( $uuids ) as $uuid ) {
-			$att = self::get_attendee( $uuid );
-			if ( is_wp_error( $att ) ) {
-				continue;
-			}
-			if ( isset( $att['data'] ) && is_array( $att['data'] ) ) {
-				$att = $att['data'];
-			}
-			$attendees[] = $att;
-		}
-
-		return $attendees;
+		return array_values( Hostlinks_Roster::resolve_attendees_map( $items ) );
 	}
 
 	/**

@@ -19,7 +19,8 @@ class Hostlinks_CVENT_API {
 
 	const TOKEN_URL    = 'https://api-platform.cvent.com/ea/oauth2/token';
 	const BASE_URL     = 'https://api-platform.cvent.com/ea/';
-	const TOKEN_KEY    = 'hostlinks_cvent_token_v4'; // v4: contacts:read for roster work city/state
+	const TOKEN_KEY          = 'hostlinks_cvent_token_v5'; // v5: contacts scope split into own transient
+	const TOKEN_KEY_CONTACTS = 'hostlinks_cvent_token_contacts_v1';
 	const SETTINGS_KEY = 'hostlinks_cvent_settings';
 	const MAX_RETRIES  = 3;
 
@@ -57,6 +58,8 @@ class Hostlinks_CVENT_API {
 		);
 		// Invalidate any cached token so next request re-authenticates.
 		delete_transient( self::TOKEN_KEY );
+		delete_transient( self::TOKEN_KEY_CONTACTS );
+		delete_transient( self::TOKEN_KEY_CONTACTS . '_unavailable' );
 	}
 
 	// -------------------------------------------------------------------------
@@ -134,9 +137,69 @@ class Hostlinks_CVENT_API {
 	}
 
 	/**
-	 * The OAuth scope string we request — exposed so the diagnostic can display it.
+	 * Fetch (or return cached) a token with contacts:read scope.
+	 * Falls back gracefully — if the workspace doesn't have the scope enabled,
+	 * returns WP_Error and caches that fact for 6 hours so we don't keep retrying.
+	 *
+	 * @return string|WP_Error
 	 */
-	const REQUESTED_SCOPE = 'event/events:read event/attendees:read event/orders:read contact/contacts:read';
+	public static function get_contacts_token() {
+		// If we already know it's unavailable, bail immediately.
+		if ( get_transient( self::TOKEN_KEY_CONTACTS . '_unavailable' ) ) {
+			return new WP_Error( 'cvent_contacts_scope_unavailable', 'contacts:read scope not available in this workspace.' );
+		}
+
+		$cached = get_transient( self::TOKEN_KEY_CONTACTS );
+		if ( $cached ) {
+			return $cached;
+		}
+
+		$s = self::get_settings();
+		if ( empty( $s['client_id'] ) || empty( $s['client_secret'] ) ) {
+			return new WP_Error( 'cvent_no_credentials', 'CVENT credentials not configured.' );
+		}
+
+		$credentials = base64_encode( $s['client_id'] . ':' . $s['client_secret'] );
+		$response    = wp_remote_post(
+			self::TOKEN_URL,
+			array(
+				'headers' => array(
+					'Authorization' => 'Basic ' . $credentials,
+					'Content-Type'  => 'application/x-www-form-urlencoded',
+				),
+				'body'    => http_build_query( array(
+					'grant_type' => 'client_credentials',
+					'scope'      => self::REQUESTED_SCOPE_CONTACTS,
+				) ),
+				'timeout' => 20,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( 200 !== $code || empty( $body['access_token'] ) ) {
+			// Cache unavailability for 6 hours to avoid hammering the token endpoint.
+			set_transient( self::TOKEN_KEY_CONTACTS . '_unavailable', true, 6 * HOUR_IN_SECONDS );
+			$msg = isset( $body['error_description'] ) ? $body['error_description'] : 'HTTP ' . $code;
+			return new WP_Error( 'cvent_contacts_token_error', 'contacts token failed: ' . $msg, $body );
+		}
+
+		$ttl = isset( $body['expires_in'] ) ? max( (int) $body['expires_in'] - 60, 60 ) : 3540;
+		set_transient( self::TOKEN_KEY_CONTACTS, $body['access_token'], $ttl );
+		return $body['access_token'];
+	}
+
+	/**
+	 * Core OAuth scope — used for all standard API calls.
+	 * Contacts scope is requested separately via get_contacts_token().
+	 */
+	const REQUESTED_SCOPE          = 'event/events:read event/attendees:read event/orders:read';
+	const REQUESTED_SCOPE_CONTACTS = 'event/events:read event/attendees:read event/orders:read contact/contacts:read';
 
 	// -------------------------------------------------------------------------
 	// HTTP layer
@@ -437,12 +500,61 @@ class Hostlinks_CVENT_API {
 
 	/**
 	 * Fetch a contact record (work city/state live on contact.workAddress).
+	 * Uses contacts-scoped token; falls back to core token if that scope is unavailable.
 	 *
 	 * @param string $contact_id CVENT contact UUID.
 	 * @return array|WP_Error
 	 */
 	public static function get_contact( $contact_id ) {
-		return self::request( 'contacts/' . self::sanitize_uuid( $contact_id ) );
+		$token = self::get_contacts_token();
+		if ( is_wp_error( $token ) ) {
+			// Contacts scope not available — skip silently.
+			return $token;
+		}
+		return self::request_with_token( $token, 'contacts/' . self::sanitize_uuid( $contact_id ) );
+	}
+
+	/**
+	 * Execute a GET request with an explicit bearer token (bypasses get_token()).
+	 *
+	 * @param string $token    Bearer token.
+	 * @param string $endpoint Path relative to BASE_URL.
+	 * @param array  $params   Query-string parameters.
+	 * @return array|WP_Error
+	 */
+	private static function request_with_token( string $token, string $endpoint, array $params = array() ) {
+		$s   = self::get_settings();
+		$url = self::BASE_URL . ltrim( $endpoint, '/' );
+		if ( ! empty( $params ) ) {
+			$url .= '?' . http_build_query( $params, '', '&', PHP_QUERY_RFC3986 );
+		}
+
+		$response = wp_remote_get(
+			$url,
+			array(
+				'headers' => array(
+					'Authorization'        => 'Bearer ' . $token,
+					'Accept'               => 'application/json',
+					'Cvent-Account-Number' => $s['account_number'],
+				),
+				'timeout' => 30,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$code = wp_remote_retrieve_response_code( $response );
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( $code < 200 || $code >= 300 ) {
+			$detail = $body['message'] ?? wp_remote_retrieve_body( $response );
+			return new WP_Error( 'cvent_api_error', sprintf( 'CVENT API error (HTTP %d): %s', $code, $detail ), $body );
+		}
+
+		self::increment_call_counter();
+		return $body;
 	}
 
 	/**

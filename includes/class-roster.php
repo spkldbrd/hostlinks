@@ -510,9 +510,13 @@ class Hostlinks_Roster {
 	}
 
 	/**
-	 * Financial summary cards (matches CVENT registrant-details footer).
+	 * Financial summary cards — four totals: ordered, paid, discounts, due.
 	 */
 	public static function render_totals( array $rows, string $prefix = 'hl-fe' ): string {
+		if ( empty( $rows ) ) {
+			return '';
+		}
+
 		$keys = array(
 			'amount_ordered'    => 'Amount Ordered',
 			'amount_paid'       => 'Amount Paid',
@@ -520,44 +524,36 @@ class Hostlinks_Roster {
 			'balance_due'       => 'Amount Due',
 		);
 
-		$stats = array();
+		$sums = array();
 		foreach ( $keys as $key => $label ) {
-			$vals = array();
+			$total = 0.0;
 			foreach ( $rows as $row ) {
 				$raw = trim( (string) ( $row[ $key ] ?? '' ) );
-				if ( $raw === '' ) {
-					continue;
+				if ( $raw !== '' ) {
+					$total += (float) str_replace( ',', '', $raw );
 				}
-				$vals[] = (float) str_replace( ',', '', $raw );
 			}
-			if ( empty( $vals ) ) {
-				continue;
-			}
-			$stats[ $key ] = array(
-				'label'   => $label,
-				'average' => array_sum( $vals ) / count( $vals ),
-				'maximum' => max( $vals ),
-				'minimum' => min( $vals ),
-				'sum'     => array_sum( $vals ),
-			);
+			$sums[ $key ] = array( 'label' => $label, 'total' => $total );
 		}
 
-		if ( empty( $stats ) ) {
+		$any = false;
+		foreach ( $sums as $s ) {
+			if ( $s['total'] != 0.0 ) {
+				$any = true;
+				break;
+			}
+		}
+		if ( ! $any ) {
 			return '';
 		}
 
 		ob_start();
 		?>
 		<div class="<?php echo esc_attr( $prefix ); ?>-roster-totals">
-			<?php foreach ( $stats as $slug => $stat ) :
-				$col = $prefix . '-col-' . str_replace( '_', '-', $slug );
-			?>
-			<div class="<?php echo esc_attr( $prefix ); ?>-roster-total-card <?php echo esc_attr( $col ); ?>">
+			<?php foreach ( $sums as $slug => $stat ) : ?>
+			<div class="<?php echo esc_attr( $prefix ); ?>-roster-total-card">
 				<strong><?php echo esc_html( $stat['label'] ); ?></strong>
-				<span>Avg <?php echo esc_html( number_format( $stat['average'], 2 ) ); ?></span>
-				<span>Max <?php echo esc_html( number_format( $stat['maximum'], 2 ) ); ?></span>
-				<span>Min <?php echo esc_html( number_format( $stat['minimum'], 2 ) ); ?></span>
-				<span>Sum <?php echo esc_html( number_format( $stat['sum'], 2 ) ); ?></span>
+				<span class="<?php echo esc_attr( $prefix ); ?>-roster-total-amount">$<?php echo esc_html( number_format( $stat['total'], 2 ) ); ?></span>
 			</div>
 			<?php endforeach; ?>
 		</div>

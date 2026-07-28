@@ -125,6 +125,8 @@ foreach ( $_rc_code_list as $c ) {
 		<?php endif; ?>
 	</div>
 
+	<?php echo Hostlinks_Roster::render_totals( $_rc_attendees, 'hl-fe' ); ?>
+
 	<?php if ( ( $_rc_has_trend || $_rc_has_type ) && $_rc_count > 0 ) : ?>
 	<div class="hl-fe-charts-row">
 
@@ -193,7 +195,6 @@ foreach ( $_rc_code_list as $c ) {
 		<?php echo Hostlinks_Roster::render_table( $_rc_attendees, $_rc_is_past, 'hl-fe' ); ?>
 	</div>
 
-	<?php echo Hostlinks_Roster::render_totals( $_rc_attendees, 'hl-fe' ); ?>
 
 </div>
 
@@ -228,10 +229,10 @@ foreach ( $_rc_code_list as $c ) {
 .hl-fe-num { color:#aaa; font-size:11px; width:30px; }
 .hl-fe-sign-in { width:260px; min-width:160px; }
 /* Financial totals */
-.hl-fe-roster-totals { display:none; gap:10px; flex-wrap:wrap; margin-top:10px; flex-shrink:0; }
-.hl-fe-roster-total-card { display:none; flex:1 1 180px; border:1px solid #ddd; border-radius:4px; padding:8px 10px; font-size:12px; background:#fafafa; }
-.hl-fe-roster-total-card strong { display:block; margin-bottom:4px; font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
-.hl-fe-roster-total-card span { display:block; color:#555; line-height:1.5; }
+.hl-fe-roster-totals { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; flex-shrink:0; }
+.hl-fe-roster-total-card { flex:1 1 140px; border:1px solid #ddd; border-radius:4px; padding:10px 14px; font-size:12px; background:#fafafa; }
+.hl-fe-roster-total-card strong { display:block; margin-bottom:6px; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#888; }
+.hl-fe-roster-total-amount { display:block; font-size:1.45em; font-weight:700; color:#1d2327; }
 <?php echo Hostlinks_Roster::optional_col_css( 'hl-fe' ); ?>
 .hl-fe-error { color:#d63638; padding:20px 0; }
 @media print {
@@ -251,7 +252,7 @@ foreach ( $_rc_code_list as $c ) {
 	<?php echo Hostlinks_Roster::optional_col_visible_css( 'hl-fe' ); ?>
 	.hl-fe-sign-in { width:200pt; }
 	.hl-fe-roster-totals { display:flex !important; }
-	.hl-fe-roster-total-card.hl-fe-col-visible { display:block !important; }
+	.hl-fe-roster-total-card { display:block !important; }
 }
 </style>
 

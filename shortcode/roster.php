@@ -172,25 +172,6 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 			els[i].style.display = show ? 'table-cell' : 'none';
 			els[i].classList[ show ? 'add' : 'remove' ]( prefix + '-col-visible' );
 		}
-		updateTotalsVisibility();
-	}
-
-	function updateTotalsVisibility() {
-		var totals = rosterDoc().querySelector( '.hl-fe-roster-totals' );
-		if ( ! totals ) return;
-		var amountSlugs = [ 'amount_ordered', 'amount_paid', 'discounts_applied', 'balance_due' ];
-		var any = false;
-		for ( var i = 0; i < amountSlugs.length; i++ ) {
-			var card = totals.querySelector( '.' + colClass( amountSlugs[i] ) );
-			var chk  = document.querySelector( '[data-col="' + amountSlugs[i] + '"]' );
-			var on   = chk && chk.checked;
-			if ( card ) {
-				card.style.display = on ? 'block' : 'none';
-				card.classList[ on ? 'add' : 'remove' ]( prefix + '-col-visible' );
-			}
-			if ( on ) any = true;
-		}
-		totals.style.display = any ? 'flex' : 'none';
 	}
 
 	function setPreset( cols ) {

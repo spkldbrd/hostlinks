@@ -75,10 +75,11 @@ $_sh_ajax_url   = admin_url( 'admin-ajax.php' );
 
 <style>
 #hl-roster-shell {
-	width: 100%;
-	max-width: 100%;
-	margin: 0 auto;
-	overflow-x: hidden;
+	/* Break out of WP's content column and fill 98% of the viewport */
+	width: 98vw;
+	position: relative;
+	left: 50%;
+	transform: translateX(-50%);
 	box-sizing: border-box;
 }
 #hl-roster-frame-wrap {

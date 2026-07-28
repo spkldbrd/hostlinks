@@ -133,7 +133,9 @@ foreach ( $_rc_code_list as $c ) {
 		<?php if ( $_rc_has_trend ) : ?>
 		<div class="hl-fe-chart-card">
 			<div class="hl-fe-chart-title">Registration Trend</div>
-			<canvas id="hl-trend-canvas" class="hl-fe-trend-canvas"></canvas>
+			<div class="hl-fe-trend-wrap">
+				<canvas id="hl-trend-canvas"></canvas>
+			</div>
 		</div>
 		<?php endif; ?>
 
@@ -209,7 +211,8 @@ foreach ( $_rc_code_list as $c ) {
 .hl-fe-charts-row { display:flex; gap:12px; flex-shrink:0; margin-bottom:10px; flex-wrap:wrap; }
 .hl-fe-chart-card { flex:1; min-width:260px; border:1px solid #ddd; border-radius:4px; padding:10px 12px; background:#fff; box-sizing:border-box; }
 .hl-fe-chart-title { font-size:.88em; font-weight:700; margin:0 0 8px; color:#1d2327; letter-spacing:.02em; }
-.hl-fe-trend-canvas { width:100% !important; height:180px !important; display:block; }
+.hl-fe-trend-wrap { position:relative; height:200px; width:100%; }
+.hl-fe-trend-wrap canvas { position:absolute; top:0; left:0; }
 .hl-fe-type-table { border-collapse:collapse; font-size:12px; width:100%; }
 .hl-fe-type-table th { background:#f0f0f0; border:1px solid #ccc; padding:4px 8px; text-align:center; font-weight:600; font-size:11px; white-space:nowrap; }
 .hl-fe-type-status-hdr { text-align:left; }
@@ -284,17 +287,18 @@ foreach ( $_rc_code_list as $c ) {
 			} ],
 		},
 		options: {
-			responsive: false,
+			responsive: true,
+			maintainAspectRatio: false,
 			plugins: { legend: { display: false } },
 			scales: {
 				x: {
-					title: { display: true, text: 'Last registration date', font: { size: 10 } },
-					ticks: { font: { size: 10 }, maxRotation: 30 },
+					title: { display: true, text: 'Last registration date', font: { size: 13 } },
+					ticks: { font: { size: 12 }, maxRotation: 30 },
 				},
 				y: {
-					title: { display: true, text: 'Number of new registrations', font: { size: 10 } },
+					title: { display: true, text: 'Number of new registrations', font: { size: 13 } },
 					beginAtZero: true,
-					ticks: { stepSize: 1, font: { size: 10 } },
+					ticks: { stepSize: 1, font: { size: 12 } },
 				},
 			},
 		},

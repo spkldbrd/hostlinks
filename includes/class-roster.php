@@ -10,6 +10,8 @@ class Hostlinks_Roster {
 
 	const CACHE_PREFIX = 'hostlinks_roster_v2_';
 
+	const ATTENDEES_CACHE_PREFIX = 'hostlinks_roster_att_v1_';
+
 	const SKIP_STATUSES = array(
 		'Cancelled', 'Declined', 'Deleted', 'TestAttendee', 'Waitlisted',
 		'cancelled', 'declined', 'deleted', 'testattendee', 'waitlisted',
@@ -53,6 +55,7 @@ class Hostlinks_Roster {
 
 		if ( $force_refresh ) {
 			delete_transient( $cache_key );
+			delete_transient( self::ATTENDEES_CACHE_PREFIX . md5( $cvent_id ) );
 		}
 
 		$cached = get_transient( $cache_key );
@@ -92,12 +95,13 @@ class Hostlinks_Roster {
 		}
 	}
 
-	public static function build_rows( array $order_items, bool $is_past ): array {
+	public static function build_rows( array $order_items, bool $is_past, string $cvent_id = '' ): array {
 		if ( empty( $order_items ) ) {
 			return array();
 		}
 
-		$attendees_map = self::resolve_attendees_map( $order_items );
+		$cache_ttl     = $is_past ? 0 : 24 * HOUR_IN_SECONDS;
+		$attendees_map = self::resolve_attendees_map( $order_items, $cvent_id, $cache_ttl );
 		$meta_by_id    = self::aggregate_order_meta( $order_items );
 		$rows          = array();
 
@@ -107,17 +111,16 @@ class Hostlinks_Roster {
 				continue;
 			}
 
-			$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
-			$meta    = $meta_by_id[ $uuid ] ?? self::empty_order_meta();
+			$meta = $meta_by_id[ $uuid ] ?? self::empty_order_meta();
 
 			list( $work_city, $work_state ) = self::extract_work_location( $att );
 
 			$rows[] = array(
-				'last'              => $att['lastName']    ?? $contact['lastName']    ?? '',
-				'first'             => $att['firstName']   ?? $contact['firstName']   ?? '',
-				'company'           => $att['companyName'] ?? $contact['company']     ?? $contact['companyName'] ?? '',
-				'title'             => $att['title']       ?? $contact['title']       ?? '',
-				'email'             => $att['email']       ?? $contact['email']       ?? '',
+				'last'              => self::pick_field( $att, array( 'lastName' ) ),
+				'first'             => self::pick_field( $att, array( 'firstName' ) ),
+				'company'           => self::pick_field( $att, array( 'companyName', 'company', 'organizationName' ) ),
+				'title'             => self::pick_field( $att, array( 'title', 'jobTitle' ) ),
+				'email'             => self::pick_field( $att, array( 'email', 'emailAddress' ) ),
 				'work_phone'        => self::format_phone( self::extract_phone( $att, 'work' ) ),
 				'mobile_phone'      => self::format_phone( self::extract_phone( $att, 'mobile' ) ),
 				'status'            => $status,
@@ -141,7 +144,15 @@ class Hostlinks_Roster {
 		return $rows;
 	}
 
-	public static function resolve_attendees_map( array $order_items ): array {
+	public static function resolve_attendees_map( array $order_items, string $cvent_id = '', int $cache_ttl = 86400 ): array {
+		if ( $cvent_id !== '' ) {
+			$att_key = self::ATTENDEES_CACHE_PREFIX . md5( $cvent_id );
+			$cached  = get_transient( $att_key );
+			if ( is_array( $cached ) && ! empty( $cached ) ) {
+				return $cached;
+			}
+		}
+
 		$map = array();
 
 		foreach ( $order_items as $item ) {
@@ -150,49 +161,124 @@ class Hostlinks_Roster {
 			if ( $uuid === '' ) {
 				continue;
 			}
-			if ( ! empty( $att['firstName'] ) || ! empty( $att['lastName'] ) || ! empty( $att['contact'] ) ) {
+			if ( ! isset( $map[ $uuid ] ) ) {
 				$map[ $uuid ] = $att;
-			} elseif ( ! isset( $map[ $uuid ] ) ) {
-				$map[ $uuid ] = $att;
-			}
-		}
-
-		$sample       = $order_items[0]['attendee'] ?? array();
-		$expand_works = isset( $sample['firstName'] ) || isset( $sample['lastName'] ) || isset( $sample['contact'] );
-
-		if ( ! $expand_works ) {
-			foreach ( array_keys( $map ) as $uuid ) {
-				$att = Hostlinks_CVENT_API::get_attendee( $uuid, 'contact' );
-				if ( is_wp_error( $att ) ) {
-					continue;
-				}
-				if ( isset( $att['data'] ) && is_array( $att['data'] ) ) {
-					$att = $att['data'];
-				}
+			} else {
 				$map[ $uuid ] = self::merge_preserving_nonempty( $map[ $uuid ], $att );
 			}
-			self::enrich_work_location_from_contacts( $map );
-			return $map;
 		}
 
-		// Expand worked for names but often omits contact.workAddress — enrich individually when needed.
+		// Order-item expand=attendee often returns only a stub contact {id} — fetch full records.
+		self::enrich_missing_identities( $map );
+
 		foreach ( array_keys( $map ) as $uuid ) {
 			if ( ! self::needs_contact_enrich( $map[ $uuid ] ) ) {
 				continue;
 			}
-			$att = Hostlinks_CVENT_API::get_attendee( $uuid, 'contact' );
-			if ( is_wp_error( $att ) ) {
+			$fetched = Hostlinks_CVENT_API::get_attendee( $uuid, 'contact' );
+			if ( is_wp_error( $fetched ) ) {
 				continue;
 			}
-			if ( isset( $att['data'] ) && is_array( $att['data'] ) ) {
-				$att = $att['data'];
-			}
-			$map[ $uuid ] = self::merge_attendee_enrichment( $map[ $uuid ], $att );
+			$map[ $uuid ] = self::merge_attendee_enrichment( $map[ $uuid ], self::unwrap_api_record( $fetched ) );
 		}
 
 		self::enrich_work_location_from_contacts( $map );
 
+		if ( $cvent_id !== '' && ! empty( $map ) ) {
+			set_transient( self::ATTENDEES_CACHE_PREFIX . md5( $cvent_id ), $map, $cache_ttl );
+		}
+
 		return $map;
+	}
+
+	/** Whether an attendee/contact payload includes a usable name or email. */
+	public static function attendee_has_identity( array $att ): bool {
+		$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
+		foreach ( array( $att, $contact ) as $src ) {
+			if ( ! empty( $src['firstName'] ) || ! empty( $src['lastName'] ) || ! empty( $src['email'] ) || ! empty( $src['emailAddress'] ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Fetch attendee + contact records when order-item expand omitted registrant fields.
+	 *
+	 * @param array<string,array> $map
+	 */
+	private static function enrich_missing_identities( array &$map ): void {
+		foreach ( array_keys( $map ) as $uuid ) {
+			if ( self::attendee_has_identity( $map[ $uuid ] ) ) {
+				continue;
+			}
+			$fetched = Hostlinks_CVENT_API::get_attendee( $uuid, 'contact' );
+			if ( is_wp_error( $fetched ) ) {
+				continue;
+			}
+			$map[ $uuid ] = self::merge_preserving_nonempty( $map[ $uuid ], self::unwrap_api_record( $fetched ) );
+		}
+
+		self::enrich_identity_from_contacts( $map );
+	}
+
+	/**
+	 * Last-resort identity lookup via GET /contacts/{id}.
+	 *
+	 * @param array<string,array> $map
+	 */
+	private static function enrich_identity_from_contacts( array &$map ): void {
+		static $contact_cache = array();
+
+		foreach ( array_keys( $map ) as $uuid ) {
+			if ( self::attendee_has_identity( $map[ $uuid ] ) ) {
+				continue;
+			}
+
+			$att     = $map[ $uuid ];
+			$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
+			$cid     = Hostlinks_CVENT_API::sanitize_uuid( (string) ( $contact['id'] ?? $att['contactId'] ?? '' ) );
+			if ( $cid === '' ) {
+				continue;
+			}
+
+			if ( ! isset( $contact_cache[ $cid ] ) ) {
+				$fetched = Hostlinks_CVENT_API::get_contact( $cid );
+				$contact_cache[ $cid ] = is_wp_error( $fetched ) ? null : self::unwrap_api_record( $fetched );
+			}
+
+			if ( empty( $contact_cache[ $cid ] ) ) {
+				continue;
+			}
+
+			$map[ $uuid ] = self::merge_attendee_contact( $att, array( 'contact' => $contact_cache[ $cid ] ) );
+		}
+	}
+
+	/** Normalize single-record API responses (top-level or wrapped in data). */
+	private static function unwrap_api_record( $response ): array {
+		if ( ! is_array( $response ) ) {
+			return array();
+		}
+		if ( isset( $response['data'] ) && is_array( $response['data'] ) ) {
+			if ( isset( $response['data']['id'] ) || isset( $response['data']['firstName'] ) || isset( $response['data']['contact'] ) ) {
+				return $response['data'];
+			}
+		}
+		return $response;
+	}
+
+	/** Read the first non-empty field from attendee or nested contact. */
+	private static function pick_field( array $att, array $keys ): string {
+		$contact = is_array( $att['contact'] ?? null ) ? $att['contact'] : array();
+		foreach ( array( $att, $contact ) as $src ) {
+			foreach ( $keys as $key ) {
+				if ( ! empty( $src[ $key ] ) ) {
+					return trim( (string) $src[ $key ] );
+				}
+			}
+		}
+		return '';
 	}
 
 	/**
@@ -265,10 +351,7 @@ class Hostlinks_Roster {
 					$contact_cache[ $cid ] = null;
 					continue;
 				}
-				if ( isset( $fetched['data'] ) && is_array( $fetched['data'] ) ) {
-					$fetched = $fetched['data'];
-				}
-				$contact_cache[ $cid ] = is_array( $fetched ) ? $fetched : null;
+				$contact_cache[ $cid ] = self::unwrap_api_record( $fetched );
 			}
 
 			if ( empty( $contact_cache[ $cid ] ) ) {

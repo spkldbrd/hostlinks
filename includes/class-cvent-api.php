@@ -483,7 +483,7 @@ class Hostlinks_CVENT_API {
 			return array();
 		}
 
-		return array_values( Hostlinks_Roster::resolve_attendees_map( $items ) );
+		return array_values( Hostlinks_Roster::resolve_attendees_map( $items, $event_id ) );
 	}
 
 	/**

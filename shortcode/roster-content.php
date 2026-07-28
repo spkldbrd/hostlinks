@@ -35,7 +35,7 @@ if ( is_wp_error( $_rc_loaded ) ) {
 
 $_rc_is_past    = $_rc_loaded['is_past'];
 $_rc_items      = $_rc_loaded['items'];
-$_rc_attendees  = Hostlinks_Roster::build_rows( $_rc_items, $_rc_is_past );
+$_rc_attendees  = Hostlinks_Roster::build_rows( $_rc_items, $_rc_is_past, $_rc_cvent_id );
 
 Hostlinks_Roster::maybe_schedule_finalize( $_rc_cvent_id, $eve_id, $_rc_row, $_rc_is_past );
 

@@ -55,8 +55,9 @@ if ( is_wp_error( $loaded ) ) {
 $from_cache    = $loaded['from_cache'];
 $is_past_event = $loaded['is_past'];
 $order_items   = $loaded['items'];
-$attendees     = Hostlinks_Roster::build_rows( $order_items, $is_past_event );
-$attendees_raw = Hostlinks_Roster::resolve_attendees_map( $order_items );
+$attendees     = Hostlinks_Roster::build_rows( $order_items, $is_past_event, $cvent_id );
+$att_cache_ttl = $is_past_event ? 0 : 24 * HOUR_IN_SECONDS;
+$attendees_raw = Hostlinks_Roster::resolve_attendees_map( $order_items, $cvent_id, $att_cache_ttl );
 
 Hostlinks_Roster::maybe_schedule_finalize( $cvent_id, $eve_id, $row, $is_past_event );
 
@@ -312,9 +313,11 @@ body {
 		<br><strong>Attendee Records (<?php echo count( $attendees_raw ); ?> resolved, <?php echo count( $attendees ); ?> after status filter)
 		— strategy: <?php
 			$sample = $debug_order_items[0]['attendee'] ?? array();
-			echo ( isset( $sample['firstName'] ) || isset( $sample['lastName'] ) || isset( $sample['contact'] ) )
-				? '<span style="color:green;">expand=attendee worked ✓ (1 call)</span>'
-				: '<span style="color:#c00;">expand not supported — used individual lookups</span>';
+			if ( Hostlinks_Roster::attendee_has_identity( $sample ) ) {
+				echo '<span style="color:green;">order-item expand includes identity ✓</span>';
+			} else {
+				echo '<span style="color:#b36b00;">stub expand — full attendee/contact lookup used</span>';
+			}
 		?>:</strong><br>
 		<?php if ( ! empty( $attendees_raw ) ) : ?>
 			<strong>First raw attendee record:</strong>

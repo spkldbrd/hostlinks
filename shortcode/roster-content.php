@@ -238,21 +238,24 @@ foreach ( $_rc_code_list as $c ) {
 @media print {
 	@page { size: landscape; margin: 0.5in; }
 	body * { visibility:hidden; }
-	body { background:#fff !important; margin:0 !important; padding:0 !important; }
-	.hl-fe-roster { visibility:visible; position:absolute; left:0; top:0; width:100%; padding:0 16px; box-sizing:border-box; }
+	body { background:#fff !important; margin:0 !important; padding:0 !important; overflow:visible !important; height:auto !important; }
+	.hl-fe-roster { visibility:visible; position:absolute; left:0; top:0; width:100%; padding:0 16px; box-sizing:border-box; height:auto !important; display:block !important; overflow:visible !important; }
 	.hl-fe-roster * { visibility:visible; }
+	/* Hide everything except the header + table */
+	.hl-fe-charts-row { display:none !important; visibility:hidden !important; }
+	.hl-fe-roster-totals { display:none !important; visibility:hidden !important; }
 	.hl-fe-roster-actions { display:flex !important; justify-content:flex-end; }
-	.hl-fe-roster-btn, .hl-fe-roster-toggles, #hl-roster-col-toggles { display:none !important; }
 	.hl-fe-roster-logo { display:block !important; max-height:72px; max-width:240px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-	.hl-fe-charts-row { display:flex !important; flex-wrap:wrap; }
-	.hl-fe-chart-card { break-inside:avoid; }
-	.hl-fe-roster-table { width:100%; border-collapse:collapse; }
+	/* Table: full width, no scroll clipping */
+	.hl-fe-table-scroll { overflow:visible !important; height:auto !important; }
+	.hl-fe-roster-table { width:100%; border-collapse:collapse; table-layout:auto; }
 	.hl-fe-roster-table th { background:#000 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 	.hl-fe-roster-table td, .hl-fe-roster-table th { border:1px solid #666 !important; padding:5px 8px; }
 	<?php echo Hostlinks_Roster::optional_col_visible_css( 'hl-fe' ); ?>
 	.hl-fe-sign-in { width:200pt; }
-	.hl-fe-roster-totals { display:flex !important; }
-	.hl-fe-roster-total-card { display:block !important; }
+	/* Allow table to break across pages */
+	.hl-fe-roster-table thead { display:table-header-group; }
+	.hl-fe-roster-table tr { break-inside:avoid; }
 }
 </style>
 

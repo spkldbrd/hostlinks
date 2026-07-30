@@ -186,15 +186,31 @@ class Hostlinks_CVENT_Matcher {
 
 		// ── Date scoring ─────────────────────────────────────────────────────
 		// Hostlinks stores DATE only strings (Y-m-d).
-		// CVENT timestamps are UTC ISO strings; extract calendar date in UTC.
+		// CVENT timestamps are UTC ISO strings; convert to event local timezone
+		// before extracting the calendar date (avoids UTC off-by-one).
 		$hl_start = $hl_event['eve_start'] ?? '';
 		$hl_end   = $hl_event['eve_end']   ?? $hl_start;
 
 		$cv_start_raw = $cvent_event['start'] ?? '';
 		$cv_end_raw   = $cvent_event['end']   ?? $cv_start_raw;
 
-		$cv_start = $cv_start_raw ? gmdate( 'Y-m-d', strtotime( $cv_start_raw ) ) : '';
-		$cv_end   = $cv_end_raw   ? gmdate( 'Y-m-d', strtotime( $cv_end_raw ) )   : '';
+		try {
+			$ev_tz = ! empty( $cvent_event['timezone'] ) ? new DateTimeZone( $cvent_event['timezone'] ) : wp_timezone();
+		} catch ( Exception $e ) {
+			$ev_tz = wp_timezone();
+		}
+		$cv_start = '';
+		$cv_end   = '';
+		if ( $cv_start_raw ) {
+			$dt = new DateTime( $cv_start_raw, new DateTimeZone( 'UTC' ) );
+			$dt->setTimezone( $ev_tz );
+			$cv_start = $dt->format( 'Y-m-d' );
+		}
+		if ( $cv_end_raw ) {
+			$dt = new DateTime( $cv_end_raw, new DateTimeZone( 'UTC' ) );
+			$dt->setTimezone( $ev_tz );
+			$cv_end = $dt->format( 'Y-m-d' );
+		}
 
 		$breakdown['hl_start'] = $hl_start;
 		$breakdown['cv_start'] = $cv_start;

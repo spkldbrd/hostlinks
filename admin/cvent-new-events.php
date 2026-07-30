@@ -254,12 +254,21 @@ function hostlinks_cvent_zoom_location( $title ) {
 			$title      = $ev['title'] ?? '(no title)';
 			$start_raw  = $ev['start'] ?? '';
 			$end_raw    = $ev['end'] ?? '';
-			$start_dt   = $start_raw ? new DateTime( $start_raw ) : null;
-			$end_dt     = $end_raw   ? new DateTime( $end_raw )   : null;
-			$start_disp = $start_dt  ? $start_dt->format( 'M j, Y' ) : '—';
-			$end_disp   = $end_dt    ? $end_dt->format( 'M j, Y' )   : '—';
-			$start_val  = $start_dt  ? $start_dt->format( 'Y-m-d' )  : '';
-			$end_val    = $end_dt    ? $end_dt->format( 'Y-m-d' )    : '';
+			// CVENT returns start/end in UTC; convert to the event's local timezone
+			// so calendar dates match what staff see in CVENT (avoids off-by-one).
+			try {
+				$ev_tz = ! empty( $ev['timezone'] ) ? new DateTimeZone( $ev['timezone'] ) : wp_timezone();
+			} catch ( Exception $e ) {
+				$ev_tz = wp_timezone();
+			}
+			$start_dt = $start_raw ? new DateTime( $start_raw, new DateTimeZone( 'UTC' ) ) : null;
+			$end_dt   = $end_raw   ? new DateTime( $end_raw,   new DateTimeZone( 'UTC' ) ) : null;
+			if ( $start_dt ) { $start_dt->setTimezone( $ev_tz ); }
+			if ( $end_dt )   { $end_dt->setTimezone( $ev_tz ); }
+			$start_disp = $start_dt ? $start_dt->format( 'M j, Y' ) : '—';
+			$end_disp   = $end_dt   ? $end_dt->format( 'M j, Y' )   : '—';
+			$start_val  = $start_dt ? $start_dt->format( 'Y-m-d' )  : '';
+			$end_val    = $end_dt   ? $end_dt->format( 'Y-m-d' )    : '';
 
 		// Pre-fill logic.
 		$is_zoom     = ( false !== stripos( $title, 'zoom' ) || false !== stripos( $title, 'webinar' ) );

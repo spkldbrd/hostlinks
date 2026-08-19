@@ -42,6 +42,17 @@ class Hostlinks_Instructor_API {
 	public static function init(): void {
 		add_action( 'rest_api_init', array( static::class, 'register_routes' ) );
 		add_action( 'admin_post_hostlinks_regenerate_api_key', array( static::class, 'handle_regenerate_key' ) );
+		self::register_rest_auth_bypass();
+	}
+
+	/**
+	 * Allow X-HL-Key to satisfy WordPress REST auth before site-wide locks
+	 * (e.g. WP Force Login) reject unauthenticated /wp-json requests.
+	 */
+	private static function register_rest_auth_bypass(): void {
+		add_filter( 'rest_authentication_errors', array( static::class, 'rest_authenticate_api_key' ), 5 );
+		add_filter( 'v_forcelogin_bypass', array( static::class, 'force_login_bypass' ), 10, 2 );
+		add_filter( 'rest_authentication_errors', array( static::class, 'rest_clear_late_blocks' ), 99 );
 	}
 
 	// ── Route registration ───────────────────────────────────────────────────
@@ -140,24 +151,12 @@ class Hostlinks_Instructor_API {
 			return new WP_Error( 'unauthorized', 'Invalid or missing X-HL-Key header.', array( 'status' => 401 ) );
 		}
 
-		$scope  = self::request_scope( $request );
-		$matched = null;
-		foreach ( $keys as $record ) {
-			$secret = (string) ( $record['key'] ?? '' );
-			if ( $secret === '' || strlen( $secret ) !== strlen( $provided ) ) {
-				continue;
-			}
-			if ( ! hash_equals( $secret, $provided ) ) {
-				continue;
-			}
-			$matched = $record;
-			break;
-		}
-
+		$matched = self::match_api_key( $provided );
 		if ( ! $matched ) {
 			return new WP_Error( 'unauthorized', 'Invalid or missing X-HL-Key header.', array( 'status' => 401 ) );
 		}
 
+		$scope = self::request_scope( $request );
 		if ( ! self::key_allows_scope( $matched, $scope ) ) {
 			return new WP_Error(
 				'forbidden',
@@ -168,6 +167,100 @@ class Hostlinks_Instructor_API {
 
 		self::touch_last_used( (string) ( $matched['id'] ?? '' ) );
 		return true;
+	}
+
+	/**
+	 * Priority 5 — authenticate REST when X-HL-Key matches before global locks run.
+	 *
+	 * @param bool|WP_Error|null $result
+	 * @return bool|WP_Error|null
+	 */
+	public static function rest_authenticate_api_key( $result ) {
+		if ( true === $result || is_wp_error( $result ) ) {
+			return $result;
+		}
+		if ( ! self::is_hostlinks_rest_route() ) {
+			return $result;
+		}
+		if ( self::match_api_key( self::get_provided_api_key_from_request() ) !== null ) {
+			return true;
+		}
+		return $result;
+	}
+
+	/**
+	 * WP Force Login whitelist — only when a valid API key is present.
+	 *
+	 * @param bool   $bypass
+	 * @param string $url
+	 * @return bool
+	 */
+	public static function force_login_bypass( $bypass, $url ) {
+		if ( $bypass ) {
+			return $bypass;
+		}
+		if ( strpos( (string) $url, '/wp-json/' . self::NAMESPACE . '/' ) === false ) {
+			return $bypass;
+		}
+		return self::match_api_key( self::get_provided_api_key_from_request() ) !== null;
+	}
+
+	/**
+	 * Priority 99 — clear late REST 401s for our namespace when key is valid.
+	 *
+	 * @param bool|WP_Error|null $result
+	 * @return bool|WP_Error|null
+	 */
+	public static function rest_clear_late_blocks( $result ) {
+		if ( ! is_wp_error( $result ) ) {
+			return $result;
+		}
+		if ( ! self::is_hostlinks_rest_route() ) {
+			return $result;
+		}
+		if ( self::match_api_key( self::get_provided_api_key_from_request() ) !== null ) {
+			return null;
+		}
+		return $result;
+	}
+
+	/** @return array<string, mixed>|null */
+	private static function match_api_key( string $provided ): ?array {
+		if ( $provided === '' ) {
+			return null;
+		}
+		foreach ( self::get_keys() as $record ) {
+			$secret = (string) ( $record['key'] ?? '' );
+			if ( $secret === '' || strlen( $secret ) !== strlen( $provided ) ) {
+				continue;
+			}
+			if ( hash_equals( $secret, $provided ) ) {
+				return $record;
+			}
+		}
+		return null;
+	}
+
+	private static function get_provided_api_key_from_request(): string {
+		if ( ! empty( $_SERVER['HTTP_X_HL_KEY'] ) ) {
+			return trim( (string) $_SERVER['HTTP_X_HL_KEY'] );
+		}
+		if ( function_exists( 'getallheaders' ) ) {
+			foreach ( getallheaders() as $name => $value ) {
+				if ( strtolower( (string) $name ) === 'x-hl-key' ) {
+					return trim( (string) $value );
+				}
+			}
+		}
+		return '';
+	}
+
+	private static function is_hostlinks_rest_route(): bool {
+		$route = isset( $GLOBALS['wp']->query_vars['rest_route'] )
+			? (string) $GLOBALS['wp']->query_vars['rest_route']
+			: '';
+		$prefix = '/' . self::NAMESPACE . '/';
+		return $route !== '' && strpos( $route, $prefix ) === 0;
 	}
 
 	/** @return array<int, array<string, mixed>> */

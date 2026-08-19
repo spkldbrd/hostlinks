@@ -69,6 +69,7 @@ $api_keys = Hostlinks_Instructor_API::get_keys();
 
 <h2 style="margin-top:0;">Automation API</h2>
 <p>These REST endpoints let external automation tools (n8n, Make, Zapier, email platforms, etc.) read and update Hostlinks event data without touching the WordPress admin. Every request must include a secret in the <code>X-HL-Key</code> HTTP header. Create a separate labeled key per tool, and grant only the endpoints that tool needs.</p>
+<p style="color:#555;max-width:900px;">Works with <strong>WP Force Login</strong> and other “logged-in users only” REST restrictions: a valid <code>X-HL-Key</code> on <code>/wp-json/hostlinks/v1/*</code> is accepted before those plugins block the request. Endpoint scope and invalid keys are still enforced per route.</p>
 
 <?php /* ── API Keys ───────────────────────────────────────────────────────── */ ?>
 <h3 style="font-size:14px;margin:24px 0 8px;">API Keys</h3>

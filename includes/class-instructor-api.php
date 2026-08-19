@@ -13,7 +13,10 @@
  *   GET  /instructors            — list all active instructors
  *
  * Auth: every request must include the header
- *   X-HL-Key: {value of option hostlinks_automation_api_key}
+ *   X-HL-Key: {one of the labeled keys from Settings → Automation API}
+ * Each key has a label and a list of allowed endpoint scopes.
+ * The legacy single option hostlinks_automation_api_key is migrated
+ * to a full-access labeled key on first load.
  *
  * Dry-run / test mode (no DB writes):
  *   Per-request : add "dry_run": true to the JSON body.
@@ -33,10 +36,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Hostlinks_Instructor_API {
 
 	const NAMESPACE = 'hostlinks/v1';
+	const KEYS_OPTION = 'hostlinks_automation_api_keys';
+	const LEGACY_KEY_OPTION = 'hostlinks_automation_api_key';
 
 	public static function init(): void {
 		add_action( 'rest_api_init', array( static::class, 'register_routes' ) );
-		// Admin-post handler: regenerate API key button.
 		add_action( 'admin_post_hostlinks_regenerate_api_key', array( static::class, 'handle_regenerate_key' ) );
 	}
 
@@ -108,16 +112,244 @@ class Hostlinks_Instructor_API {
 
 	// ── Auth ─────────────────────────────────────────────────────────────────
 
+	/**
+	 * Endpoint scope catalog for settings UI and key checks.
+	 * '*' means every current and future endpoint.
+	 *
+	 * @return array<string, string> slug => label
+	 */
+	public static function scope_catalog(): array {
+		return array(
+			'*'                    => 'All endpoints',
+			'assign-instructor'    => 'POST /assign-instructor — assign trainers',
+			'create-event-request' => 'POST /create-event-request — queue host emails',
+			'upcoming-events'      => 'GET /upcoming-events — instructor check list',
+			'email-events'         => 'GET /email-events — email merge fields',
+			'instructors'          => 'GET /instructors — instructor names',
+		);
+	}
+
 	public static function check_api_key( WP_REST_Request $request ): bool|WP_Error {
-		$stored = get_option( 'hostlinks_automation_api_key', '' );
-		if ( ! $stored ) {
+		$keys = self::get_keys();
+		if ( empty( $keys ) ) {
 			return new WP_Error( 'api_disabled', 'Automation API key not configured.', array( 'status' => 503 ) );
 		}
-		$provided = trim( $request->get_header( 'X-HL-Key' ) ?? '' );
-		if ( ! hash_equals( $stored, $provided ) ) {
+
+		$provided = trim( (string) ( $request->get_header( 'X-HL-Key' ) ?? '' ) );
+		if ( $provided === '' ) {
 			return new WP_Error( 'unauthorized', 'Invalid or missing X-HL-Key header.', array( 'status' => 401 ) );
 		}
+
+		$scope  = self::request_scope( $request );
+		$matched = null;
+		foreach ( $keys as $record ) {
+			$secret = (string) ( $record['key'] ?? '' );
+			if ( $secret === '' || strlen( $secret ) !== strlen( $provided ) ) {
+				continue;
+			}
+			if ( ! hash_equals( $secret, $provided ) ) {
+				continue;
+			}
+			$matched = $record;
+			break;
+		}
+
+		if ( ! $matched ) {
+			return new WP_Error( 'unauthorized', 'Invalid or missing X-HL-Key header.', array( 'status' => 401 ) );
+		}
+
+		if ( ! self::key_allows_scope( $matched, $scope ) ) {
+			return new WP_Error(
+				'forbidden',
+				'This API key is not allowed to access this endpoint.',
+				array( 'status' => 403 )
+			);
+		}
+
+		self::touch_last_used( (string) ( $matched['id'] ?? '' ) );
 		return true;
+	}
+
+	/** @return array<int, array<string, mixed>> */
+	public static function get_keys(): array {
+		self::maybe_migrate_legacy_key();
+		$keys = get_option( self::KEYS_OPTION, array() );
+		return is_array( $keys ) ? array_values( $keys ) : array();
+	}
+
+	public static function create_key( string $label, array $scopes ): array|WP_Error {
+		$scopes = self::sanitize_scopes( $scopes );
+		if ( empty( $scopes ) ) {
+			return new WP_Error( 'invalid_scopes', 'Select at least one endpoint this key may access.' );
+		}
+		$label  = sanitize_text_field( $label );
+		$record = self::make_record( $label, $scopes );
+		$keys   = self::get_keys();
+		$keys[] = $record;
+		update_option( self::KEYS_OPTION, $keys );
+		return $record;
+	}
+
+	public static function update_key( string $id, string $label, array $scopes ): bool|WP_Error {
+		$scopes = self::sanitize_scopes( $scopes );
+		if ( empty( $scopes ) ) {
+			return new WP_Error( 'invalid_scopes', 'Select at least one endpoint this key may access.' );
+		}
+		$label   = sanitize_text_field( $label );
+		$keys    = self::get_keys();
+		$found   = false;
+		foreach ( $keys as &$record ) {
+			if ( (string) ( $record['id'] ?? '' ) !== $id ) {
+				continue;
+			}
+			$record['label']  = $label !== '' ? $label : 'Untitled';
+			$record['scopes'] = $scopes;
+			$found            = true;
+			break;
+		}
+		unset( $record );
+		if ( ! $found ) {
+			return new WP_Error( 'not_found', 'API key not found.' );
+		}
+		update_option( self::KEYS_OPTION, $keys );
+		return true;
+	}
+
+	public static function regenerate_key( string $id ): string|WP_Error {
+		$keys  = self::get_keys();
+		$found = false;
+		$new   = '';
+		foreach ( $keys as &$record ) {
+			if ( (string) ( $record['id'] ?? '' ) !== $id ) {
+				continue;
+			}
+			$new              = wp_generate_password( 40, false );
+			$record['key']    = $new;
+			$record['last_used_at'] = '';
+			$found            = true;
+			break;
+		}
+		unset( $record );
+		if ( ! $found ) {
+			return new WP_Error( 'not_found', 'API key not found.' );
+		}
+		update_option( self::KEYS_OPTION, $keys );
+		return $new;
+	}
+
+	public static function delete_key( string $id ): bool|WP_Error {
+		$keys    = self::get_keys();
+		$filtered = array();
+		$found    = false;
+		foreach ( $keys as $record ) {
+			if ( (string) ( $record['id'] ?? '' ) === $id ) {
+				$found = true;
+				continue;
+			}
+			$filtered[] = $record;
+		}
+		if ( ! $found ) {
+			return new WP_Error( 'not_found', 'API key not found.' );
+		}
+		update_option( self::KEYS_OPTION, array_values( $filtered ) );
+		return true;
+	}
+
+	public static function format_scopes_label( array $scopes ): string {
+		$catalog = self::scope_catalog();
+		if ( in_array( '*', $scopes, true ) ) {
+			return $catalog['*'];
+		}
+		$labels = array();
+		foreach ( $scopes as $slug ) {
+			$labels[] = $catalog[ $slug ] ?? $slug;
+		}
+		return $labels ? implode( '; ', $labels ) : 'None';
+	}
+
+	private static function maybe_migrate_legacy_key(): void {
+		$existing = get_option( self::KEYS_OPTION, false );
+		if ( $existing !== false ) {
+			return;
+		}
+		$legacy = trim( (string) get_option( self::LEGACY_KEY_OPTION, '' ) );
+		if ( $legacy === '' ) {
+			add_option( self::KEYS_OPTION, array() );
+			return;
+		}
+		$record = self::make_record( 'Legacy (all endpoints)', array( '*' ), $legacy );
+		add_option( self::KEYS_OPTION, array( $record ) );
+	}
+
+	private static function make_record( string $label, array $scopes, string $secret = '' ): array {
+		return array(
+			'id'           => wp_generate_password( 12, false ),
+			'label'        => $label !== '' ? $label : 'Untitled',
+			'key'          => $secret !== '' ? $secret : wp_generate_password( 40, false ),
+			'scopes'       => $scopes,
+			'created_at'   => current_time( 'mysql' ),
+			'last_used_at' => '',
+		);
+	}
+
+	private static function sanitize_scopes( array $raw ): array {
+		$valid = array_keys( self::scope_catalog() );
+		$out   = array();
+		foreach ( $raw as $slug ) {
+			$slug = sanitize_text_field( (string) $slug );
+			if ( in_array( $slug, $valid, true ) ) {
+				$out[] = $slug;
+			}
+		}
+		$out = array_values( array_unique( $out ) );
+		if ( in_array( '*', $out, true ) ) {
+			return array( '*' );
+		}
+		return $out;
+	}
+
+	private static function key_allows_scope( array $record, string $scope ): bool {
+		$scopes = (array) ( $record['scopes'] ?? array() );
+		if ( in_array( '*', $scopes, true ) ) {
+			return true;
+		}
+		return $scope !== '' && in_array( $scope, $scopes, true );
+	}
+
+	private static function request_scope( WP_REST_Request $request ): string {
+		$route  = (string) $request->get_route();
+		$prefix = '/' . self::NAMESPACE . '/';
+		if ( strpos( $route, $prefix ) === 0 ) {
+			return trim( substr( $route, strlen( $prefix ) ), '/' );
+		}
+		return trim( $route, '/' );
+	}
+
+	private static function touch_last_used( string $id ): void {
+		if ( $id === '' ) {
+			return;
+		}
+		$keys    = get_option( self::KEYS_OPTION, array() );
+		if ( ! is_array( $keys ) ) {
+			return;
+		}
+		$now     = current_time( 'mysql' );
+		$changed = false;
+		foreach ( $keys as &$record ) {
+			if ( (string) ( $record['id'] ?? '' ) !== $id ) {
+				continue;
+			}
+			$prev = (string) ( $record['last_used_at'] ?? '' );
+			if ( $prev === '' || ( time() - strtotime( $prev ) ) > 60 ) {
+				$record['last_used_at'] = $now;
+				$changed                = true;
+			}
+			break;
+		}
+		unset( $record );
+		if ( $changed ) {
+			update_option( self::KEYS_OPTION, $keys );
+		}
 	}
 
 	// ── Dry-run detection ────────────────────────────────────────────────────
@@ -937,15 +1169,25 @@ class Hostlinks_Instructor_API {
 		);
 	}
 
-	// ── Key regeneration (admin-post) ────────────────────────────────────────
+	// ── Key regeneration (admin-post, legacy + keyed) ─────────────────────────
 
 	public static function handle_regenerate_key(): void {
 		check_admin_referer( 'hostlinks_regenerate_api_key' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( 'Unauthorized.' );
 		}
-		$key = wp_generate_password( 40, false );
-		update_option( 'hostlinks_automation_api_key', $key );
+
+		$key_id = sanitize_text_field( (string) ( $_POST['key_id'] ?? $_GET['key_id'] ?? '' ) );
+		$keys   = self::get_keys();
+
+		if ( $key_id !== '' ) {
+			self::regenerate_key( $key_id );
+		} elseif ( count( $keys ) === 1 ) {
+			self::regenerate_key( (string) $keys[0]['id'] );
+		} elseif ( empty( $keys ) ) {
+			self::create_key( 'Default (all endpoints)', array( '*' ) );
+		}
+
 		wp_safe_redirect( add_query_arg(
 			array( 'page' => 'hostlinks-settings', 'tab' => 'automation-api', 'hl_key_regen' => '1' ),
 			admin_url( 'admin.php' )

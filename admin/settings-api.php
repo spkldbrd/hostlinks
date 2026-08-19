@@ -2,7 +2,7 @@
 /**
  * Settings → Automation API tab.
  *
- * Manages the secret API key used by n8n (or any HTTP client) to call
+ * Manages labeled, scoped API keys used by n8n (or any HTTP client) to call
  * the Hostlinks REST API endpoints under /wp-json/hostlinks/v1/.
  */
 if ( ! defined( 'ABSPATH' ) ) {
@@ -13,9 +13,40 @@ if ( ! current_user_can( 'manage_options' ) ) {
 }
 
 $notice    = '';
-$api_key   = get_option( 'hostlinks_automation_api_key', '' );
 $base_url  = rest_url( 'hostlinks/v1' );
 $test_mode = (bool) get_option( 'hostlinks_api_test_mode', 0 );
+$catalog   = Hostlinks_Instructor_API::scope_catalog();
+
+// ── Key CRUD ────────────────────────────────────────────────────────────────
+if ( isset( $_POST['hl_api_key_action'] ) ) {
+	check_admin_referer( 'hostlinks_api_keys' );
+	$action = sanitize_text_field( (string) $_POST['hl_api_key_action'] );
+	$key_id = sanitize_text_field( (string) ( $_POST['key_id'] ?? '' ) );
+	$label  = sanitize_text_field( (string) ( $_POST['key_label'] ?? '' ) );
+	$scopes = isset( $_POST['key_scopes'] ) ? (array) $_POST['key_scopes'] : array();
+
+	if ( 'create' === $action ) {
+		$result = Hostlinks_Instructor_API::create_key( $label, $scopes );
+		$notice = is_wp_error( $result )
+			? '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result->get_error_message() ) . '</p></div>'
+			: '<div class="notice notice-success is-dismissible"><p>API key <strong>' . esc_html( $result['label'] ) . '</strong> created. Copy it now into the email tool or n8n.</p></div>';
+	} elseif ( 'update' === $action && $key_id ) {
+		$result = Hostlinks_Instructor_API::update_key( $key_id, $label, $scopes );
+		$notice = is_wp_error( $result )
+			? '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result->get_error_message() ) . '</p></div>'
+			: '<div class="notice notice-success is-dismissible"><p>API key updated.</p></div>';
+	} elseif ( 'regenerate' === $action && $key_id ) {
+		$result = Hostlinks_Instructor_API::regenerate_key( $key_id );
+		$notice = is_wp_error( $result )
+			? '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result->get_error_message() ) . '</p></div>'
+			: '<div class="notice notice-warning is-dismissible"><p>Secret regenerated. Update the key in any tool still using the old value.</p></div>';
+	} elseif ( 'delete' === $action && $key_id ) {
+		$result = Hostlinks_Instructor_API::delete_key( $key_id );
+		$notice = is_wp_error( $result )
+			? '<div class="notice notice-error is-dismissible"><p>' . esc_html( $result->get_error_message() ) . '</p></div>'
+			: '<div class="notice notice-success is-dismissible"><p>API key deleted.</p></div>';
+	}
+}
 
 // ── Handle global test-mode toggle save ───────────────────────────────────
 if ( isset( $_POST['hostlinks_save_api_test_mode'] ) ) {
@@ -28,53 +59,108 @@ if ( isset( $_POST['hostlinks_save_api_test_mode'] ) ) {
 		: '<div class="notice notice-success is-dismissible"><p>API Test Mode disabled — write endpoints are live again.</p></div>';
 }
 
-if ( isset( $_GET['hl_key_regen'] ) ) {
-	$api_key = get_option( 'hostlinks_automation_api_key', '' ); // re-read after regeneration
-	$notice  = '<div class="notice notice-success is-dismissible"><p>API key regenerated. Update it in n8n and any other automation clients before your next run.</p></div>';
+if ( isset( $_GET['hl_key_regen'] ) && $notice === '' ) {
+	$notice = '<div class="notice notice-warning is-dismissible"><p>API key regenerated. Update it in n8n and any other automation clients before your next run.</p></div>';
 }
+
+$api_keys = Hostlinks_Instructor_API::get_keys();
 ?>
 <?php echo $notice; ?>
 
 <h2 style="margin-top:0;">Automation API</h2>
-<p>These REST endpoints let external automation tools (n8n, Make, Zapier, email platforms, etc.) read and update Hostlinks event data without touching the WordPress admin. Every request must include the secret key in the <code>X-HL-Key</code> HTTP header.</p>
+<p>These REST endpoints let external automation tools (n8n, Make, Zapier, email platforms, etc.) read and update Hostlinks event data without touching the WordPress admin. Every request must include a secret in the <code>X-HL-Key</code> HTTP header. Create a separate labeled key per tool, and grant only the endpoints that tool needs.</p>
 
-<?php /* ── API Key ────────────────────────────────────────────────────────── */ ?>
-<h3 style="font-size:14px;margin:24px 0 8px;">Secret API Key</h3>
-<table class="widefat striped" style="max-width:700px;margin-bottom:14px;">
-	<tbody>
-		<tr>
-			<th style="width:180px;">Current key</th>
-			<td>
-				<?php if ( $api_key ) : ?>
-					<code id="hl-api-key-display" style="font-size:13px;background:#f0f0f1;padding:4px 8px;border-radius:3px;user-select:all;"><?php echo esc_html( $api_key ); ?></code>
-					&nbsp;
-					<button type="button" class="button button-small"
-					        onclick="navigator.clipboard.writeText('<?php echo esc_js( $api_key ); ?>').then(()=>this.textContent='Copied!').catch(()=>{})">
-						Copy
-					</button>
-				<?php else : ?>
-					<em style="color:#d63638;">No key set — generate one below before using the API.</em>
-				<?php endif; ?>
-			</td>
-		</tr>
-		<tr>
-			<th>Header name</th>
-			<td><code>X-HL-Key</code></td>
-		</tr>
-	</tbody>
-</table>
+<?php /* ── API Keys ───────────────────────────────────────────────────────── */ ?>
+<h3 style="font-size:14px;margin:24px 0 8px;">API Keys</h3>
+<p style="color:#555;max-width:900px;margin-top:0;">Header name: <code>X-HL-Key</code>. The existing single key (if you had one) is migrated as <em>Legacy (all endpoints)</em> so current n8n workflows keep working.</p>
 
-<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-	<?php wp_nonce_field( 'hostlinks_regenerate_api_key' ); ?>
-	<input type="hidden" name="action" value="hostlinks_regenerate_api_key">
-	<button type="submit" class="button button-primary"
-	        onclick="return confirm('This will invalidate the current key immediately. Any automation using the old key will stop working until you update it. Continue?');">
-		<?php echo $api_key ? '&#x21BA; Regenerate Key' : '&#x2B; Generate Key'; ?>
-	</button>
-	<?php if ( $api_key ) : ?>
-		<span style="color:#666;font-size:12px;margin-left:10px;line-height:30px;">Regenerating invalidates the current key immediately.</span>
-	<?php endif; ?>
+<?php if ( empty( $api_keys ) ) : ?>
+	<p style="color:#d63638;"><em>No keys yet — create one below before calling the API.</em></p>
+<?php endif; ?>
+
+<?php foreach ( $api_keys as $k ) :
+	$kid    = (string) ( $k['id'] ?? '' );
+	$klabel = (string) ( $k['label'] ?? 'Untitled' );
+	$ksec   = (string) ( $k['key'] ?? '' );
+	$ksc    = (array) ( $k['scopes'] ?? array() );
+	$created = ! empty( $k['created_at'] ) ? $k['created_at'] : '—';
+	$used    = ! empty( $k['last_used_at'] ) ? $k['last_used_at'] : 'Never';
+	$uid     = 'hl-key-' . esc_attr( $kid );
+	?>
+	<form method="post" style="max-width:900px;margin:0 0 16px;border:1px solid #c3c4c7;background:#fff;padding:14px 16px;">
+		<?php wp_nonce_field( 'hostlinks_api_keys' ); ?>
+		<input type="hidden" name="key_id" value="<?php echo esc_attr( $kid ); ?>">
+		<div style="display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-start;">
+			<div style="flex:1;min-width:220px;">
+				<label style="display:block;font-weight:600;margin-bottom:4px;">Label</label>
+				<input type="text" name="key_label" value="<?php echo esc_attr( $klabel ); ?>"
+				       class="regular-text" style="width:100%;max-width:320px;" placeholder="e.g. Email platform">
+				<p style="margin:8px 0 4px;font-size:12px;color:#666;">Secret</p>
+				<code id="<?php echo $uid; ?>" style="font-size:12px;background:#f0f0f1;padding:4px 8px;border-radius:3px;user-select:all;word-break:break-all;"><?php echo esc_html( $ksec ); ?></code>
+				<button type="button" class="button button-small" style="margin-left:6px;"
+				        onclick="navigator.clipboard.writeText(document.getElementById('<?php echo $uid; ?>').textContent).then(()=>{this.textContent='Copied!';}).catch(()=>{})">Copy</button>
+				<p style="margin:8px 0 0;font-size:12px;color:#666;">Created <?php echo esc_html( $created ); ?> · Last used <?php echo esc_html( $used ); ?></p>
+			</div>
+			<div style="flex:1;min-width:260px;">
+				<label style="display:block;font-weight:600;margin-bottom:6px;">Allowed endpoints</label>
+				<?php foreach ( $catalog as $slug => $scope_label ) :
+					$checked = in_array( '*', $ksc, true ) || in_array( $slug, $ksc, true );
+					?>
+					<label style="display:flex;align-items:flex-start;gap:6px;margin:0 0 4px;font-size:13px;cursor:pointer;">
+						<input type="checkbox" name="key_scopes[]" value="<?php echo esc_attr( $slug ); ?>"
+						       <?php checked( $checked ); ?>
+						       <?php echo ( '*' === $slug ) ? 'data-hl-all="1"' : 'data-hl-scope="1"'; ?>>
+						<span><?php echo esc_html( $scope_label ); ?></span>
+					</label>
+				<?php endforeach; ?>
+			</div>
+		</div>
+		<p style="margin:12px 0 0;">
+			<button type="submit" name="hl_api_key_action" value="update" class="button button-secondary">Save label &amp; access</button>
+			<button type="submit" name="hl_api_key_action" value="regenerate" class="button"
+			        onclick="return confirm('This replaces the secret immediately. Any tool using the old value will stop working until you update it. Continue?');">Regenerate secret</button>
+			<button type="submit" name="hl_api_key_action" value="delete" class="button"
+			        style="color:#b32d2e;"
+			        onclick="return confirm('Delete this API key? Tools using it will lose access immediately.');">Delete</button>
+		</p>
+	</form>
+<?php endforeach; ?>
+
+<form method="post" style="max-width:900px;margin:0 0 8px;border:1px dashed #c3c4c7;background:#f6f7f7;padding:14px 16px;">
+	<?php wp_nonce_field( 'hostlinks_api_keys' ); ?>
+	<h4 style="margin:0 0 8px;">Create a new key</h4>
+	<p style="margin:0 0 10px;color:#555;font-size:13px;">Give it a label that matches the tool (e.g. “Email platform” or “n8n trainer assignment”) and tick only the endpoints that tool should call.</p>
+	<p>
+		<label style="font-weight:600;display:block;margin-bottom:4px;">Label</label>
+		<input type="text" name="key_label" class="regular-text" placeholder="e.g. Email platform" required>
+	</p>
+	<p style="margin:0 0 6px;font-weight:600;">Allowed endpoints</p>
+	<?php foreach ( $catalog as $slug => $scope_label ) : ?>
+		<label style="display:flex;align-items:flex-start;gap:6px;margin:0 0 4px;font-size:13px;cursor:pointer;">
+			<input type="checkbox" name="key_scopes[]" value="<?php echo esc_attr( $slug ); ?>"
+			       <?php echo ( 'email-events' === $slug ) ? 'checked' : ''; ?>
+			       <?php echo ( '*' === $slug ) ? 'data-hl-all="1"' : 'data-hl-scope="1"'; ?>>
+			<span><?php echo esc_html( $scope_label ); ?></span>
+		</label>
+	<?php endforeach; ?>
+	<p style="margin:12px 0 0;">
+		<button type="submit" name="hl_api_key_action" value="create" class="button button-primary">Create key</button>
+	</p>
 </form>
+<script>
+(function(){
+	document.querySelectorAll('form').forEach(function(form){
+		var all = form.querySelector('input[data-hl-all="1"]');
+		if (!all) return;
+		var scopes = form.querySelectorAll('input[data-hl-scope="1"]');
+		function sync(){
+			scopes.forEach(function(cb){ cb.disabled = all.checked; if (all.checked) cb.checked = true; });
+		}
+		all.addEventListener('change', sync);
+		sync();
+	});
+})();
+</script>
 
 <?php /* ── Global Test Mode toggle ─────────────────────────────────────── */ ?>
 <hr style="margin:28px 0;" />
@@ -162,7 +248,7 @@ if ( isset( $_GET['hl_key_regen'] ) ) {
 		</tr>
 		<tr>
 			<th>Request headers</th>
-			<td><code>X-HL-Key: {your-secret-key}</code></td>
+			<td><code>X-HL-Key: {key with email-events access}</code></td>
 		</tr>
 		<tr>
 			<th>Query parameters</th>
@@ -438,7 +524,8 @@ if ( isset( $_GET['hl_key_regen'] ) ) {
 	<li>
 		<strong>Store credentials in n8n</strong><br>
 		In n8n → Credentials, create a new <em>Header Auth</em> credential:<br>
-		<code>Name: X-HL-Key</code> &nbsp;|&nbsp; <code>Value: {your key above}</code>
+		<code>Name: X-HL-Key</code> &nbsp;|&nbsp; <code>Value: {the key labeled for this workflow}</code>
+		<br><span style="color:#666;font-size:13px;">Use a key whose allowed endpoints include <code>POST /assign-instructor</code> (or All endpoints).</span>
 	</li>
 	<li>
 		<strong>Gmail Trigger node</strong><br>
@@ -581,18 +668,18 @@ Email text:
 
 <?php /* ── Test with curl ──────────────────────────────────────────────────── */ ?>
 <h3 style="font-size:14px;margin:0 0 8px;">Quick Test (curl)</h3>
-<p style="color:#555;margin-bottom:8px;">Verify the endpoints are live and your key works:</p>
+<p style="color:#555;margin-bottom:8px;">Verify the endpoints are live. Replace <code>YOUR-KEY-HERE</code> with a key from the table above that is allowed to call that endpoint. A key scoped only to <code>/email-events</code> will get HTTP 403 on write endpoints.</p>
 <p style="font-weight:600;margin:12px 0 4px;">Trainer assignment:</p>
 <pre style="background:#f6f7f7;padding:12px 16px;border-radius:4px;font-size:12px;overflow-x:auto;max-width:900px;">curl -s -X POST \
   "<?php echo esc_html( rest_url( 'hostlinks/v1/assign-instructor' ) ); ?>" \
   -H "Content-Type: application/json" \
-  -H "X-HL-Key: <?php echo $api_key ? esc_html( $api_key ) : 'YOUR-KEY-HERE'; ?>" \
+  -H "X-HL-Key: YOUR-KEY-HERE" \
   -d '{"assignments":[{"city":"Casper","instructor":"Sudie"}]}' | python3 -m json.tool</pre>
 <p style="font-weight:600;margin:12px 0 4px;">Create event request (minimal test):</p>
 <pre style="background:#f6f7f7;padding:12px 16px;border-radius:4px;font-size:12px;overflow-x:auto;max-width:900px;">curl -s -X POST \
   "<?php echo esc_html( rest_url( 'hostlinks/v1/create-event-request' ) ); ?>" \
   -H "Content-Type: application/json" \
-  -H "X-HL-Key: <?php echo $api_key ? esc_html( $api_key ) : 'YOUR-KEY-HERE'; ?>" \
+  -H "X-HL-Key: YOUR-KEY-HERE" \
   -d '{
     "events":[{"category":"Management","start_date":"2026-08-19","end_date":"2026-08-20","trainer":"TBA","is_zoom":false}],
     "marketer":"Nikki","city":"Billings","state":"MT","zip_code":"59101",
@@ -605,8 +692,8 @@ Email text:
 
 <p style="color:#555;margin-top:8px;">List upcoming classes for email merge fields:</p>
 <pre style="background:#f6f7f7;padding:12px 16px;border-radius:4px;font-size:12px;overflow-x:auto;max-width:900px;">curl -s "<?php echo esc_html( rest_url( 'hostlinks/v1/email-events' ) ); ?>?days=90" \
-  -H "X-HL-Key: <?php echo $api_key ? esc_html( $api_key ) : 'YOUR-KEY-HERE'; ?>" | python3 -m json.tool</pre>
+  -H "X-HL-Key: YOUR-KEY-HERE" | python3 -m json.tool</pre>
 
 <p style="color:#555;margin-top:8px;">List all instructors:</p>
 <pre style="background:#f6f7f7;padding:12px 16px;border-radius:4px;font-size:12px;overflow-x:auto;max-width:900px;">curl -s "<?php echo esc_html( rest_url( 'hostlinks/v1/instructors' ) ); ?>" \
-  -H "X-HL-Key: <?php echo $api_key ? esc_html( $api_key ) : 'YOUR-KEY-HERE'; ?>" | python3 -m json.tool</pre>
+  -H "X-HL-Key: YOUR-KEY-HERE" | python3 -m json.tool</pre>

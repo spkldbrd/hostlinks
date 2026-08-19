@@ -9,6 +9,7 @@
  *   POST /assign-instructor      — bulk-assign instructors to upcoming events
  *   POST /create-event-request   — insert a parsed email into the event queue
  *   GET  /upcoming-events        — list upcoming events with current instructor
+ *   GET  /email-events           — upcoming events as email merge-field JSON
  *   GET  /instructors            — list all active instructors
  *
  * Auth: every request must include the header
@@ -58,6 +59,44 @@ class Hostlinks_Instructor_API {
 			'methods'             => 'GET',
 			'callback'            => array( static::class, 'get_upcoming_events' ),
 			'permission_callback' => array( static::class, 'check_api_key' ),
+		) );
+
+		register_rest_route( self::NAMESPACE, '/email-events', array(
+			'methods'             => 'GET',
+			'callback'            => array( static::class, 'get_email_events' ),
+			'permission_callback' => array( static::class, 'check_api_key' ),
+			'args'                => array(
+				'id'              => array(
+					'description' => 'Return a single event by Hostlinks eve_id.',
+					'type'        => 'integer',
+					'minimum'     => 1,
+				),
+				'days'            => array(
+					'description' => 'Only include events whose start date is within this many days.',
+					'type'        => 'integer',
+					'minimum'     => 1,
+					'maximum'     => 1095,
+				),
+				'marketer'        => array(
+					'description' => 'Filter by marketer ID or exact name.',
+					'type'        => 'string',
+				),
+				'type'            => array(
+					'description' => 'Filter by event type ID, name, or abbreviation.',
+					'type'        => 'string',
+				),
+				'include_private' => array(
+					'description' => 'When true, include hidden/private classes. Default false.',
+					'type'        => 'boolean',
+					'default'     => false,
+				),
+				'detail'          => array(
+					'description' => 'summary (default) or full (adds venue ops, hotels, host contacts, shipping).',
+					'type'        => 'string',
+					'enum'        => array( 'summary', 'full' ),
+					'default'     => 'summary',
+				),
+			),
 		) );
 
 		register_rest_route( self::NAMESPACE, '/instructors', array(
@@ -492,6 +531,270 @@ class Hostlinks_Instructor_API {
 		}, $rows );
 
 		return new WP_REST_Response( $data, 200 );
+	}
+
+	// ── GET /email-events ────────────────────────────────────────────────────
+
+	/**
+	 * Upcoming (or single) events shaped for email merge fields.
+	 *
+	 * Query params:
+	 *   id              int     Single event by eve_id (bypasses date + private filters)
+	 *   days            int     Only events starting within N days (default: all upcoming)
+	 *   marketer        string  Marketer ID or exact name
+	 *   type            string  Type ID, name, or abbreviation
+	 *   include_private bool    Include hidden/private classes (default false)
+	 *   detail          string  "summary" (default) or "full"
+	 */
+	public static function get_email_events( WP_REST_Request $request ): WP_REST_Response {
+		global $wpdb;
+		$edl  = $wpdb->prefix . 'event_details_list';
+		$inst = $wpdb->prefix . 'event_instructor';
+		$mktr = $wpdb->prefix . 'event_marketer';
+		$typ  = $wpdb->prefix . 'event_type';
+		$today = current_time( 'Y-m-d' );
+
+		$id              = (int) $request->get_param( 'id' );
+		$days            = (int) $request->get_param( 'days' );
+		$marketer        = trim( (string) ( $request->get_param( 'marketer' ) ?? '' ) );
+		$type            = trim( (string) ( $request->get_param( 'type' ) ?? '' ) );
+		$include_private = rest_sanitize_boolean( $request->get_param( 'include_private' ) );
+		$detail          = strtolower( (string) ( $request->get_param( 'detail' ) ?? 'summary' ) );
+		$full            = ( 'full' === $detail );
+
+		$where = array( 'e.eve_status = 1' );
+		$args  = array();
+
+		if ( $id > 0 ) {
+			$where[] = 'e.eve_id = %d';
+			$args[]  = $id;
+		} else {
+			$where[] = 'e.eve_end >= %s';
+			$args[]  = $today;
+			if ( $days > 0 ) {
+				$until   = ( new DateTime( $today, wp_timezone() ) )->modify( '+' . $days . ' days' )->format( 'Y-m-d' );
+				$where[] = 'e.eve_start <= %s';
+				$args[]  = $until;
+			}
+			if ( ! $include_private ) {
+				$where[] = 'e.eve_public_hide = 0';
+				$where[] = 'e.eve_location NOT LIKE %s';
+				$args[]  = '%|PRIVATE%';
+				$where[] = 'e.eve_location NOT LIKE %s';
+				$args[]  = '%| PRIVATE%';
+				$where[] = 'e.eve_location NOT LIKE %s';
+				$args[]  = '%|private%';
+				$where[] = "NOT ( e.eve_marketer > 0 AND LOWER( TRIM( COALESCE( m.event_marketer_name, '' ) ) ) = 'private' )";
+			}
+		}
+
+		if ( $marketer !== '' ) {
+			if ( ctype_digit( $marketer ) ) {
+				$where[] = 'e.eve_marketer = %d';
+				$args[]  = (int) $marketer;
+			} else {
+				$where[] = 'LOWER( TRIM( m.event_marketer_name ) ) = %s';
+				$args[]  = strtolower( $marketer );
+			}
+		}
+
+		if ( $type !== '' ) {
+			if ( ctype_digit( $type ) ) {
+				$where[] = 'e.eve_type = %d';
+				$args[]  = (int) $type;
+			} else {
+				$where[] = '( LOWER( TRIM( t.event_type_name ) ) = %s OR LOWER( TRIM( t.event_type_abbr ) ) = %s )';
+				$args[]  = strtolower( $type );
+				$args[]  = strtolower( $type );
+			}
+		}
+
+		$sql = "SELECT e.eve_id, e.eve_location, e.eve_start, e.eve_end, e.eve_tot_date,
+		               e.eve_type, e.eve_zoom, e.eve_zoom_time, e.eve_marketer, e.eve_instructor,
+		               e.eve_host_url, e.eve_roster_url, e.eve_trainer_url, e.eve_web_url, e.eve_email_url,
+		               e.eve_paid, e.eve_free, e.eve_public_hide, e.cvent_event_id, e.cvent_event_title,
+		               e.host_name, e.displayed_as, e.location_name,
+		               e.street_address_1, e.street_address_2, e.street_address_3,
+		               e.city, e.state, e.zip_code, e.custom_email_intro,
+		               e.special_instructions, e.parking_file_url, e.max_attendees,
+		               e.host_contacts, e.hotels,
+		               e.ship_name, e.ship_email, e.ship_phone,
+		               e.ship_address_1, e.ship_address_2, e.ship_address_3,
+		               e.ship_city, e.ship_state, e.ship_zip, e.ship_workbooks, e.ship_notes,
+		               t.event_type_name AS type_name, t.event_type_abbr AS type_abbr,
+		               m.event_marketer_name AS marketer_name, m.marketer_email AS marketer_email,
+		               i.event_instructor_name AS instructor_name
+		        FROM `{$edl}` e
+		        LEFT JOIN `{$typ}` t ON t.event_type_id = e.eve_type
+		        LEFT JOIN `{$mktr}` m ON m.event_marketer_id = e.eve_marketer
+		        LEFT JOIN `{$inst}` i ON i.event_instructor_id = e.eve_instructor
+		        WHERE " . implode( ' AND ', $where ) . '
+		        ORDER BY e.eve_start ASC';
+
+		if ( empty( $args ) ) {
+			$rows = $wpdb->get_results( $sql, ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		} else {
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$args ), ARRAY_A );
+		}
+
+		$events = array();
+		foreach ( (array) $rows as $r ) {
+			$events[] = self::format_email_event( $r, $full );
+		}
+
+		return new WP_REST_Response( array(
+			'count'  => count( $events ),
+			'events' => $events,
+		), 200 );
+	}
+
+	/**
+	 * Shape one event row as email merge fields.
+	 *
+	 * @param array $r    Joined event_details_list row.
+	 * @param bool  $full Include ops/PII fields (contacts, hotels, shipping).
+	 */
+	private static function format_email_event( array $r, bool $full ): array {
+		$start = (string) ( $r['eve_start'] ?? '' );
+		$end   = (string) ( $r['eve_end'] ?? $start );
+		$loc   = (string) ( $r['eve_location'] ?? '' );
+
+		$city  = trim( (string) ( $r['city'] ?? '' ) );
+		$state = trim( (string) ( $r['state'] ?? '' ) );
+		if ( $city === '' || $state === '' ) {
+			$loc_city = trim( (string) preg_replace( '/\|.*/', '', $loc ) );
+			if ( preg_match( '/^(.+),\s*([A-Za-z]{2})\b/', $loc_city, $m ) ) {
+				if ( $city === '' ) {
+					$city = trim( $m[1] );
+				}
+				if ( $state === '' ) {
+					$state = strtoupper( trim( $m[2] ) );
+				}
+			}
+		}
+
+		$out = array(
+			'id'                  => (int) $r['eve_id'],
+			'location'            => $loc,
+			'city'                => $city,
+			'state'               => $state,
+			'start'               => $start,
+			'end'                 => $end,
+			'dates_display'       => self::format_dates_display( $start, $end ),
+			'type'                => (string) ( $r['type_name'] ?? '' ),
+			'type_abbr'           => (string) ( $r['type_abbr'] ?? '' ),
+			'type_id'             => (int) ( $r['eve_type'] ?? 0 ),
+			'marketer'            => (string) ( $r['marketer_name'] ?? '' ),
+			'marketer_email'      => (string) ( $r['marketer_email'] ?? '' ),
+			'instructor'          => $r['instructor_name'] ? (string) $r['instructor_name'] : 'TBA',
+			'is_zoom'             => ( strtolower( trim( (string) ( $r['eve_zoom'] ?? '' ) ) ) === 'yes' ),
+			'zoom_time'           => (string) ( $r['eve_zoom_time'] ?? '' ),
+			'reg_url'             => (string) ( $r['eve_trainer_url'] ?? '' ),
+			'web_url'             => (string) ( $r['eve_web_url'] ?? '' ),
+			'host_url'            => (string) ( $r['eve_host_url'] ?? '' ),
+			'email_url'           => (string) ( $r['eve_email_url'] ?? '' ),
+			'roster_url'          => (string) ( $r['eve_roster_url'] ?? '' ),
+			'venue_name'          => (string) ( $r['location_name'] ?? '' ),
+			'venue_address'       => self::format_venue_address( $r ),
+			'host_name'           => (string) ( $r['host_name'] ?? '' ),
+			'displayed_as'        => (string) ( $r['displayed_as'] ?? '' ),
+			'custom_email_intro'  => (string) ( $r['custom_email_intro'] ?? '' ),
+			'paid'                => (int) ( $r['eve_paid'] ?? 0 ),
+			'free'                => (int) ( $r['eve_free'] ?? 0 ),
+			'is_private'          => self::event_is_private( $r ),
+			'cvent_id'            => (string) ( $r['cvent_event_id'] ?? '' ),
+			'cvent_title'         => (string) ( $r['cvent_event_title'] ?? '' ),
+		);
+
+		if ( $full ) {
+			$out['max_attendees']        = isset( $r['max_attendees'] ) && $r['max_attendees'] !== '' && $r['max_attendees'] !== null
+				? (int) $r['max_attendees'] : null;
+			$out['special_instructions'] = (string) ( $r['special_instructions'] ?? '' );
+			$out['parking_file_url']     = (string) ( $r['parking_file_url'] ?? '' );
+			$out['host_contacts']        = self::decode_json_array( $r['host_contacts'] ?? '' );
+			$out['hotels']               = self::decode_json_array( $r['hotels'] ?? '' );
+			$out['shipping']             = array(
+				'name'      => (string) ( $r['ship_name'] ?? '' ),
+				'email'     => (string) ( $r['ship_email'] ?? '' ),
+				'phone'     => (string) ( $r['ship_phone'] ?? '' ),
+				'address_1' => (string) ( $r['ship_address_1'] ?? '' ),
+				'address_2' => (string) ( $r['ship_address_2'] ?? '' ),
+				'address_3' => (string) ( $r['ship_address_3'] ?? '' ),
+				'city'      => (string) ( $r['ship_city'] ?? '' ),
+				'state'     => (string) ( $r['ship_state'] ?? '' ),
+				'zip'       => (string) ( $r['ship_zip'] ?? '' ),
+				'workbooks' => isset( $r['ship_workbooks'] ) && $r['ship_workbooks'] !== '' && $r['ship_workbooks'] !== null
+					? (int) $r['ship_workbooks'] : null,
+				'notes'     => (string) ( $r['ship_notes'] ?? '' ),
+			);
+		}
+
+		return $out;
+	}
+
+	/** Calendar-friendly date range, e.g. "December 2–3, 2027". */
+	private static function format_dates_display( string $start, string $end ): string {
+		if ( $start === '' ) {
+			return '';
+		}
+		$tz = wp_timezone();
+		$s  = DateTime::createFromFormat( 'Y-m-d', $start, $tz );
+		if ( ! $s ) {
+			return $start;
+		}
+		$e = $end !== '' ? DateTime::createFromFormat( 'Y-m-d', $end, $tz ) : $s;
+		if ( ! $e ) {
+			$e = $s;
+		}
+		if ( $s->format( 'Y-m-d' ) === $e->format( 'Y-m-d' ) ) {
+			return $s->format( 'F j, Y' );
+		}
+		if ( $s->format( 'Y-m' ) === $e->format( 'Y-m' ) ) {
+			return $s->format( 'F j' ) . '–' . $e->format( 'j, Y' );
+		}
+		if ( $s->format( 'Y' ) === $e->format( 'Y' ) ) {
+			return $s->format( 'F j' ) . ' – ' . $e->format( 'F j, Y' );
+		}
+		return $s->format( 'F j, Y' ) . ' – ' . $e->format( 'F j, Y' );
+	}
+
+	/** Single-line venue address from street / city / state / zip columns. */
+	private static function format_venue_address( array $r ): string {
+		$parts = array_filter( array(
+			trim( (string) ( $r['street_address_1'] ?? '' ) ),
+			trim( (string) ( $r['street_address_2'] ?? '' ) ),
+			trim( (string) ( $r['street_address_3'] ?? '' ) ),
+		) );
+		$city  = trim( (string) ( $r['city'] ?? '' ) );
+		$state = trim( (string) ( $r['state'] ?? '' ) );
+		$zip   = trim( (string) ( $r['zip_code'] ?? '' ) );
+		$csz   = trim( $city . ( $city && $state ? ', ' : '' ) . $state . ( $zip !== '' ? ' ' . $zip : '' ) );
+		if ( $csz !== '' ) {
+			$parts[] = $csz;
+		}
+		return implode( ', ', $parts );
+	}
+
+	private static function event_is_private( array $r ): bool {
+		if ( (int) ( $r['eve_public_hide'] ?? 0 ) === 1 ) {
+			return true;
+		}
+		if ( preg_match( '/\|\s*private/i', (string) ( $r['eve_location'] ?? '' ) ) ) {
+			return true;
+		}
+		return strtolower( trim( (string) ( $r['marketer_name'] ?? '' ) ) ) === 'private';
+	}
+
+	private static function decode_json_array( $raw ): array {
+		if ( is_array( $raw ) ) {
+			return $raw;
+		}
+		$raw = trim( (string) $raw );
+		if ( $raw === '' ) {
+			return array();
+		}
+		$decoded = json_decode( $raw, true );
+		return is_array( $decoded ) ? $decoded : array();
 	}
 
 	// ── GET /instructors ─────────────────────────────────────────────────────

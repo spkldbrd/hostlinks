@@ -36,7 +36,7 @@ if ( isset( $_GET['hl_key_regen'] ) ) {
 <?php echo $notice; ?>
 
 <h2 style="margin-top:0;">Automation API</h2>
-<p>These REST endpoints let external automation tools (n8n, Make, Zapier, etc.) read and update Hostlinks event data without touching the WordPress admin. Every request must include the secret key in the <code>X-HL-Key</code> HTTP header.</p>
+<p>These REST endpoints let external automation tools (n8n, Make, Zapier, email platforms, etc.) read and update Hostlinks event data without touching the WordPress admin. Every request must include the secret key in the <code>X-HL-Key</code> HTTP header.</p>
 
 <?php /* ── API Key ────────────────────────────────────────────────────────── */ ?>
 <h3 style="font-size:14px;margin:24px 0 8px;">Secret API Key</h3>
@@ -139,8 +139,111 @@ if ( isset( $_GET['hl_key_regen'] ) ) {
 		</tr>
 		<tr>
 			<td><code>GET</code></td>
+			<td><code>/email-events</code></td>
+			<td>Upcoming classes as merge-field JSON for email tools: location, dates, registration URL, marketer, instructor, type, and related links. See the section below.</td>
+		</tr>
+		<tr>
+			<td><code>GET</code></td>
 			<td><code>/instructors</code></td>
 			<td>List all active instructors (id + name). Use to validate instructor names before posting assignments.</td>
+		</tr>
+	</tbody>
+</table>
+
+<?php /* ── GET /email-events detail ────────────────────────────────────────── */ ?>
+<h4 style="margin:0 0 6px;">GET /email-events</h4>
+<p style="color:#555;margin-bottom:8px;">Read-only feed of upcoming classes for email platforms and merge variables. Private / hidden classes are excluded by default. Host-contact, hotel, and shipping fields are omitted unless you pass <code>detail=full</code>.</p>
+
+<table class="widefat striped" style="max-width:900px;margin-bottom:8px;">
+	<tbody>
+		<tr>
+			<th style="width:160px;">URL</th>
+			<td><code><?php echo esc_html( rest_url( 'hostlinks/v1/email-events' ) ); ?></code></td>
+		</tr>
+		<tr>
+			<th>Request headers</th>
+			<td><code>X-HL-Key: {your-secret-key}</code></td>
+		</tr>
+		<tr>
+			<th>Query parameters</th>
+			<td>
+				<code>days</code> — only events starting within N days (omit for all upcoming)<br>
+				<code>marketer</code> — marketer ID or exact name (e.g. <code>Nikki</code>)<br>
+				<code>type</code> — type ID, full name, or abbreviation (e.g. <code>Management</code>)<br>
+				<code>include_private=1</code> — include hidden and private-marketer classes<br>
+				<code>id=1234</code> — single event by Hostlinks ID (bypasses date and private filters)<br>
+				<code>detail=full</code> — add venue ops fields: host contacts, hotels, shipping, special instructions
+			</td>
+		</tr>
+		<tr>
+			<th>Example URLs</th>
+			<td>
+				<code>/email-events</code> — all upcoming public classes<br>
+				<code>/email-events?days=90</code> — next 90 days<br>
+				<code>/email-events?marketer=Nikki&amp;type=Writing</code> — Nikki’s writing classes<br>
+				<code>/email-events?id=1234&amp;detail=full</code> — one event with full ops detail
+			</td>
+		</tr>
+		<tr>
+			<th>Response</th>
+			<td>
+<pre style="background:#f6f7f7;padding:10px 14px;border-radius:4px;font-size:12px;overflow-x:auto;">{
+  "count": 1,
+  "events": [
+    {
+      "id": 1234,
+      "location": "Anaheim, CA",
+      "city": "Anaheim",
+      "state": "CA",
+      "start": "2027-12-02",
+      "end": "2027-12-03",
+      "dates_display": "December 2–3, 2027",
+      "type": "Grant Management USA",
+      "type_abbr": "GM",
+      "type_id": 2,
+      "marketer": "Nikki",
+      "marketer_email": "nikki@example.com",
+      "instructor": "Ericka",
+      "is_zoom": false,
+      "zoom_time": "",
+      "reg_url": "https://web.cvent.com/event/.../register",
+      "web_url": "https://grantwritingusa.com/...",
+      "host_url": "https://...",
+      "email_url": "https://...",
+      "roster_url": "https://...",
+      "venue_name": "Anaheim Convention Center",
+      "venue_address": "800 W Katella Ave, Anaheim, CA 92802",
+      "host_name": "",
+      "displayed_as": "",
+      "custom_email_intro": "",
+      "paid": 28,
+      "free": 2,
+      "is_private": false,
+      "cvent_id": "97b0d6ae-...",
+      "cvent_title": "Anaheim, CA - Grant Management USA"
+    }
+  ]
+}</pre>
+			</td>
+		</tr>
+		<tr>
+			<th>Merge-field map</th>
+			<td>
+				Use these JSON keys as variables in your email tool:<br>
+				<code>{{location}}</code> · <code>{{city}}</code> · <code>{{state}}</code> ·
+				<code>{{start}}</code> · <code>{{end}}</code> · <code>{{dates_display}}</code> ·
+				<code>{{type}}</code> · <code>{{marketer}}</code> · <code>{{instructor}}</code> ·
+				<code>{{reg_url}}</code> · <code>{{web_url}}</code> · <code>{{email_url}}</code> ·
+				<code>{{venue_name}}</code> · <code>{{venue_address}}</code> ·
+				<code>{{zoom_time}}</code> · <code>{{custom_email_intro}}</code>
+			</td>
+		</tr>
+		<tr>
+			<th>Privacy</th>
+			<td>
+				Default list excludes: Hide from Public, location flagged <code>| PRIVATE</code>, and marketer named “Private”.<br>
+				<code>detail=summary</code> (default) never returns host contacts, hotels, or shipping addresses.
+			</td>
 		</tr>
 	</tbody>
 </table>
@@ -499,6 +602,10 @@ Email text:
     "ship_name":"Sgt. Brad Mansur","ship_address_1":"220 North 27th Street","ship_city":"Billings","ship_state":"MT","ship_zip":"59101","ship_phone":"406-247-8557",
     "source":"email-forward"
   }' | python3 -m json.tool</pre>
+
+<p style="color:#555;margin-top:8px;">List upcoming classes for email merge fields:</p>
+<pre style="background:#f6f7f7;padding:12px 16px;border-radius:4px;font-size:12px;overflow-x:auto;max-width:900px;">curl -s "<?php echo esc_html( rest_url( 'hostlinks/v1/email-events' ) ); ?>?days=90" \
+  -H "X-HL-Key: <?php echo $api_key ? esc_html( $api_key ) : 'YOUR-KEY-HERE'; ?>" | python3 -m json.tool</pre>
 
 <p style="color:#555;margin-top:8px;">List all instructors:</p>
 <pre style="background:#f6f7f7;padding:12px 16px;border-radius:4px;font-size:12px;overflow-x:auto;max-width:900px;">curl -s "<?php echo esc_html( rest_url( 'hostlinks/v1/instructors' ) ); ?>" \

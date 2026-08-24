@@ -371,7 +371,10 @@ class Hostlinks_CVENT_API {
 	 * @return array|WP_Error
 	 */
 	public static function get_event( $event_id ) {
-		return self::request( 'events/' . self::sanitize_uuid( $event_id ) );
+		return self::request(
+			'events/' . self::sanitize_uuid( $event_id ),
+			array( 'expand' => 'venues' )
+		);
 	}
 
 	/**

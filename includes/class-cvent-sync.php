@@ -198,6 +198,7 @@ class Hostlinks_CVENT_Sync {
 				$stored_id,
 				$check['registrationUrl'] ?? $check['publicRegistrationUrl'] ?? $check['websiteLink'] ?? ''
 			);
+			self::apply_cvent_host_name( $eve_id, $row, $check, $dry_run );
 			// Verify staleness hash hasn't changed drastically.
 				$new_hash = Hostlinks_CVENT_Matcher::staleness_hash( $check );
 				if ( $new_hash !== ( $row['cvent_staleness_hash'] ?? '' ) ) {
@@ -259,6 +260,11 @@ class Hostlinks_CVENT_Sync {
 					$bootstrap_data['eve_roster_url'] = rtrim( $roster_base, '/' ) . '/?eve_id=' . $eve_id;
 					$bootstrap_fmt[]                  = '%s';
 				}
+			}
+			$host_fields = self::host_name_update_fields( $row, $best );
+			foreach ( $host_fields as $col => $val ) {
+				$bootstrap_data[ $col ] = $val;
+				$bootstrap_fmt[]        = '%s';
 			}
 			$wpdb->update(
 				$table,
@@ -423,6 +429,11 @@ class Hostlinks_CVENT_Sync {
 		$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $cvent_event );
 		$table = $wpdb->prefix . 'event_details_list';
 
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SELECT * FROM `{$table}` WHERE eve_id = %d", $eve_id ),
+			ARRAY_A
+		);
+
 		$link_data   = array(
 			'cvent_event_id'        => $cvent_id,
 			'cvent_event_title'     => $cvent_event['title'] ?? '',
@@ -434,15 +445,18 @@ class Hostlinks_CVENT_Sync {
 		$link_fmt = array( '%s', '%s', '%s', null, '%s', '%s' );
 
 		// Auto-fill Roster URL if the field is currently blank.
-		$current_roster = $wpdb->get_var( $wpdb->prepare(
-			"SELECT eve_roster_url FROM `{$table}` WHERE eve_id = %d", $eve_id
-		) );
-		if ( empty( $current_roster ) ) {
+		if ( empty( $row['eve_roster_url'] ?? '' ) ) {
 			$roster_base = Hostlinks_Page_URLs::get_roster();
 			if ( $roster_base ) {
 				$link_data['eve_roster_url'] = rtrim( $roster_base, '/' ) . '/?eve_id=' . $eve_id;
 				$link_fmt[]                  = '%s';
 			}
+		}
+
+		$host_fields = self::host_name_update_fields( $row ? $row : array(), $cvent_event );
+		foreach ( $host_fields as $col => $val ) {
+			$link_data[ $col ] = $val;
+			$link_fmt[]        = '%s';
 		}
 
 		$wpdb->update(
@@ -784,9 +798,133 @@ class Hostlinks_CVENT_Sync {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * If $url is blank, call GET /ea/events/{id}/weblinks and return the URL of
-	 * the first weblink whose name or type contains "registr" (case-insensitive).
-	 * Returns empty string on any failure or if no registration link is found.
+	 * Pull CVENT venues.name (object or first list item). Empty if missing or "Custom Location".
+	 *
+	 * @param array $cvent_event
+	 * @return string
+	 */
+	private static function cvent_venue_raw_name( $cvent_event ) {
+		if ( empty( $cvent_event['venues'] ) && isset( $cvent_event['data'] ) && is_array( $cvent_event['data'] ) ) {
+			$cvent_event = $cvent_event['data'];
+		}
+		if ( empty( $cvent_event['venues'] ) || ! is_array( $cvent_event['venues'] ) ) {
+			return '';
+		}
+		$venues = $cvent_event['venues'];
+		if ( isset( $venues['name'] ) && is_string( $venues['name'] ) ) {
+			$name = trim( $venues['name'] );
+		} elseif ( isset( $venues[0] ) && is_array( $venues[0] ) ) {
+			$name = trim( (string) ( $venues[0]['name'] ?? '' ) );
+		} else {
+			return '';
+		}
+		if ( '' === $name || 0 === strcasecmp( $name, 'Custom Location' ) ) {
+			return '';
+		}
+		return $name;
+	}
+
+	/**
+	 * Strip leading CVENT venue prefixes (longest first, case-insensitive).
+	 * "at" only matches as a whole word so "Atlanta" is left alone.
+	 *
+	 * @param string $name
+	 * @return string
+	 */
+	private static function strip_cvent_venue_prefixes( $name ) {
+		$name = trim( (string) $name );
+		if ( '' === $name ) {
+			return '';
+		}
+		$patterns = array(
+			'/^hosted\s+by\s+/i',
+			'/^hosted\s+at\s+/i',
+			'/^at\s+the\s+/i',
+			'/^at:\s*/i',
+			'/^at\s+/i',
+		);
+		$changed = true;
+		$guard   = 0;
+		while ( $changed && $guard++ < 5 ) {
+			$changed = false;
+			foreach ( $patterns as $pattern ) {
+				$stripped = preg_replace( $pattern, '', $name, 1, $count );
+				if ( $count > 0 ) {
+					$name    = trim( $stripped );
+					$changed = true;
+					break;
+				}
+			}
+		}
+		return $name;
+	}
+
+	/**
+	 * Fields to write when Host Name should follow the CVENT venue.
+	 * Empty array = leave host_name alone (no usable name, or staff typed something else).
+	 *
+	 * @param array $row          Current event_details_list row.
+	 * @param array $cvent_event  CVENT event object (may include venues).
+	 * @return array<string,string>
+	 */
+	private static function host_name_update_fields( $row, $cvent_event ) {
+		$raw   = self::cvent_venue_raw_name( $cvent_event );
+		$clean = self::strip_cvent_venue_prefixes( $raw );
+		if ( '' === $clean ) {
+			return array();
+		}
+
+		$current = trim( (string) ( $row['host_name'] ?? '' ) );
+		$last    = trim( (string) ( $row['cvent_host_name'] ?? '' ) );
+
+		$looks_cvent = (
+			0 === strcasecmp( $current, $raw )
+			|| ( '' !== $current && 0 === strcasecmp( self::strip_cvent_venue_prefixes( $current ), $clean ) )
+		);
+
+		$overwrite = ( '' === $current || $current === $last || $looks_cvent );
+		if ( ! $overwrite ) {
+			return array();
+		}
+		if ( $current === $clean && $last === $clean ) {
+			return array();
+		}
+
+		return array(
+			'host_name'       => $clean,
+			'cvent_host_name' => $clean,
+		);
+	}
+
+	/**
+	 * Write Host Name from CVENT venues.name when overwrite rules allow.
+	 *
+	 * @param int   $eve_id
+	 * @param array $row
+	 * @param array $cvent_event
+	 * @param bool  $dry_run
+	 */
+	private static function apply_cvent_host_name( $eve_id, $row, $cvent_event, $dry_run ) {
+		if ( $dry_run ) {
+			return;
+		}
+		$fields = self::host_name_update_fields( $row, $cvent_event );
+		if ( empty( $fields ) ) {
+			return;
+		}
+		global $wpdb;
+		$wpdb->update(
+			$wpdb->prefix . 'event_details_list',
+			$fields,
+			array( 'eve_id' => $eve_id ),
+			array( '%s', '%s' ),
+			array( '%d' )
+		);
+	}
+
+	/**
+	 * If $url is blank, construct the standard CVENT registration URL from the event UUID.
+	 * Format: https://web.cvent.com/event/{UUID}/register
 	 *
 	 * @param string $cvent_id  Sanitized CVENT event UUID.
 	 * @param string $url       URL already extracted from the event object (may be blank).

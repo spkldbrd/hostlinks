@@ -113,6 +113,15 @@ class Hostlinks_DB {
 		self::create_tables();
 	}
 
+	// v2.6 — last CVENT-managed host_name so staff edits are not overwritten on sync.
+	if ( version_compare( $installed, '2.6', '<' ) ) {
+		$tbl      = $wpdb->prefix . 'event_details_list';
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+		if ( ! in_array( 'cvent_host_name', $existing, true ) ) {
+			$wpdb->query( "ALTER TABLE `{$tbl}` ADD `cvent_host_name` varchar(255) NOT NULL DEFAULT '' AFTER `host_name`" );
+		}
+	}
+
 	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
 	if ( version_compare( $installed, '2.1', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'event_details_list';
@@ -273,6 +282,7 @@ class Hostlinks_DB {
 			ship_notes     text NOT NULL DEFAULT '',
 			eve_email_url  text NOT NULL DEFAULT '',
 			host_name            varchar(255) NOT NULL DEFAULT '',
+			cvent_host_name      varchar(255) NOT NULL DEFAULT '',
 			displayed_as         varchar(500) NOT NULL DEFAULT '',
 			location_name        varchar(255) NOT NULL DEFAULT '',
 			street_address_1     varchar(255) NOT NULL DEFAULT '',

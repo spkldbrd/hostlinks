@@ -313,6 +313,14 @@ class Hostlinks_Hotel_Batch {
 				continue;
 			}
 
+			$row_notes = array();
+			if ( empty( $place['state'] ) ) {
+				$row_notes[] = 'No state on this row';
+			}
+			if ( ! empty( $place['used_county'] ) ) {
+				$row_notes[] = 'City was blank — used County as city';
+			}
+
 			$found = array();
 			foreach ( $prepared as $ev ) {
 				if ( ! self::date_matches( $date, $ev['start'], $ev['end'] ) ) {
@@ -343,6 +351,8 @@ class Hostlinks_Hotel_Batch {
 				}
 				if ( ! empty( $typed ) ) {
 					$found = $typed;
+				} else {
+					$row_notes[] = 'Type did not match — kept all city/date events';
 				}
 			}
 
@@ -356,6 +366,8 @@ class Hostlinks_Hotel_Batch {
 				}
 				if ( ! empty( $hosted ) ) {
 					$found = $hosted;
+				} else {
+					$row_notes[] = 'Host Name did not match — used city/date only';
 				}
 			}
 
@@ -364,12 +376,29 @@ class Hostlinks_Hotel_Batch {
 				continue;
 			}
 
+			$on_start = false;
+			foreach ( $found as $ev ) {
+				if ( $date === substr( (string) $ev['start'], 0, 10 ) ) {
+					$on_start = true;
+					break;
+				}
+			}
+			if ( ! $on_start ) {
+				$row_notes[] = 'Date is not the event start (matched a day in the range)';
+			}
+			if ( count( $found ) > 1 ) {
+				$row_notes[] = 'Would apply to ' . count( $found ) . ' events on this city/date';
+			}
+
 			$hotel = array(
 				'name'    => $hotel_name,
 				'address' => sanitize_text_field( $row['address'] ?? '' ),
 				'phone'   => sanitize_text_field( $row['phone'] ?? '' ),
 				'url'     => esc_url_raw( trim( (string) ( $row['url'] ?? '' ) ) ),
 			);
+			if ( '' === $hotel['address'] ) {
+				$row_notes[] = 'No address';
+			}
 
 			foreach ( $found as $id => $ev ) {
 				if ( ! isset( $by_event[ $id ] ) ) {
@@ -386,10 +415,12 @@ class Hostlinks_Hotel_Batch {
 						'has_existing'   => $has,
 						'hotels'         => array(),
 						'csv_lines'      => array(),
+						'warnings'       => array(),
 					);
 				}
 				$by_event[ $id ]['hotels']      = self::merge_hotel( $by_event[ $id ]['hotels'], $hotel );
 				$by_event[ $id ]['csv_lines'][] = (int) $row['line'];
+				$by_event[ $id ]['warnings']    = array_values( array_unique( array_merge( $by_event[ $id ]['warnings'], $row_notes ) ) );
 			}
 		}
 
@@ -408,6 +439,8 @@ class Hostlinks_Hotel_Batch {
 			$matches[] = $m;
 		}
 
+		$quality = self::quality_report( $csv_rows, $matches, $unmatched, $skipped );
+
 		return array(
 			'matches'           => $matches,
 			'unmatched'         => $unmatched,
@@ -416,6 +449,68 @@ class Hostlinks_Hotel_Batch {
 			'events_scanned'    => count( $events ),
 			'include_past'      => (bool) $include_past,
 			'replace_existing'  => (bool) $replace_existing,
+			'quality'           => $quality,
+		);
+	}
+
+	/**
+	 * Verdict for a dry-run: good, review, or poor.
+	 *
+	 * @param array $csv_rows
+	 * @param array $matches
+	 * @param array $unmatched
+	 * @param array $skipped
+	 * @return array
+	 */
+	public static function quality_report( $csv_rows, $matches, $unmatched, $skipped ) {
+		$csv_n     = count( $csv_rows );
+		$match_n   = count( $matches );
+		$unmatch_n = count( $unmatched );
+		$skip_n    = count( $skipped );
+		$warn_n    = 0;
+		$multi_n   = 0;
+		foreach ( $matches as $m ) {
+			$warns = (array) ( $m['warnings'] ?? array() );
+			$warn_n += count( $warns );
+			foreach ( $warns as $w ) {
+				if ( 0 === strpos( (string) $w, 'Would apply to ' ) ) {
+					$multi_n++;
+					break;
+				}
+			}
+		}
+
+		$linked = max( 0, $csv_n - $unmatch_n );
+		$rate   = $csv_n > 0 ? (int) round( 100 * $linked / $csv_n ) : 0;
+
+		if ( 0 === $match_n && 0 === $skip_n ) {
+			$verdict = 'poor';
+			$label   = 'Do not import yet';
+			$summary = 'No rows matched an event. Fix City / State / Date and test again.';
+		} elseif ( $csv_n > 0 && ( $unmatch_n / $csv_n ) > 0.5 ) {
+			$verdict = 'poor';
+			$label   = 'Do not import yet';
+			$summary = 'More than half of the CSV rows did not match. Review unmatched rows before importing.';
+		} elseif ( $unmatch_n > 0 || $warn_n > 0 || $skip_n > 0 || $multi_n > 0 ) {
+			$verdict = 'review';
+			$label   = 'Needs review';
+			$summary = 'Some rows matched, but check unmatched rows and warnings before you import.';
+		} else {
+			$verdict = 'good';
+			$label   = 'Looks good';
+			$summary = 'Every CSV row matched, and there are no warnings. Safe to import.';
+		}
+
+		return array(
+			'verdict'       => $verdict,
+			'label'         => $label,
+			'summary'       => $summary,
+			'match_rate'    => $rate,
+			'warning_count' => $warn_n,
+			'multi_event'   => $multi_n,
+			'would_update'  => $match_n,
+			'unmatched'     => $unmatch_n,
+			'skipped'       => $skip_n,
 		);
 	}
 
@@ -479,13 +574,16 @@ class Hostlinks_Hotel_Batch {
 				$state = trim( $parts[1] );
 			}
 		}
+		$used_county = false;
 		if ( '' === $city ) {
-			$city = trim( (string) ( $row['county'] ?? '' ) );
-			$city = preg_replace( '/\s+county$/i', '', $city );
+			$city        = trim( (string) ( $row['county'] ?? '' ) );
+			$city        = preg_replace( '/\s+county$/i', '', $city );
+			$used_county = ( '' !== $city );
 		}
 		return array(
-			'city'  => self::normalize_city( $city ),
-			'state' => Hostlinks_CVENT_Matcher::normalize_state( $state ),
+			'city'        => self::normalize_city( $city ),
+			'state'       => Hostlinks_CVENT_Matcher::normalize_state( $state ),
+			'used_county' => $used_county,
 		);
 	}
 

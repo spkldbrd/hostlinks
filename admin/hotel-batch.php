@@ -51,6 +51,7 @@ $future_count = count( Hostlinks_Hotel_Batch::candidate_events( false ) );
 
 <h2 style="margin-top:0;">Hotels — CSV importer</h2>
 <p>Fill <strong>Hotel Recommendations</strong> on events that were created without hotel data. Matching uses <strong>city + state + date</strong>. Host name and event type are optional tie-breakers when more than one event shares that weekend (for example Grant Writing and Grant Management).</p>
+<p><strong>Always run Test import first.</strong> That is a dry run — nothing is written. You only import after you have reviewed the match report.</p>
 <p class="description">There <?php echo ( 1 === (int) $future_count ) ? 'is' : 'are'; ?> <strong><?php echo (int) $future_count; ?></strong> future event<?php echo ( 1 === (int) $future_count ) ? '' : 's'; ?> right now. County is accepted on the sheet but is not stored in Hostlinks — it is only used if City is blank.</p>
 
 <h3>CSV columns</h3>
@@ -149,27 +150,75 @@ $future_count = count( Hostlinks_Hotel_Batch::candidate_events( false ) );
 	$match_n   = count( $preview['matches'] );
 	$unmatch_n = count( $preview['unmatched'] );
 	$skip_n    = count( $preview['skipped'] );
+	$q         = $preview['quality'] ?? array();
+	$verdict   = $q['verdict'] ?? 'review';
+	$q_colors  = array(
+		'good'   => array( '#00a32a', '#edfaef' ),
+		'review' => array( '#dba617', '#fcf9e8' ),
+		'poor'   => array( '#d63638', '#fcf0f1' ),
+	);
+	$qc = $q_colors[ $verdict ] ?? $q_colors['review'];
 	?>
-	<div class="notice notice-info" style="margin:16px 0;padding:12px 16px;">
-		<p style="margin:0;"><strong>Preview</strong> — <?php echo (int) $preview['csv_rows']; ?> CSV row(s),
-			scanned <?php echo (int) $preview['events_scanned']; ?> event(s),
-			<strong><?php echo (int) $match_n; ?></strong> will get hotels,
-			<?php echo (int) $skip_n; ?> already have hotels,
-			<?php echo (int) $unmatch_n; ?> CSV row(s) unmatched.
-			Nothing has been saved yet.</p>
+	<div style="border:2px solid <?php echo esc_attr( $qc[0] ); ?>;background:<?php echo esc_attr( $qc[1] ); ?>;border-radius:6px;padding:14px 16px;margin:16px 0;max-width:920px;">
+		<p style="margin:0 0 8px;font-size:15px;"><strong>Test import — nothing was written</strong></p>
+		<p style="margin:0 0 10px;">
+			Verdict: <strong style="color:<?php echo esc_attr( $qc[0] ); ?>;"><?php echo esc_html( $q['label'] ?? 'Needs review' ); ?></strong>
+			— <?php echo esc_html( $q['summary'] ?? '' ); ?>
+		</p>
+		<table style="border-collapse:collapse;">
+			<tr>
+				<td style="padding:2px 20px 2px 0;">CSV rows</td>
+				<td><strong><?php echo (int) $preview['csv_rows']; ?></strong></td>
+			</tr>
+			<tr>
+				<td style="padding:2px 20px 2px 0;">Rows that matched an event</td>
+				<td><strong><?php echo (int) ( $q['match_rate'] ?? 0 ); ?>%</strong></td>
+			</tr>
+			<tr>
+				<td style="padding:2px 20px 2px 0;">Events that would get hotels</td>
+				<td><strong><?php echo (int) $match_n; ?></strong></td>
+			</tr>
+			<tr>
+				<td style="padding:2px 20px 2px 0;">Already have hotels (skipped)</td>
+				<td><strong><?php echo (int) $skip_n; ?></strong></td>
+			</tr>
+			<tr>
+				<td style="padding:2px 20px 2px 0;">Unmatched CSV rows</td>
+				<td><strong><?php echo (int) $unmatch_n; ?></strong></td>
+			</tr>
+			<tr>
+				<td style="padding:2px 20px 2px 0;">Warnings</td>
+				<td><strong><?php echo (int) ( $q['warning_count'] ?? 0 ); ?></strong></td>
+			</tr>
+		</table>
 	</div>
 
 	<?php if ( $match_n > 0 ) : ?>
-		<form method="post" action="<?php echo esc_url( $tab_url ); ?>" style="margin-bottom:24px;">
+		<form method="post" action="<?php echo esc_url( $tab_url ); ?>" id="hl-hotel-apply-form" style="margin-bottom:24px;">
 			<?php wp_nonce_field( 'hostlinks_hotel_batch' ); ?>
 			<input type="hidden" name="hl_batch_token" value="<?php echo esc_attr( $preview['token'] ); ?>">
 			<p>
-				<button type="submit" name="hl_hotel_apply" value="1" class="button button-primary">
-					Save hotels on <?php echo (int) $match_n; ?> event<?php echo ( 1 === $match_n ) ? '' : 's'; ?>
+				<button type="submit" name="hl_hotel_apply" value="1" class="button <?php echo ( 'poor' === $verdict ) ? 'button-secondary' : 'button-primary'; ?>">
+					Run import on <?php echo (int) $match_n; ?> event<?php echo ( 1 === $match_n ) ? '' : 's'; ?>
 				</button>
-				<a href="<?php echo esc_url( $tab_url ); ?>" class="button">Cancel</a>
+				<a href="<?php echo esc_url( $tab_url ); ?>" class="button">Cancel — do not import</a>
 			</p>
+			<?php if ( 'poor' === $verdict ) : ?>
+				<p class="description" style="color:#d63638;">This test looks risky. Only run the import if you have reviewed the unmatched rows and still want those matches written.</p>
+			<?php elseif ( 'review' === $verdict ) : ?>
+				<p class="description">Review the tables below. Import only writes the matched events listed — unmatched rows are left alone.</p>
+			<?php endif; ?>
 		</form>
+		<script>
+		document.getElementById('hl-hotel-apply-form').addEventListener('submit', function(e) {
+			var msg = <?php echo wp_json_encode( 'poor' === $verdict
+				? 'This test import looks poor. Import anyway? Unmatched rows will be skipped, but matched events will still be updated.'
+				: 'Import hotels onto ' . $match_n . ' event(s)? This writes to the database.' ); ?>;
+			if (!window.confirm(msg)) {
+				e.preventDefault();
+			}
+		});
+		</script>
 
 		<table class="widefat striped" style="max-width:1100px;">
 			<thead>
@@ -178,6 +227,7 @@ $future_count = count( Hostlinks_Hotel_Batch::candidate_events( false ) );
 					<th>Start</th>
 					<th>Host</th>
 					<th>Incoming hotels</th>
+					<th>Warnings</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -191,18 +241,22 @@ $future_count = count( Hostlinks_Hotel_Batch::candidate_events( false ) );
 				foreach ( (array) ( $m['hotels'] ?? array() ) as $h ) {
 					$hotel_bits[] = $h['name'] ?? '';
 				}
+				$warns = array_filter( (array) ( $m['warnings'] ?? array() ) );
 				?>
 				<tr>
 					<td><a href="<?php echo esc_url( $edit ); ?>"><?php echo esc_html( $label ); ?></a></td>
 					<td><?php echo esc_html( $m['start'] ?? '' ); ?></td>
 					<td><?php echo esc_html( $m['host_name'] ?? '' ); ?></td>
 					<td><?php echo esc_html( implode( '; ', array_filter( $hotel_bits ) ) ); ?></td>
+					<td style="font-size:12px;color:<?php echo $warns ? '#996800' : '#00a32a'; ?>;">
+						<?php echo $warns ? esc_html( implode( '; ', $warns ) ) : 'OK'; ?>
+					</td>
 				</tr>
 			<?php endforeach; ?>
 			</tbody>
 		</table>
 	<?php else : ?>
-		<p>No hotels will be saved. Check skipped and unmatched rows below.</p>
+		<p>No hotels would be saved. Fix the unmatched rows (and skipped events if you meant to overwrite) and test again.</p>
 	<?php endif; ?>
 
 	<?php if ( $skip_n > 0 ) : ?>
@@ -279,6 +333,7 @@ $future_count = count( Hostlinks_Hotel_Batch::candidate_events( false ) );
 		</tr>
 	</table>
 	<p class="submit">
-		<button type="submit" name="hl_hotel_preview" value="1" class="button button-primary">Preview matches</button>
+		<button type="submit" name="hl_hotel_preview" value="1" class="button button-primary">Test import</button>
+		<span class="description" style="margin-left:8px;">Dry run only — reviews matches and does not write hotels.</span>
 	</p>
 </form>

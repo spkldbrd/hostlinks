@@ -1,6 +1,6 @@
 <?php
 /**
- * Settings → Hotels tab.
+ * Settings → Import / Export → Hotels sub-tab.
  *
  * Upload a hotel CSV and fill Hotel Recommendations on matching events.
  */
@@ -11,12 +11,7 @@ if ( ! current_user_can( 'manage_options' ) ) {
 	wp_die( 'Unauthorized' );
 }
 
-$tab_url = admin_url( 'admin.php?page=hostlinks-settings&tab=hotels' );
-
-if ( isset( $_GET['hl_hotel_sample'] ) ) {
-	check_admin_referer( 'hostlinks_hotel_sample' );
-	Hostlinks_Hotel_Batch::download_sample();
-}
+$tab_url = admin_url( 'admin.php?page=hostlinks-settings&tab=import-export&hl_ie=hotels' );
 
 $notice  = '';
 $preview = null;
@@ -51,7 +46,6 @@ if ( isset( $_POST['hl_hotel_apply'] ) ) {
 }
 
 $future_count = count( Hostlinks_Hotel_Batch::candidate_events( false ) );
-$sample_url   = wp_nonce_url( add_query_arg( 'hl_hotel_sample', '1', $tab_url ), 'hostlinks_hotel_sample' );
 ?>
 <?php echo $notice; ?>
 
@@ -61,7 +55,11 @@ $sample_url   = wp_nonce_url( add_query_arg( 'hl_hotel_sample', '1', $tab_url ),
 
 <h3>CSV columns</h3>
 <p>First row must be headers. Column names are not case-sensitive. Two hotels for the same event = two rows with the same City / State / Date.</p>
-<p><a href="<?php echo esc_url( $sample_url ); ?>" class="button">Download sample CSV</a></p>
+<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0 0 8px;">
+	<?php wp_nonce_field( 'hostlinks_hotel_sample' ); ?>
+	<input type="hidden" name="action" value="hostlinks_hotel_sample">
+	<button type="submit" class="button">Download sample CSV</button>
+</form>
 
 <table class="widefat striped" style="max-width:920px;margin:12px 0 20px;">
 	<thead>

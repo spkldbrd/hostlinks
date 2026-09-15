@@ -11,6 +11,21 @@ class Hostlinks_Hotel_Batch {
 	const TRANSIENT_PREFIX = 'hl_hotel_batch_';
 	const TRANSIENT_TTL    = 1800;
 
+	public static function init() {
+		add_action( 'admin_post_hostlinks_hotel_sample', array( __CLASS__, 'handle_sample_download' ) );
+	}
+
+	/**
+	 * admin-post.php handler so headers are sent before any admin HTML.
+	 */
+	public static function handle_sample_download() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Unauthorized' );
+		}
+		check_admin_referer( 'hostlinks_hotel_sample' );
+		self::download_sample();
+	}
+
 	const SAMPLE_HEADERS = array(
 		'City',
 		'State',
@@ -136,9 +151,10 @@ class Hostlinks_Hotel_Batch {
 	 */
 	public static function download_sample() {
 		$filename = 'hostlinks-hotels-sample.csv';
+		nocache_headers();
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
-		header( 'Pragma: no-cache' );
+		header( 'X-Content-Type-Options: nosniff' );
 		$out = fopen( 'php://output', 'w' );
 		fputcsv( $out, self::SAMPLE_HEADERS );
 		fputcsv(

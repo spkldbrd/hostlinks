@@ -13,7 +13,6 @@ $valid_tabs = array(
 	'cvent'             => 'CVENT',
 	'import-export'     => 'Import / Export',
 	'short-links'       => 'Short Links',
-	'hotels'            => 'Hotels',
 	'type-settings'     => 'Type Settings',
 	'marketers'         => 'Marketers',
 	'instructors'       => 'Instructors',
@@ -26,6 +25,10 @@ $valid_tabs = array(
 );
 
 $current_tab = sanitize_key( $_GET['tab'] ?? 'general' );
+if ( 'hotels' === $current_tab ) {
+	wp_safe_redirect( admin_url( 'admin.php?page=hostlinks-settings&tab=import-export&hl_ie=hotels' ) );
+	exit;
+}
 if ( ! array_key_exists( $current_tab, $valid_tabs ) ) {
 	$current_tab = 'general';
 }
@@ -68,9 +71,6 @@ switch ( $current_tab ) {
 		break;
 	case 'short-links':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/short-url-batch.php';
-		break;
-	case 'hotels':
-		include HOSTLINKS_PLUGIN_DIR . 'admin/hotel-batch.php';
 		break;
 	case 'type-settings':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/type-menu.php';

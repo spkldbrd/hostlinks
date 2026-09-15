@@ -64,6 +64,11 @@ if ( isset( $_GET['hl_msg'] ) && $_GET['hl_msg'] === 'reset_done' ) {
 		. esc_html( implode( ', ', $cleared_labels ) ) . '.</p></div>';
 }
 
+$hl_ie_open = sanitize_key( $_GET['hl_ie'] ?? '' );
+if ( isset( $_POST['hl_hotel_preview'] ) || isset( $_POST['hl_hotel_apply'] ) ) {
+	$hl_ie_open = 'hotels';
+}
+
 $messages = array(
 	'imported'          => $import_notice,
 	'reset_done'        => $reset_notice,
@@ -84,6 +89,7 @@ $messages = array(
   <nav class="nav-tab-wrapper" id="hl-ie-tabs">
     <a href="#hl-export" class="nav-tab nav-tab-active" onclick="hlTab(event,'hl-export')">Export</a>
     <a href="#hl-import" class="nav-tab" onclick="hlTab(event,'hl-import')">Import</a>
+    <a href="#hl-hotels" class="nav-tab" onclick="hlTab(event,'hl-hotels')">Hotels</a>
     <a href="#hl-reset"  class="nav-tab" onclick="hlTab(event,'hl-reset')" style="color:#b32d2e;">Reset Data</a>
   </nav>
 
@@ -218,6 +224,11 @@ $messages = array(
       </p>
     </form>
   </div>
+
+  <!-- ══════ HOTELS ══════ -->
+  <div id="hl-hotels" class="hl-tab-panel" style="display:none;margin-top:20px;">
+    <?php include HOSTLINKS_PLUGIN_DIR . 'admin/hotel-batch.php'; ?>
+  </div>
 <?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 
 <script>
@@ -230,15 +241,21 @@ function hlTab(e, id) {
 }
 
 // Auto-open relevant tab based on the current message.
-<?php if ( in_array( $hl_msg, array( 'imported', 'no_file', 'bad_type', 'bad_json', 'bad_csv' ) ) ) : ?>
 document.addEventListener('DOMContentLoaded', function(){
-  hlTab({ preventDefault: function(){}, target: document.querySelectorAll('#hl-ie-tabs .nav-tab')[1] }, 'hl-import');
-});
+  function hlOpenIe(id) {
+    var link = document.querySelector('#hl-ie-tabs a[href="#' + id + '"]');
+    if (link) {
+      hlTab({ preventDefault: function(){}, target: link }, id);
+    }
+  }
+<?php if ( 'hotels' === $hl_ie_open ) : ?>
+  hlOpenIe('hl-hotels');
+<?php elseif ( in_array( $hl_msg, array( 'imported', 'no_file', 'bad_type', 'bad_json', 'bad_csv' ), true ) ) : ?>
+  hlOpenIe('hl-import');
 <?php elseif ( in_array( $hl_msg, array( 'reset_done', 'reset_not_confirmed' ), true ) ) : ?>
-document.addEventListener('DOMContentLoaded', function(){
-  hlTab({ preventDefault: function(){}, target: document.querySelectorAll('#hl-ie-tabs .nav-tab')[2] }, 'hl-reset');
-});
+  hlOpenIe('hl-reset');
 <?php endif; ?>
+});
 
 // ── Reset tab interactivity ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function(){

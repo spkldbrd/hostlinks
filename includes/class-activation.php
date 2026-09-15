@@ -31,6 +31,9 @@ class Hostlinks_Activation {
 	public static function on_activate() {
 		Hostlinks_DB::create_tables();
 		self::detect_theme_conflict();
+		if ( class_exists( 'Hostlinks_EmailCraft_Push' ) ) {
+			Hostlinks_EmailCraft_Push::ensure_hourly();
+		}
 	}
 
 	// Scan the active theme's functions.php for old Hostlinks registrations

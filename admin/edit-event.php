@@ -449,6 +449,7 @@ if ( $mode === 'edit' && isset( $_POST['hl_edit_full_event'] ) ) {
 	);
 
 	$wpdb->update( $table, $update_data, array( 'eve_id' => $eve_id ) );
+	do_action( 'hostlinks_event_updated', $eve_id );
 	// Bust Marketing Ops public REST cache so the front-end sees fresh data immediately.
 	if ( class_exists( 'HMO_REST', false ) && is_callable( array( 'HMO_REST', 'flush_public_events_cache' ) ) ) {
 		HMO_REST::flush_public_events_cache();

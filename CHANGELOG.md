@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.29 — 2026-09-15
+
+### New: EmailCraft ingest push
+- Hostlinks POSTs the upcoming-events snapshot to EmailCraft (`/api/events/hostlinks-ingest`) from the server via `wp_remote_post()`. This replaces EmailCraft’s VPS GET of `/wp-json/hostlinks/v1/email-events`, which Imunify/Cloudflare was failing with 520.
+- Settings live on **Settings → Automation API** (ingest URL + key stored in a WP option; key is not in git). Header is `X-EmailCraft-Ingest-Key` only — never `X-HL-Key`.
+- Pushes after event create/update/delete/cancel (and related batch/CVENT/import writes), plus an hourly safety cron. Debounced (20s) with backoff on 401/503/429. Empty lists are not posted. Public GET `/email-events` is unchanged.
+
+---
+
 ## v2.6.9 — 2026-04-10
 
 ### Fix: Marketing Ops settings label consistency

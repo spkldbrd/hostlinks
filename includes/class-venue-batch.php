@@ -129,6 +129,10 @@ class Hostlinks_Venue_Batch {
 
 		delete_transient( $key );
 
+		if ( $updated > 0 ) {
+			do_action( 'hostlinks_event_updated' );
+		}
+
 		return array(
 			'updated'   => $updated,
 			'skipped'   => $skipped,

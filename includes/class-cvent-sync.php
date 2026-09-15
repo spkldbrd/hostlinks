@@ -404,6 +404,10 @@ class Hostlinks_CVENT_Sync {
 			}
 		}
 
+		if ( ! $dry_run && ! empty( $rows ) ) {
+			do_action( 'hostlinks_event_updated' );
+		}
+
 		return array_merge( array( 'results' => $results, 'dry_run' => $dry_run ), $counts );
 	}
 
@@ -466,6 +470,8 @@ class Hostlinks_CVENT_Sync {
 			$link_fmt,
 			array( '%d' )
 		);
+
+		do_action( 'hostlinks_event_updated', $eve_id );
 
 		return true;
 	}

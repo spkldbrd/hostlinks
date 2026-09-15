@@ -63,6 +63,29 @@ if ( isset( $_GET['hl_key_regen'] ) && $notice === '' ) {
 	$notice = '<div class="notice notice-warning is-dismissible"><p>API key regenerated. Update it in n8n and any other automation clients before your next run.</p></div>';
 }
 
+if ( isset( $_POST['hostlinks_save_emailcraft'] ) ) {
+	check_admin_referer( 'hostlinks_emailcraft' );
+	$keep_key = ( '' === trim( (string) ( $_POST['emailcraft_key'] ?? '' ) ) );
+	Hostlinks_EmailCraft_Push::save_settings(
+		(string) ( $_POST['emailcraft_url'] ?? '' ),
+		(string) ( $_POST['emailcraft_key'] ?? '' ),
+		$keep_key
+	);
+	Hostlinks_EmailCraft_Push::schedule();
+	$notice = '<div class="notice notice-success is-dismissible"><p>EmailCraft ingest settings saved.</p></div>';
+}
+
+if ( isset( $_GET['hl_ec_push'] ) && $notice === '' ) {
+	$st = Hostlinks_EmailCraft_Push::get_status();
+	if ( 'ok' === $_GET['hl_ec_push'] ) {
+		$count = isset( $st['count'] ) ? (int) $st['count'] : 0;
+		$notice = '<div class="notice notice-success is-dismissible"><p>EmailCraft ingest succeeded (' . esc_html( (string) $count ) . ' events).</p></div>';
+	} else {
+		$msg = (string) ( $st['message'] ?? 'EmailCraft ingest failed. Check the status below and the PHP error log.' );
+		$notice = '<div class="notice notice-error is-dismissible"><p>' . esc_html( $msg ) . '</p></div>';
+	}
+}
+
 $api_keys = Hostlinks_Instructor_API::get_keys();
 ?>
 <?php echo $notice; ?>
@@ -163,6 +186,70 @@ $api_keys = Hostlinks_Instructor_API::get_keys();
 })();
 </script>
 
+<?php
+$ec_settings = Hostlinks_EmailCraft_Push::get_settings();
+$ec_status   = Hostlinks_EmailCraft_Push::get_status();
+$ec_key_set  = ( '' !== $ec_settings['key'] );
+$ec_hint     = $ec_key_set ? ( '••••' . substr( $ec_settings['key'], -4 ) ) : '(not set)';
+?>
+<hr style="margin:28px 0;" />
+<h3 style="font-size:14px;margin:0 0 8px;">EmailCraft ingest (push)</h3>
+<p style="color:#555;max-width:900px;margin-top:0;">
+	Hostlinks POSTs the next 180 days of public classes to EmailCraft from the server (not the browser).
+	Paste the ingest key from <strong>EmailCraft Admin → Email → Hostlinks</strong>. Do not put that key in git.
+	The public GET <code>/email-events</code> feed is unchanged — browser “Sync” in EmailCraft still uses it.
+</p>
+<form method="post" style="max-width:900px;border:1px solid #c3c4c7;background:#fff;padding:14px 16px;margin-bottom:12px;">
+	<?php wp_nonce_field( 'hostlinks_emailcraft' ); ?>
+	<p>
+		<label for="emailcraft_url" style="display:block;font-weight:600;margin-bottom:4px;">Ingest URL</label>
+		<input type="url" id="emailcraft_url" name="emailcraft_url" class="regular-text" style="width:100%;max-width:560px;"
+		       value="<?php echo esc_attr( $ec_settings['url'] ); ?>"
+		       placeholder="<?php echo esc_attr( Hostlinks_EmailCraft_Push::DEFAULT_URL ); ?>">
+	</p>
+	<p>
+		<label for="emailcraft_key" style="display:block;font-weight:600;margin-bottom:4px;">Ingest key</label>
+		<input type="password" id="emailcraft_key" name="emailcraft_key" class="regular-text" style="width:100%;max-width:560px;"
+		       value="" autocomplete="new-password"
+		       placeholder="<?php echo $ec_key_set ? 'Leave blank to keep the current key' : 'Paste key from EmailCraft'; ?>">
+		<span style="display:block;margin-top:4px;font-size:12px;color:#666;">Stored key: <code><?php echo esc_html( $ec_hint ); ?></code>. Header sent: <code>X-EmailCraft-Ingest-Key</code> (never <code>X-HL-Key</code>).</span>
+	</p>
+	<p style="margin:12px 0 0;">
+		<button type="submit" name="hostlinks_save_emailcraft" value="1" class="button button-primary">Save EmailCraft settings</button>
+	</p>
+</form>
+<?php if ( $ec_key_set ) : ?>
+<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0 0 12px;">
+	<?php wp_nonce_field( 'hostlinks_emailcraft_push_now' ); ?>
+	<input type="hidden" name="action" value="hostlinks_emailcraft_push_now">
+	<button type="submit" class="button">Push snapshot now</button>
+	<span style="font-size:12px;color:#666;margin-left:8px;">Sends a full replace of EmailCraft’s stored list. Skipped if there are no upcoming public events.</span>
+</form>
+<?php endif; ?>
+<?php if ( ! empty( $ec_status ) ) :
+	$ok = ! empty( $ec_status['ok'] );
+	$skipped = ! empty( $ec_status['skipped'] );
+	?>
+	<p style="max-width:900px;font-size:13px;<?php echo $ok ? 'color:#1d2327;' : ( $skipped ? 'color:#996800;' : 'color:#b32d2e;' ); ?>">
+		<strong>Last ingest:</strong>
+		<?php if ( $ok ) : ?>
+			OK — <?php echo esc_html( (string) ( $ec_status['count'] ?? 0 ) ); ?> events
+			<?php if ( ! empty( $ec_status['updatedAt'] ) ) : ?>
+				at <?php echo esc_html( (string) $ec_status['updatedAt'] ); ?>
+			<?php endif; ?>
+			(<?php echo esc_html( (string) ( $ec_status['source'] ?? 'plugin-push' ) ); ?>)
+		<?php else : ?>
+			<?php echo esc_html( (string) ( $ec_status['message'] ?? 'Failed' ) ); ?>
+			<?php if ( ! empty( $ec_status['http'] ) ) : ?>
+				(HTTP <?php echo esc_html( (string) $ec_status['http'] ); ?>)
+			<?php endif; ?>
+		<?php endif; ?>
+		<?php if ( ! empty( $ec_status['at'] ) ) : ?>
+			<span style="color:#666;"> · logged <?php echo esc_html( (string) $ec_status['at'] ); ?></span>
+		<?php endif; ?>
+	</p>
+<?php endif; ?>
+
 <?php /* ── Global Test Mode toggle ─────────────────────────────────────── */ ?>
 <hr style="margin:28px 0;" />
 
@@ -239,7 +326,7 @@ $api_keys = Hostlinks_Instructor_API::get_keys();
 
 <?php /* ── GET /email-events detail ────────────────────────────────────────── */ ?>
 <h4 style="margin:0 0 6px;">GET /email-events</h4>
-<p style="color:#555;margin-bottom:8px;">Read-only feed of upcoming classes for email platforms and merge variables. Private / hidden classes are excluded by default. Host-contact, hotel, and shipping fields are omitted unless you pass <code>detail=full</code>.</p>
+<p style="color:#555;margin-bottom:8px;">Read-only feed of upcoming classes for email platforms and merge variables. Private / hidden classes are excluded by default. Host-contact, hotel, and shipping fields are omitted unless you pass <code>detail=full</code>. EmailCraft’s VPS should use the <strong>EmailCraft ingest</strong> push above instead of calling this URL from the server; “Sync via browser” in EmailCraft still uses this GET.</p>
 
 <table class="widefat striped" style="max-width:900px;margin-bottom:8px;">
 	<tbody>

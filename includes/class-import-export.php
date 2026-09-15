@@ -257,6 +257,10 @@ class Hostlinks_Import_Export {
 			}
 		}
 
+		if ( $imported > 0 ) {
+			do_action( 'hostlinks_event_updated' );
+		}
+
 		$args = array(
 			'hl_msg'      => 'imported',
 			'hl_imported' => $imported,
@@ -308,6 +312,10 @@ class Hostlinks_Import_Export {
 			}
 		}
 		fclose( $handle );
+
+		if ( $imported > 0 ) {
+			do_action( 'hostlinks_event_updated' );
+		}
 
 		$args = array(
 			'hl_msg'      => 'imported',

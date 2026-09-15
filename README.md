@@ -104,6 +104,22 @@ Fired immediately after a new event row is inserted in `event_details_list`. Tri
 
 **Use case:** The Marketing Ops plugin hooks here to auto-provision checklist tasks for new events without requiring someone to open the event detail page first.
 
+### `hostlinks_event_updated`
+
+```php
+do_action( 'hostlinks_event_updated', int $eve_id = 0 );
+```
+
+Fired after an existing event is changed or removed from the public upcoming list (edit, bulk update, delete/cancel, CVENT sync, batch venue/hotel/short-URL apply, import, instructor assign). Hostlinks uses this to push a fresh EmailCraft snapshot.
+
+---
+
+## EmailCraft ingest
+
+EmailCraft cannot GET Hostlinks REST from its VPS. Hostlinks instead **POSTs** the next 180 days of public classes to `https://emailcraft.grantwritingusa.com/api/events/hostlinks-ingest` using `wp_remote_post()` (never from the browser).
+
+Configure the ingest URL and key under **Settings → Automation API**. The key comes from EmailCraft Admin → Email → Hostlinks and is stored in the `hostlinks_emailcraft_ingest` option. The public GET `/wp-json/hostlinks/v1/email-events` API is unchanged (EmailCraft’s “Sync via browser” still uses it).
+
 ---
 
 ## Event URL Fields

@@ -581,6 +581,10 @@ class Hostlinks_Instructor_API {
 			$summary['updated']++;
 		}
 
+		if ( ! $dry_run && ( $summary['updated'] ?? 0 ) > 0 ) {
+			do_action( 'hostlinks_event_updated' );
+		}
+
 		$response = array( 'results' => $results, 'summary' => $summary );
 		if ( $dry_run ) {
 			$response['dry_run'] = true;
@@ -872,6 +876,38 @@ class Hostlinks_Instructor_API {
 	 *   detail          string  "summary" (default) or "full"
 	 */
 	public static function get_email_events( WP_REST_Request $request ): WP_REST_Response {
+		$events = self::query_email_events(
+			array(
+				'id'              => (int) $request->get_param( 'id' ),
+				'days'            => (int) $request->get_param( 'days' ),
+				'marketer'        => trim( (string) ( $request->get_param( 'marketer' ) ?? '' ) ),
+				'type'            => trim( (string) ( $request->get_param( 'type' ) ?? '' ) ),
+				'include_private' => rest_sanitize_boolean( $request->get_param( 'include_private' ) ),
+				'detail'          => strtolower( (string) ( $request->get_param( 'detail' ) ?? 'summary' ) ),
+			)
+		);
+
+		return new WP_REST_Response( array(
+			'count'  => count( $events ),
+			'events' => $events,
+		), 200 );
+	}
+
+	/**
+	 * Same event list as GET /email-events, for server-side consumers.
+	 *
+	 * @param array $opts {
+	 *     @type int    $id
+	 *     @type int    $days
+	 *     @type string $marketer
+	 *     @type string $type
+	 *     @type bool   $include_private
+	 *     @type string $detail  "summary" or "full"
+	 *     @type int    $limit   Max rows (0 = no limit)
+	 * }
+	 * @return array<int, array>
+	 */
+	public static function query_email_events( array $opts = array() ): array {
 		global $wpdb;
 		$edl  = $wpdb->prefix . 'event_details_list';
 		$inst = $wpdb->prefix . 'event_instructor';
@@ -879,13 +915,14 @@ class Hostlinks_Instructor_API {
 		$typ  = $wpdb->prefix . 'event_type';
 		$today = current_time( 'Y-m-d' );
 
-		$id              = (int) $request->get_param( 'id' );
-		$days            = (int) $request->get_param( 'days' );
-		$marketer        = trim( (string) ( $request->get_param( 'marketer' ) ?? '' ) );
-		$type            = trim( (string) ( $request->get_param( 'type' ) ?? '' ) );
-		$include_private = rest_sanitize_boolean( $request->get_param( 'include_private' ) );
-		$detail          = strtolower( (string) ( $request->get_param( 'detail' ) ?? 'summary' ) );
+		$id              = (int) ( $opts['id'] ?? 0 );
+		$days            = (int) ( $opts['days'] ?? 0 );
+		$marketer        = trim( (string) ( $opts['marketer'] ?? '' ) );
+		$type            = trim( (string) ( $opts['type'] ?? '' ) );
+		$include_private = ! empty( $opts['include_private'] );
+		$detail          = strtolower( (string) ( $opts['detail'] ?? 'summary' ) );
 		$full            = ( 'full' === $detail );
+		$limit           = max( 0, (int) ( $opts['limit'] ?? 0 ) );
 
 		$where = array( 'e.eve_status = 1' );
 		$args  = array();
@@ -956,6 +993,10 @@ class Hostlinks_Instructor_API {
 		        WHERE " . implode( ' AND ', $where ) . '
 		        ORDER BY e.eve_start ASC';
 
+		if ( $limit > 0 ) {
+			$sql .= ' LIMIT ' . $limit;
+		}
+
 		if ( empty( $args ) ) {
 			$rows = $wpdb->get_results( $sql, ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		} else {
@@ -967,10 +1008,7 @@ class Hostlinks_Instructor_API {
 			$events[] = self::format_email_event( $r, $full );
 		}
 
-		return new WP_REST_Response( array(
-			'count'  => count( $events ),
-			'events' => $events,
-		), 200 );
+		return $events;
 	}
 
 	/**

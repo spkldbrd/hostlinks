@@ -68,6 +68,9 @@ $hl_ie_open = sanitize_key( $_GET['hl_ie'] ?? '' );
 if ( isset( $_POST['hl_hotel_preview'] ) || isset( $_POST['hl_hotel_apply'] ) ) {
 	$hl_ie_open = 'hotels';
 }
+if ( isset( $_POST['hl_venue_preview'] ) || isset( $_POST['hl_venue_apply'] ) ) {
+	$hl_ie_open = 'venue';
+}
 
 $messages = array(
 	'imported'          => $import_notice,
@@ -90,6 +93,7 @@ $messages = array(
     <a href="#hl-export" class="nav-tab nav-tab-active" onclick="hlTab(event,'hl-export')">Export</a>
     <a href="#hl-import" class="nav-tab" onclick="hlTab(event,'hl-import')">Import</a>
     <a href="#hl-hotels" class="nav-tab" onclick="hlTab(event,'hl-hotels')">Hotels</a>
+    <a href="#hl-venue" class="nav-tab" onclick="hlTab(event,'hl-venue')">Host &amp; Venue</a>
     <a href="#hl-reset"  class="nav-tab" onclick="hlTab(event,'hl-reset')" style="color:#b32d2e;">Reset Data</a>
   </nav>
 
@@ -229,6 +233,11 @@ $messages = array(
   <div id="hl-hotels" class="hl-tab-panel" style="display:none;margin-top:20px;">
     <?php include HOSTLINKS_PLUGIN_DIR . 'admin/hotel-batch.php'; ?>
   </div>
+
+  <!-- ══════ HOST & VENUE ══════ -->
+  <div id="hl-venue" class="hl-tab-panel" style="display:none;margin-top:20px;">
+    <?php include HOSTLINKS_PLUGIN_DIR . 'admin/venue-batch.php'; ?>
+  </div>
 <?php if ( empty( $hl_embedded ) ) : ?></div><?php endif; ?>
 
 <script>
@@ -250,6 +259,8 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 <?php if ( 'hotels' === $hl_ie_open ) : ?>
   hlOpenIe('hl-hotels');
+<?php elseif ( 'venue' === $hl_ie_open ) : ?>
+  hlOpenIe('hl-venue');
 <?php elseif ( in_array( $hl_msg, array( 'imported', 'no_file', 'bad_type', 'bad_json', 'bad_csv' ), true ) ) : ?>
   hlOpenIe('hl-import');
 <?php elseif ( in_array( $hl_msg, array( 'reset_done', 'reset_not_confirmed' ), true ) ) : ?>

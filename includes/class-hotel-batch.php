@@ -302,93 +302,13 @@ class Hostlinks_Hotel_Batch {
 				continue;
 			}
 
-			$place = self::csv_place( $row );
-			$date  = self::parse_date( $row['date'] ?? '' );
-			if ( '' === $date ) {
-				$unmatched[] = self::unmatched_row( $row, 'Date is missing or not a valid date' );
+			$match = self::find_matching_events_for_csv_row( $row, $prepared );
+			if ( ! empty( $match['error'] ) ) {
+				$unmatched[] = self::unmatched_row( $row, $match['error'] );
 				continue;
 			}
-			if ( '' === $place['city'] ) {
-				$unmatched[] = self::unmatched_row( $row, 'Need City or Location (City, ST)' );
-				continue;
-			}
-
-			$row_notes = array();
-			if ( empty( $place['state'] ) ) {
-				$row_notes[] = 'No state on this row';
-			}
-			if ( ! empty( $place['used_county'] ) ) {
-				$row_notes[] = 'City was blank — used County as city';
-			}
-
-			$found = array();
-			foreach ( $prepared as $ev ) {
-				if ( ! self::date_matches( $date, $ev['start'], $ev['end'] ) ) {
-					continue;
-				}
-				if ( $place['state'] && $ev['state'] && $place['state'] !== $ev['state'] ) {
-					continue;
-				}
-				if ( $ev['city'] && $place['city'] !== $ev['city'] ) {
-					continue;
-				}
-				if ( ! $ev['city'] && $place['city'] ) {
-					$loc = $ev['city_norm_loc'];
-					if ( $loc && false === strpos( $loc, $place['city'] ) && false === strpos( $place['city'], $loc ) ) {
-						continue;
-					}
-				}
-				$found[ $ev['eve_id'] ] = $ev;
-			}
-
-			$type = trim( (string) ( $row['type'] ?? '' ) );
-			if ( $type && count( $found ) > 1 ) {
-				$typed = array();
-				foreach ( $found as $id => $ev ) {
-					if ( self::type_matches( $type, $ev ) ) {
-						$typed[ $id ] = $ev;
-					}
-				}
-				if ( ! empty( $typed ) ) {
-					$found = $typed;
-				} else {
-					$row_notes[] = 'Type did not match — kept all city/date events';
-				}
-			}
-
-			$host = trim( (string) ( $row['host'] ?? '' ) );
-			if ( $host && count( $found ) > 1 ) {
-				$hosted = array();
-				foreach ( $found as $id => $ev ) {
-					if ( self::host_matches( $host, $ev['host_name'] ) ) {
-						$hosted[ $id ] = $ev;
-					}
-				}
-				if ( ! empty( $hosted ) ) {
-					$found = $hosted;
-				} else {
-					$row_notes[] = 'Host Name did not match — used city/date only';
-				}
-			}
-
-			if ( empty( $found ) ) {
-				$unmatched[] = self::unmatched_row( $row, 'No event with this city, state, and date' );
-				continue;
-			}
-
-			$on_start = false;
-			foreach ( $found as $ev ) {
-				if ( $date === substr( (string) $ev['start'], 0, 10 ) ) {
-					$on_start = true;
-					break;
-				}
-			}
-			if ( ! $on_start ) {
-				$row_notes[] = 'Date is not the event start (matched a day in the range)';
-			}
-			if ( count( $found ) > 1 ) {
-				$row_notes[] = 'Would apply to ' . count( $found ) . ' events on this city/date';
-			}
+			$found     = $match['found'];
+			$row_notes = $match['notes'];
 
 			$hotel = array(
 				'name'    => $hotel_name,
@@ -518,6 +438,102 @@ class Hostlinks_Hotel_Batch {
 	 * @param bool $include_past
 	 * @return array
 	 */
+	/**
+	 * Match one CSV row to Hostlinks events (city/state/date, optional type + host tie-breakers).
+	 *
+	 * @param array $row       Parsed CSV row (city, state, date, host, type, …).
+	 * @param array $prepared  Output of prepare_event() for each candidate.
+	 * @return array{found: array<int, array>, notes: string[], error: string}
+	 */
+	public static function find_matching_events_for_csv_row( array $row, array $prepared ) {
+		$place = self::csv_place( $row );
+		$date  = self::parse_date( $row['date'] ?? '' );
+		if ( '' === $date ) {
+			return array( 'found' => array(), 'notes' => array(), 'error' => 'Date is missing or not a valid date' );
+		}
+		if ( '' === $place['city'] ) {
+			return array( 'found' => array(), 'notes' => array(), 'error' => 'Need City or Location (City, ST)' );
+		}
+
+		$row_notes = array();
+		if ( empty( $place['state'] ) ) {
+			$row_notes[] = 'No state on this row';
+		}
+		if ( ! empty( $place['used_county'] ) ) {
+			$row_notes[] = 'City was blank — used County as city';
+		}
+
+		$found = array();
+		foreach ( $prepared as $ev ) {
+			if ( ! self::date_matches( $date, $ev['start'], $ev['end'] ) ) {
+				continue;
+			}
+			if ( $place['state'] && $ev['state'] && $place['state'] !== $ev['state'] ) {
+				continue;
+			}
+			if ( $ev['city'] && $place['city'] !== $ev['city'] ) {
+				continue;
+			}
+			if ( ! $ev['city'] && $place['city'] ) {
+				$loc = $ev['city_norm_loc'];
+				if ( $loc && false === strpos( $loc, $place['city'] ) && false === strpos( $place['city'], $loc ) ) {
+					continue;
+				}
+			}
+			$found[ $ev['eve_id'] ] = $ev;
+		}
+
+		$type = trim( (string) ( $row['type'] ?? '' ) );
+		if ( $type && count( $found ) > 1 ) {
+			$typed = array();
+			foreach ( $found as $id => $ev ) {
+				if ( self::type_matches( $type, $ev ) ) {
+					$typed[ $id ] = $ev;
+				}
+			}
+			if ( ! empty( $typed ) ) {
+				$found = $typed;
+			} else {
+				$row_notes[] = 'Type did not match — kept all city/date events';
+			}
+		}
+
+		$host = trim( (string) ( $row['host'] ?? '' ) );
+		if ( $host && count( $found ) > 1 ) {
+			$hosted = array();
+			foreach ( $found as $id => $ev ) {
+				if ( self::host_matches( $host, $ev['host_name'] ) ) {
+					$hosted[ $id ] = $ev;
+				}
+			}
+			if ( ! empty( $hosted ) ) {
+				$found = $hosted;
+			} else {
+				$row_notes[] = 'Host Name did not match — used city/date only';
+			}
+		}
+
+		if ( empty( $found ) ) {
+			return array( 'found' => array(), 'notes' => $row_notes, 'error' => 'No event with this city, state, and date' );
+		}
+
+		$on_start = false;
+		foreach ( $found as $ev ) {
+			if ( $date === substr( (string) $ev['start'], 0, 10 ) ) {
+				$on_start = true;
+				break;
+			}
+		}
+		if ( ! $on_start ) {
+			$row_notes[] = 'Date is not the event start (matched a day in the range)';
+		}
+		if ( count( $found ) > 1 ) {
+			$row_notes[] = 'Would apply to ' . count( $found ) . ' events on this city/date';
+		}
+
+		return array( 'found' => $found, 'notes' => $row_notes, 'error' => '' );
+	}
+
 	public static function candidate_events( $include_past = false ) {
 		global $wpdb;
 		$edl   = $wpdb->prefix . 'event_details_list';
@@ -534,7 +550,7 @@ class Hostlinks_Hotel_Batch {
 		return $wpdb->get_results( $sql, ARRAY_A );
 	}
 
-	private static function prepare_event( $ev ) {
+	public static function prepare_event( $ev ) {
 		$city  = trim( (string) ( $ev['city'] ?? '' ) );
 		$state = trim( (string) ( $ev['state'] ?? '' ) );
 		$base  = self::location_base( $ev['eve_location'] ?? '' );
@@ -560,7 +576,7 @@ class Hostlinks_Hotel_Batch {
 		);
 	}
 
-	private static function csv_place( $row ) {
+	public static function csv_place( $row ) {
 		$city  = trim( (string) ( $row['city'] ?? '' ) );
 		$state = trim( (string) ( $row['state'] ?? '' ) );
 		$loc   = trim( (string) ( $row['location'] ?? '' ) );

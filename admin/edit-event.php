@@ -1193,7 +1193,7 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 				<option value="">— State —</option>
 				<?php foreach ( $us_states as $abbr ) : ?>
 				<option value="<?php echo esc_attr( $abbr ); ?>"
-					<?php selected( $ev['state'] ?? '', $abbr ); ?>>
+					<?php selected( strtoupper( (string) ( $ev['state'] ?? '' ) ), $abbr ); ?>>
 					<?php echo esc_html( $abbr ); ?>
 				</option>
 				<?php endforeach; ?>

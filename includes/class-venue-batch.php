@@ -432,7 +432,10 @@ class Hostlinks_Venue_Batch {
 			$out['city'] = sanitize_text_field( $city );
 		}
 		if ( $state !== '' ) {
-			$out['state'] = sanitize_text_field( Hostlinks_CVENT_Matcher::normalize_state( $state ) );
+			$db_state = self::state_for_database( $state );
+			if ( $db_state !== '' ) {
+				$out['state'] = $db_state;
+			}
 		}
 
 		if ( empty( $out['displayed_as'] ) && ! empty( $out['host_name'] ) ) {
@@ -440,6 +443,17 @@ class Hostlinks_Venue_Batch {
 		}
 
 		return $out;
+	}
+
+	/**
+	 * Hostlinks stores state as uppercase USPS abbreviations (Edit Event dropdown).
+	 */
+	private static function state_for_database( string $raw ): string {
+		$abbr = strtoupper( Hostlinks_CVENT_Matcher::normalize_state( $raw ) );
+		if ( strlen( $abbr ) === 2 && ctype_alpha( $abbr ) ) {
+			return $abbr;
+		}
+		return '';
 	}
 
 	private static function fields_summary( array $fields ) {

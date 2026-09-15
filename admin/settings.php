@@ -13,6 +13,7 @@ $valid_tabs = array(
 	'cvent'             => 'CVENT',
 	'import-export'     => 'Import / Export',
 	'short-links'       => 'Short Links',
+	'hotels'            => 'Hotels',
 	'type-settings'     => 'Type Settings',
 	'marketers'         => 'Marketers',
 	'instructors'       => 'Instructors',
@@ -67,6 +68,9 @@ switch ( $current_tab ) {
 		break;
 	case 'short-links':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/short-url-batch.php';
+		break;
+	case 'hotels':
+		include HOSTLINKS_PLUGIN_DIR . 'admin/hotel-batch.php';
 		break;
 	case 'type-settings':
 		include HOSTLINKS_PLUGIN_DIR . 'admin/type-menu.php';

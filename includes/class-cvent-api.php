@@ -19,7 +19,7 @@ class Hostlinks_CVENT_API {
 
 	const TOKEN_URL    = 'https://api-platform.cvent.com/ea/oauth2/token';
 	const BASE_URL     = 'https://api-platform.cvent.com/ea/';
-	const TOKEN_KEY          = 'hostlinks_cvent_token_v5'; // v5: contacts scope split into own transient
+	const TOKEN_KEY          = 'hostlinks_cvent_token_v6'; // v6: sessions + session-enrollment scopes
 	const TOKEN_KEY_CONTACTS = 'hostlinks_cvent_token_contacts_v1';
 	const SETTINGS_KEY = 'hostlinks_cvent_settings';
 	const MAX_RETRIES  = 3;
@@ -197,9 +197,10 @@ class Hostlinks_CVENT_API {
 	/**
 	 * Core OAuth scope — used for all standard API calls.
 	 * Contacts scope is requested separately via get_contacts_token().
+	 * Sessions scopes are required for multi-event / session-code counting.
 	 */
-	const REQUESTED_SCOPE          = 'event/events:read event/attendees:read event/orders:read';
-	const REQUESTED_SCOPE_CONTACTS = 'event/events:read event/attendees:read event/orders:read contact/contacts:read';
+	const REQUESTED_SCOPE          = 'event/events:read event/attendees:read event/orders:read event/sessions:read event/session-enrollment:read';
+	const REQUESTED_SCOPE_CONTACTS = 'event/events:read event/attendees:read event/orders:read event/sessions:read event/session-enrollment:read contact/contacts:read';
 
 	// -------------------------------------------------------------------------
 	// HTTP layer
@@ -484,6 +485,128 @@ class Hostlinks_CVENT_API {
 		} while ( $next && $page < $max_pages );
 
 		return $all;
+	}
+
+	/**
+	 * List agenda sessions for a CVENT event (paginated).
+	 *
+	 * Endpoint: GET /ea/sessions?filter=event.id eq '{id}'
+	 * Requires scope: event/sessions:read
+	 *
+	 * @param string $event_id CVENT event UUID.
+	 * @return array|WP_Error Flat array of session records (id, code, title, start, …).
+	 */
+	public static function get_sessions_for_event( $event_id ) {
+		$event_id  = self::sanitize_uuid( $event_id );
+		$all       = array();
+		$next      = null;
+		$page      = 0;
+		$max_pages = 10;
+
+		do {
+			$params = array(
+				'limit'  => 200,
+				'filter' => "event.id eq '" . $event_id . "'",
+			);
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+
+			$result = self::request( 'sessions', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			$data = isset( $result['data'] ) ? $result['data'] : array();
+			$all  = array_merge( $all, $data );
+			$next = isset( $result['paging']['nextToken'] ) ? $result['paging']['nextToken'] : null;
+			$page++;
+		} while ( $next && $page < $max_pages );
+
+		return $all;
+	}
+
+	/**
+	 * List attendees enrolled in a CVENT session (paginated).
+	 *
+	 * Endpoint: GET /ea/sessions/enrollment?filter=session.id eq '{id}'
+	 * Requires scope: event/session-enrollment:read
+	 *
+	 * For optional sessions this returns registrants. For included sessions
+	 * CVENT may only return participants / no-shows — verify against your event setup.
+	 *
+	 * @param string $session_id CVENT session UUID.
+	 * @return array|WP_Error Flat array of enrollment records.
+	 */
+	public static function get_session_enrollments( $session_id ) {
+		$session_id = self::sanitize_uuid( $session_id );
+		$all        = array();
+		$next       = null;
+		$page       = 0;
+		$max_pages  = 20;
+
+		do {
+			$params = array(
+				'limit'  => 200,
+				'filter' => "session.id eq '" . $session_id . "'",
+			);
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+
+			$result = self::request( 'sessions/enrollment', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			$data = isset( $result['data'] ) ? $result['data'] : array();
+			$all  = array_merge( $all, $data );
+			$next = isset( $result['paging']['nextToken'] ) ? $result['paging']['nextToken'] : null;
+			$page++;
+		} while ( $next && $page < $max_pages );
+
+		return $all;
+	}
+
+	/**
+	 * Extract attendee UUIDs from session enrollment records.
+	 *
+	 * @param array $enrollments
+	 * @return array<string,true> Attendee ID set (keys).
+	 */
+	public static function enrollment_attendee_set( array $enrollments ) {
+		$set = array();
+		foreach ( $enrollments as $row ) {
+			$att_id = $row['attendee']['id']
+				?? $row['attendeeId']
+				?? $row['id']
+				?? null;
+			if ( is_string( $att_id ) && $att_id !== '' ) {
+				$set[ self::sanitize_uuid( $att_id ) ?: $att_id ] = true;
+			}
+		}
+		return $set;
+	}
+
+	/**
+	 * Find a session in a list by exact code (case-insensitive trim).
+	 *
+	 * @param array  $sessions
+	 * @param string $code
+	 * @return array|null
+	 */
+	public static function find_session_by_code( array $sessions, $code ) {
+		$needle = strtolower( trim( (string) $code ) );
+		if ( $needle === '' ) {
+			return null;
+		}
+		foreach ( $sessions as $s ) {
+			$c = strtolower( trim( (string) ( $s['code'] ?? '' ) ) );
+			if ( $c !== '' && $c === $needle ) {
+				return $s;
+			}
+		}
+		return null;
 	}
 
 	/**

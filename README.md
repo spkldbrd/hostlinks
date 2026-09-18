@@ -150,6 +150,8 @@ Hostlinks connects to the CVENT REST API (OAuth 2.0 Client Credentials flow) to 
 
 **Daily sync** runs automatically via WordPress cron. Covers all events ending within the last 60 days or in the future.
 
+**Session-code map (multi-event):** When one CVENT registration includes several sessions (e.g. Webinar 1 / 2 / 3), link the umbrella CVENT event once, then use **CVENT Sync → Session map** to assign each Session Code to a Hostlinks event. Sync counts only attendees enrolled in that session. Requires CVENT app scopes `event/sessions:read` and `event/session-enrollment:read`.
+
 **New event detection** scans CVENT for events with a 60-day lookback that don't yet exist in Hostlinks. Results are cached for 1 hour.
 
 **Subaward detection:** Events with "Subaward" / "Sub-Award" variants in the CVENT title are auto-assigned the Subaward event type and tagged `| SUB` in the location field.

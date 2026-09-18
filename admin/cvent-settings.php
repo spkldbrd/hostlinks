@@ -102,11 +102,17 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 			'events/{UUID}/orders'               => 'events/' . $diag_id . '/orders',
 			// Flat attendees with no filter — verifies attendees:read scope at all.
 			'attendees (no filter, scope check)' => 'attendees',
+			// Sessions + enrollment (multi-event / session-code counting).
+			'sessions?filter=event.id'           => 'sessions',
+			'sessions/enrollment (sample)'       => 'sessions/enrollment',
 		);
 
 		$endpoint_results = array();
 		foreach ( $endpoints_to_test as $label => $ep ) {
 			$params = array( 'limit' => 3 );
+			if ( 'sessions?filter=event.id' === $label ) {
+				$params['filter'] = "event.id eq '" . $diag_id . "'";
+			}
 			$res    = Hostlinks_CVENT_API::request( $ep, $params );
 			$endpoint_results[ $label ] = array(
 				'url'    => Hostlinks_CVENT_API::BASE_URL . $ep . '?' . http_build_query( $params, '', '&', PHP_QUERY_RFC3986 ),

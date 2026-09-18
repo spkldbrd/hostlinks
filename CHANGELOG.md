@@ -2,6 +2,16 @@
 
 ---
 
+## v2.11.31 — 2026-09-18
+
+### New: CVENT session-code map (1 CVENT event → N Hostlinks events)
+- One CVENT registration with multiple sessions (e.g. Webinar 1 / 2 / 3) can feed separate Hostlinks events.
+- On **CVENT Sync**, open **Session map** on a linked row: assign each Session Code to a Hostlinks event. Sync then counts only attendees enrolled in that session (a registrant in Webinar 1 and 3 counts on both Hostlinks rows).
+- Requires CVENT app scopes `event/sessions:read` and `event/session-enrollment:read` (token cache bumped so scopes refresh).
+- DB: `cvent_session_code` + `cvent_session_id` on `event_details_list` (DB version 2.7).
+
+---
+
 ## v2.11.30 — 2026-09-18
 
 ### Enhancement: Copy event + tighter Events list inputs

@@ -492,6 +492,8 @@ class Hostlinks_CVENT_Sync {
 			$table,
 			array(
 				'cvent_event_id'        => null,
+				'cvent_session_code'    => '',
+				'cvent_session_id'      => '',
 				'cvent_event_title'     => null,
 				'cvent_event_start_utc' => null,
 				'cvent_match_score'     => null,
@@ -500,9 +502,99 @@ class Hostlinks_CVENT_Sync {
 				'cvent_staleness_hash'  => null,
 			),
 			array( 'eve_id' => $eve_id ),
-			array( null, null, null, null, '%s', null, null ),
+			array( null, '%s', '%s', null, null, null, '%s', null, null ),
 			array( '%d' )
 		);
+	}
+
+	/**
+	 * Link several Hostlinks events to one CVENT umbrella event, each with a session code.
+	 *
+	 * @param string               $cvent_id CVENT event UUID.
+	 * @param array<int,string>    $map      eve_id => session_code (empty string clears session filter but keeps link if already linked — pass null to skip).
+	 * @return true|WP_Error
+	 */
+	public static function save_session_map( $cvent_id, array $map ) {
+		global $wpdb;
+
+		$cvent_id = Hostlinks_CVENT_API::sanitize_uuid( $cvent_id );
+		if ( ! $cvent_id ) {
+			return new WP_Error( 'bad_cvent', 'Invalid CVENT event ID.' );
+		}
+
+		$cvent_event = Hostlinks_CVENT_API::get_event( $cvent_id );
+		if ( is_wp_error( $cvent_event ) ) {
+			return $cvent_event;
+		}
+
+		$sessions = Hostlinks_CVENT_API::get_sessions_for_event( $cvent_id );
+		if ( is_wp_error( $sessions ) ) {
+			return $sessions;
+		}
+
+		$hash  = Hostlinks_CVENT_Matcher::staleness_hash( $cvent_event );
+		$table = $wpdb->prefix . 'event_details_list';
+		$title = (string) ( $cvent_event['title'] ?? '' );
+		$start = isset( $cvent_event['start'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( $cvent_event['start'] ) ) : null;
+
+		foreach ( $map as $eve_id => $session_code ) {
+			$eve_id       = (int) $eve_id;
+			$session_code = trim( (string) $session_code );
+			if ( $eve_id < 1 ) {
+				continue;
+			}
+
+			$session_id = '';
+			if ( $session_code !== '' ) {
+				$match = Hostlinks_CVENT_API::find_session_by_code( $sessions, $session_code );
+				if ( ! $match ) {
+					return new WP_Error(
+						'bad_session',
+						sprintf( 'Session code "%s" was not found on this CVENT event.', $session_code )
+					);
+				}
+				$session_id = Hostlinks_CVENT_API::sanitize_uuid( $match['id'] ?? '' ) ?: (string) ( $match['id'] ?? '' );
+			}
+
+			$row = $wpdb->get_row(
+				$wpdb->prepare( "SELECT * FROM `{$table}` WHERE eve_id = %d", $eve_id ),
+				ARRAY_A
+			);
+			if ( ! $row ) {
+				continue;
+			}
+
+			$data = array(
+				'cvent_event_id'        => $cvent_id,
+				'cvent_session_code'    => $session_code,
+				'cvent_session_id'      => $session_id,
+				'cvent_event_title'     => $title,
+				'cvent_event_start_utc' => $start,
+				'cvent_match_score'     => null,
+				'cvent_match_status'    => $session_code !== '' ? 'session' : 'manual',
+				'cvent_staleness_hash'  => $hash,
+			);
+			$fmt = array( '%s', '%s', '%s', '%s', '%s', null, '%s', '%s' );
+
+			if ( empty( $row['eve_roster_url'] ) ) {
+				$roster_base = Hostlinks_Page_URLs::get_roster();
+				if ( $roster_base ) {
+					$data['eve_roster_url'] = rtrim( $roster_base, '/' ) . '/?eve_id=' . $eve_id;
+					$fmt[]                  = '%s';
+				}
+			}
+
+			$host_fields = self::host_name_update_fields( $row, $cvent_event );
+			foreach ( $host_fields as $col => $val ) {
+				$data[ $col ] = $val;
+				$fmt[]        = '%s';
+			}
+
+			$wpdb->update( $table, $data, array( 'eve_id' => $eve_id ), $fmt, array( '%d' ) );
+		}
+
+		do_action( 'hostlinks_event_updated' );
+		return true;
 	}
 
 	// -------------------------------------------------------------------------
@@ -511,6 +603,9 @@ class Hostlinks_CVENT_Sync {
 
 	/**
 	 * Fetch all attendees for a CVENT event, then count PAID/FREE.
+	 *
+	 * When the Hostlinks row has cvent_session_code / cvent_session_id, only
+	 * attendees enrolled in that session are counted (multi-event split).
 	 *
 	 * @param int    $eve_id
 	 * @param string $cvent_id
@@ -521,6 +616,68 @@ class Hostlinks_CVENT_Sync {
 	private static function do_count_sync( $eve_id, $cvent_id, $row, $dry_run = false, $cvent_reg_url = '' ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';
+
+		// ── Optional session filter (1 CVENT event → N Hostlinks rows) ────────
+		$session_attendee_set = null; // null = whole-event count
+		$session_note         = '';
+		$session_id           = Hostlinks_CVENT_API::sanitize_uuid( $row['cvent_session_id'] ?? '' );
+		$session_code         = trim( (string) ( $row['cvent_session_code'] ?? '' ) );
+
+		if ( $session_code !== '' || $session_id ) {
+			if ( ! $session_id && $session_code !== '' ) {
+				$sessions = Hostlinks_CVENT_API::get_sessions_for_event( $cvent_id );
+				if ( is_wp_error( $sessions ) ) {
+					return self::result(
+						$eve_id,
+						'error',
+						'Session list failed: ' . $sessions->get_error_message(),
+						hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
+						hl_free: (int) ( $row['eve_free'] ?? 0 ),
+						dry_run: $dry_run
+					);
+				}
+				$match = Hostlinks_CVENT_API::find_session_by_code( $sessions, $session_code );
+				if ( ! $match ) {
+					return self::result(
+						$eve_id,
+						'error',
+						sprintf( 'Session code "%s" not found on this CVENT event.', $session_code ),
+						hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
+						hl_free: (int) ( $row['eve_free'] ?? 0 ),
+						dry_run: $dry_run
+					);
+				}
+				$session_id = Hostlinks_CVENT_API::sanitize_uuid( $match['id'] ?? '' ) ?: (string) ( $match['id'] ?? '' );
+				if ( ! $dry_run && $session_id && $session_id !== ( $row['cvent_session_id'] ?? '' ) ) {
+					$wpdb->update(
+						$table,
+						array( 'cvent_session_id' => $session_id ),
+						array( 'eve_id' => $eve_id ),
+						array( '%s' ),
+						array( '%d' )
+					);
+				}
+			}
+
+			$enrollments = Hostlinks_CVENT_API::get_session_enrollments( $session_id );
+			if ( is_wp_error( $enrollments ) ) {
+				return self::result(
+					$eve_id,
+					'error',
+					'Session enrollment fetch failed: ' . $enrollments->get_error_message()
+						. ' (Ensure the CVENT app has event/session-enrollment:read.)',
+					hl_paid: (int) ( $row['eve_paid'] ?? 0 ),
+					hl_free: (int) ( $row['eve_free'] ?? 0 ),
+					dry_run: $dry_run
+				);
+			}
+			$session_attendee_set = Hostlinks_CVENT_API::enrollment_attendee_set( $enrollments );
+			$session_note         = sprintf(
+				'; session "%s" (%d enrolled)',
+				$session_code !== '' ? $session_code : $session_id,
+				count( $session_attendee_set )
+			);
+		}
 
 		// ── Step A: order items via event-scoped path ─────────────────────────
 		// GET /ea/events/{UUID}/orders/items — primary source for count + discounts.
@@ -543,6 +700,7 @@ class Hostlinks_CVENT_Sync {
 		$preview         = array();
 		$preview_added   = array(); // attendeeIds already in preview
 		$cancelled_count = 0; // items explicitly marked active=false
+		$skipped_session = 0;
 
 		foreach ( $order_items as $item ) {
 			// Skip inactive (cancelled/voided) order items.
@@ -556,9 +714,16 @@ class Hostlinks_CVENT_Sync {
 			if ( ! $att_id ) {
 				continue;
 			}
+			$att_key = Hostlinks_CVENT_API::sanitize_uuid( $att_id ) ?: (string) $att_id;
+
+			// Session-split: only count attendees enrolled in this Hostlinks session.
+			if ( is_array( $session_attendee_set ) && empty( $session_attendee_set[ $att_key ] ) ) {
+				$skipped_session++;
+				continue;
+			}
 
 			// Once an attendee is FREE, no subsequent item can downgrade them.
-			if ( isset( $seen[ $att_id ] ) && $seen[ $att_id ] === 'free' ) {
+			if ( isset( $seen[ $att_key ] ) && $seen[ $att_key ] === 'free' ) {
 				continue;
 			}
 
@@ -589,22 +754,43 @@ class Hostlinks_CVENT_Sync {
 			}
 
 			// First encounter: set classification. Subsequent encounters: upgrade paid→free only.
-			if ( ! isset( $seen[ $att_id ] ) ) {
-				$seen[ $att_id ] = $is_free ? 'free' : 'paid';
+			if ( ! isset( $seen[ $att_key ] ) ) {
+				$seen[ $att_key ] = $is_free ? 'free' : 'paid';
 			} elseif ( $is_free ) {
-				$seen[ $att_id ] = 'free'; // upgrade
+				$seen[ $att_key ] = 'free'; // upgrade
 			}
 
 			// Dry-run preview: one entry per attendee (first encounter only).
-			if ( $dry_run && count( $preview ) < 10 && ! isset( $preview_added[ $att_id ] ) ) {
-				$preview_added[ $att_id ] = true;
+			if ( $dry_run && count( $preview ) < 10 && ! isset( $preview_added[ $att_key ] ) ) {
+				$preview_added[ $att_key ] = true;
 				$preview[] = array(
-					'id'               => $att_id,
+					'id'               => $att_key,
 					'active'           => $item['active'] ?? true,
 					'discount_strings' => $discount_strings,
 					'counted_as'       => $is_free ? 'FREE' : 'PAID',
 					'source'           => 'order_items',
+					'session'          => $session_code !== '' ? $session_code : null,
 				);
+			}
+		}
+
+		// Enrolled but with no active order item yet — still count as PAID (no discount data).
+		if ( is_array( $session_attendee_set ) ) {
+			foreach ( $session_attendee_set as $att_key => $_true ) {
+				if ( ! isset( $seen[ $att_key ] ) ) {
+					$seen[ $att_key ] = 'paid';
+					if ( $dry_run && count( $preview ) < 10 && ! isset( $preview_added[ $att_key ] ) ) {
+						$preview_added[ $att_key ] = true;
+						$preview[] = array(
+							'id'               => $att_key,
+							'active'           => true,
+							'discount_strings' => array(),
+							'counted_as'       => 'PAID',
+							'source'           => 'session_enrollment_only',
+							'session'          => $session_code !== '' ? $session_code : null,
+						);
+					}
+				}
 			}
 		}
 
@@ -615,7 +801,10 @@ class Hostlinks_CVENT_Sync {
 		// Duplicate order lines for the same attendee (e.g. ticket + add-on)
 		// are silently deduplicated via $seen and are NOT counted as filtered.
 		$filtered_out = $cancelled_count;
-		$source_note  = '';
+		$source_note  = $session_note;
+		if ( $skipped_session > 0 ) {
+			$source_note .= sprintf( '; %d order lines outside this session', $skipped_session );
+		}
 
 		} else {
 			// ── No fallback available ─────────────────────────────────────────

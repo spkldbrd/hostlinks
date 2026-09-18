@@ -90,7 +90,7 @@ class Hostlinks_Roster {
 		$cached = get_transient( $cache_key );
 		if ( $cached !== false && is_array( $cached ) ) {
 			return array(
-				'items'                => $cached,
+				'items'                => self::filter_items_by_session( $cached, $event_row ),
 				'is_past'              => $is_past,
 				'from_cache'           => true,
 				'refresh_locked_until' => $lock_expires,
@@ -105,11 +105,64 @@ class Hostlinks_Roster {
 		set_transient( $cache_key, $items, $cache_ttl );
 
 		return array(
-			'items'                => $items,
+			'items'                => self::filter_items_by_session( $items, $event_row ),
 			'is_past'              => $is_past,
 			'from_cache'           => false,
 			'refresh_locked_until' => $lock_expires,
 		);
+	}
+
+	/**
+	 * When the Hostlinks event is session-mapped, keep only order lines for
+	 * attendees enrolled in that session.
+	 *
+	 * @param array $items
+	 * @param array $event_row
+	 * @return array
+	 */
+	public static function filter_items_by_session( array $items, array $event_row ): array {
+		$session_id   = Hostlinks_CVENT_API::sanitize_uuid( $event_row['cvent_session_id'] ?? '' );
+		$session_code = trim( (string) ( $event_row['cvent_session_code'] ?? '' ) );
+		if ( ! $session_id && $session_code === '' ) {
+			return $items;
+		}
+
+		$cvent_id = Hostlinks_CVENT_API::sanitize_uuid( $event_row['cvent_event_id'] ?? '' );
+		if ( ! $session_id && $cvent_id && $session_code !== '' ) {
+			$sessions = Hostlinks_CVENT_API::get_sessions_for_event( $cvent_id );
+			if ( ! is_wp_error( $sessions ) ) {
+				$match = Hostlinks_CVENT_API::find_session_by_code( $sessions, $session_code );
+				if ( $match ) {
+					$session_id = Hostlinks_CVENT_API::sanitize_uuid( $match['id'] ?? '' ) ?: (string) ( $match['id'] ?? '' );
+				}
+			}
+		}
+		if ( ! $session_id ) {
+			return $items;
+		}
+
+		$enrollments = Hostlinks_CVENT_API::get_session_enrollments( $session_id );
+		if ( is_wp_error( $enrollments ) ) {
+			return $items; // Fail open to full roster rather than empty on API error.
+		}
+		$set = Hostlinks_CVENT_API::enrollment_attendee_set( $enrollments );
+		if ( empty( $set ) ) {
+			return array();
+		}
+
+		$out = array();
+		foreach ( $items as $item ) {
+			$att_id = $item['attendeeId']
+				?? ( $item['attendee']['id'] ?? null );
+			if ( ! $att_id ) {
+				continue;
+			}
+			$key = Hostlinks_CVENT_API::sanitize_uuid( $att_id ) ?: (string) $att_id;
+			if ( ! empty( $set[ $key ] ) ) {
+				$out[] = $item;
+			}
+		}
+		return $out;
 	}
 
 	public static function maybe_schedule_finalize( string $cvent_id, int $eve_id, array $event_row, bool $is_past ): void {

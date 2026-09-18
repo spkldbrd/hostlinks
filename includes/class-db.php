@@ -122,6 +122,18 @@ class Hostlinks_DB {
 		}
 	}
 
+	// v2.7 — session-code filter so one CVENT event can feed multiple Hostlinks rows.
+	if ( version_compare( $installed, '2.7', '<' ) ) {
+		$tbl      = $wpdb->prefix . 'event_details_list';
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+		if ( ! in_array( 'cvent_session_code', $existing, true ) ) {
+			$wpdb->query( "ALTER TABLE `{$tbl}` ADD `cvent_session_code` varchar(100) NOT NULL DEFAULT '' AFTER `cvent_event_id`" );
+		}
+		if ( ! in_array( 'cvent_session_id', $existing, true ) ) {
+			$wpdb->query( "ALTER TABLE `{$tbl}` ADD `cvent_session_id` varchar(100) NOT NULL DEFAULT '' AFTER `cvent_session_code`" );
+		}
+	}
+
 	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
 	if ( version_compare( $installed, '2.1', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'event_details_list';
@@ -261,6 +273,8 @@ class Hostlinks_DB {
 			eve_status tinyint(1) NOT NULL DEFAULT 1,
 			eve_created_at datetime DEFAULT NULL,
 			cvent_event_id varchar(100) DEFAULT NULL,
+			cvent_session_code varchar(100) NOT NULL DEFAULT '',
+			cvent_session_id varchar(100) NOT NULL DEFAULT '',
 			cvent_event_title varchar(500) DEFAULT NULL,
 			cvent_event_start_utc datetime DEFAULT NULL,
 			cvent_match_score tinyint unsigned DEFAULT NULL,

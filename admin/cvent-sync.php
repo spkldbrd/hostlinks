@@ -99,6 +99,85 @@ if ( isset( $_POST['hostlinks_cvent_manual_save'] ) ) {
 	}
 }
 
+// ── Session map (1 CVENT event → N Hostlinks events by session code) ──────────
+$session_map_cvent_id = '';
+$session_map_sessions = null;
+$session_map_error    = '';
+
+if ( isset( $_POST['hostlinks_cvent_session_map_save'] ) ) {
+	check_admin_referer( 'hostlinks_cvent_sync' );
+	$session_map_cvent_id = Hostlinks_CVENT_API::sanitize_uuid( $_POST['session_map_cvent_id'] ?? '' );
+	$raw_map              = isset( $_POST['session_map_eve'] ) && is_array( $_POST['session_map_eve'] )
+		? wp_unslash( $_POST['session_map_eve'] )
+		: array();
+	$map = array();
+	foreach ( $raw_map as $code => $eve_id ) {
+		$code   = sanitize_text_field( (string) $code );
+		$eve_id = (int) $eve_id;
+		if ( $code === '' || $eve_id < 1 ) {
+			continue;
+		}
+		$map[ $eve_id ] = $code;
+	}
+	if ( $session_map_cvent_id && $map ) {
+		$r = Hostlinks_CVENT_Sync::save_session_map( $session_map_cvent_id, $map );
+		if ( is_wp_error( $r ) ) {
+			$notice = '<div class="notice notice-error is-dismissible"><p>' . esc_html( $r->get_error_message() ) . '</p></div>';
+			$fetched = Hostlinks_CVENT_API::get_sessions_for_event( $session_map_cvent_id );
+			$session_map_sessions = is_wp_error( $fetched ) ? array() : $fetched;
+			if ( is_wp_error( $fetched ) ) {
+				$session_map_error = $fetched->get_error_message();
+			}
+		} else {
+			$notice = '<div class="notice notice-success is-dismissible"><p>Session map saved for ' . count( $map ) . ' Hostlinks event(s). Run Sync on each to refresh Paid/Free.</p></div>';
+			$session_map_cvent_id = '';
+		}
+	} elseif ( $session_map_cvent_id && ! $map ) {
+		$notice = '<div class="notice notice-warning is-dismissible"><p>Pick at least one Hostlinks event for a session code.</p></div>';
+		$fetched = Hostlinks_CVENT_API::get_sessions_for_event( $session_map_cvent_id );
+		$session_map_sessions = is_wp_error( $fetched ) ? array() : $fetched;
+	}
+}
+
+if ( isset( $_POST['hostlinks_cvent_session_map_open'] ) ) {
+	check_admin_referer( 'hostlinks_cvent_sync' );
+	$session_map_cvent_id = Hostlinks_CVENT_API::sanitize_uuid( $_POST['session_map_cvent_id'] ?? '' );
+	if ( ! $session_map_cvent_id ) {
+		$from_eve = (int) ( $_POST['hostlinks_cvent_eve_id'] ?? 0 );
+		if ( $from_eve ) {
+			global $wpdb;
+			$session_map_cvent_id = Hostlinks_CVENT_API::sanitize_uuid(
+				(string) $wpdb->get_var( $wpdb->prepare(
+					"SELECT cvent_event_id FROM {$wpdb->prefix}event_details_list WHERE eve_id = %d",
+					$from_eve
+				) )
+			);
+		}
+	}
+	if ( $session_map_cvent_id ) {
+		$fetched = Hostlinks_CVENT_API::get_sessions_for_event( $session_map_cvent_id );
+		if ( is_wp_error( $fetched ) ) {
+			$session_map_error    = $fetched->get_error_message();
+			$session_map_sessions = array();
+		} else {
+			$session_map_sessions = $fetched;
+		}
+	}
+}
+
+if ( isset( $_GET['session_map'] ) && ! $session_map_cvent_id ) {
+	$session_map_cvent_id = Hostlinks_CVENT_API::sanitize_uuid( $_GET['session_map'] );
+	if ( $session_map_cvent_id ) {
+		$fetched = Hostlinks_CVENT_API::get_sessions_for_event( $session_map_cvent_id );
+		if ( is_wp_error( $fetched ) ) {
+			$session_map_error    = $fetched->get_error_message();
+			$session_map_sessions = array();
+		} else {
+			$session_map_sessions = $fetched;
+		}
+	}
+}
+
 // ── Load events for the table ─────────────────────────────────────────────────
 global $wpdb;
 $tbl  = $wpdb->prefix . 'event_details_list';
@@ -110,7 +189,8 @@ $events = $wpdb->get_results(
 	$wpdb->prepare(
 		"SELECT edl.eve_id, edl.eve_location, edl.eve_start, edl.eve_end,
 		        edl.eve_paid, edl.eve_free, edl.eve_zoom,
-		        edl.cvent_event_id, edl.cvent_event_title, edl.cvent_match_score,
+		        edl.cvent_event_id, edl.cvent_session_code, edl.cvent_session_id,
+		        edl.cvent_event_title, edl.cvent_match_score,
 		        edl.cvent_match_status, edl.cvent_last_synced,
 		        edl.cvent_prev_paid, edl.cvent_prev_free
 		 FROM `{$tbl}` edl
@@ -132,6 +212,7 @@ function hl_cvent_status_badge( $status ) {
 	$map = array(
 		'auto'          => array( 'green',  'Auto-matched' ),
 		'manual'        => array( '#0073aa', 'Manual' ),
+		'session'       => array( '#7c3aed', 'Session' ),
 		'needs_review'  => array( '#d63638', 'Needs Review' ),
 		'no_candidates' => array( '#888',   'No Candidates' ),
 		'unlinked'      => array( '#888',   'Unlinked' ),
@@ -197,6 +278,100 @@ function hl_cvent_status_badge( $status ) {
 	</form>
 
 	<?php echo $notice; ?>
+
+	<?php if ( $session_map_cvent_id && is_array( $session_map_sessions ) ) : ?>
+		<?php
+		$hl_choices = array();
+		foreach ( $events as $_e ) {
+			$hl_choices[ (int) $_e['eve_id'] ] = sprintf(
+				'#%d · %s · %s',
+				(int) $_e['eve_id'],
+				$_e['eve_start'] ?? '',
+				$_e['eve_location'] ?? ''
+			);
+		}
+		// Current assignments for this umbrella CVENT id.
+		$assigned_by_code = array();
+		foreach ( $events as $_e ) {
+			if ( Hostlinks_CVENT_API::sanitize_uuid( $_e['cvent_event_id'] ?? '' ) !== $session_map_cvent_id ) {
+				continue;
+			}
+			$code = trim( (string) ( $_e['cvent_session_code'] ?? '' ) );
+			if ( $code !== '' ) {
+				$assigned_by_code[ strtolower( $code ) ] = (int) $_e['eve_id'];
+			}
+		}
+		?>
+		<div style="background:#f5f0ff;border:1px solid #c4b5fd;border-radius:6px;padding:16px 18px;margin-bottom:20px;">
+			<h2 style="margin:0 0 8px;font-size:16px;">Session map — multi-event CVENT link</h2>
+			<p style="margin:0 0 12px;color:#555;max-width:900px;">
+				One CVENT registration can include several sessions (e.g. Webinar 1 / 2 / 3).
+				Assign each <strong>Session Code</strong> to a Hostlinks event. Sync then counts only
+				attendees enrolled in that session. The same person in Webinar 1 and 3 counts on both Hostlinks rows.
+			</p>
+			<p style="margin:0 0 12px;font-size:12px;color:#666;">
+				CVENT event: <code><?php echo esc_html( $session_map_cvent_id ); ?></code>
+				· Requires CVENT app scopes <code>event/sessions:read</code> and <code>event/session-enrollment:read</code>
+				· <a href="<?php echo esc_url( admin_url( 'admin.php?page=cvent-sync' ) ); ?>">Close</a>
+			</p>
+			<?php if ( $session_map_error ) : ?>
+				<div class="notice notice-error inline"><p><?php echo esc_html( $session_map_error ); ?></p></div>
+			<?php elseif ( empty( $session_map_sessions ) ) : ?>
+				<div class="notice notice-warning inline"><p>No sessions returned for this CVENT event. Confirm Agenda sessions exist and the sessions:read scope is granted.</p></div>
+			<?php else : ?>
+				<form method="post">
+					<?php wp_nonce_field( 'hostlinks_cvent_sync' ); ?>
+					<input type="hidden" name="session_map_cvent_id" value="<?php echo esc_attr( $session_map_cvent_id ); ?>">
+					<table class="widefat striped" style="max-width:960px;">
+						<thead>
+							<tr>
+								<th>Session Code</th>
+								<th>Title</th>
+								<th>Start</th>
+								<th>Hostlinks event</th>
+							</tr>
+						</thead>
+						<tbody>
+						<?php foreach ( $session_map_sessions as $sess ) :
+							$code  = (string) ( $sess['code'] ?? '' );
+							$title = (string) ( $sess['title'] ?? '' );
+							$start = (string) ( $sess['start'] ?? '' );
+							if ( $code === '' && $title === '' ) {
+								continue;
+							}
+							$selected = $assigned_by_code[ strtolower( $code ) ] ?? 0;
+							?>
+							<tr>
+								<td><code><?php echo esc_html( $code !== '' ? $code : '—' ); ?></code></td>
+								<td><?php echo esc_html( $title ); ?></td>
+								<td style="font-size:12px;white-space:nowrap;"><?php
+									echo $start ? esc_html( wp_date( 'M j, Y g:ia', strtotime( $start ) ) ) : '—';
+								?></td>
+								<td>
+									<?php if ( $code === '' ) : ?>
+										<span style="color:#888;">No code — set a Session Code in CVENT</span>
+									<?php else : ?>
+										<select name="session_map_eve[<?php echo esc_attr( $code ); ?>]" style="max-width:420px;">
+											<option value="0">— not mapped —</option>
+											<?php foreach ( $hl_choices as $hid => $label ) : ?>
+												<option value="<?php echo (int) $hid; ?>" <?php selected( $selected, $hid ); ?>>
+													<?php echo esc_html( $label ); ?>
+												</option>
+											<?php endforeach; ?>
+										</select>
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+					<p style="margin:12px 0 0;">
+						<button type="submit" name="hostlinks_cvent_session_map_save" class="button button-primary">Save session map</button>
+					</p>
+				</form>
+			<?php endif; ?>
+		</div>
+	<?php endif; ?>
 
 	<?php if ( $sync_report ) : ?>
 		<?php $is_dry = ! empty( $sync_report['dry_run'] ); ?>
@@ -465,7 +640,11 @@ function hl_cvent_status_badge( $status ) {
 				<td><?php echo $eve_id; ?></td>
 				<td><?php echo $dates; ?></td>
 				<td><?php echo $loc; ?></td>
-				<td><?php echo hl_cvent_status_badge( $status ); ?></td>
+				<td><?php echo hl_cvent_status_badge( $status ); ?>
+					<?php if ( ! empty( $ev['cvent_session_code'] ) ) : ?>
+						<br><span style="font-size:11px;color:#7c3aed;">Session: <?php echo esc_html( $ev['cvent_session_code'] ); ?></span>
+					<?php endif; ?>
+				</td>
 				<td style="font-size:12px;"><?php echo $cv_title; ?></td>
 				<td><?php echo $score; ?></td>
 			<td style="font-size:11px;"><?php echo $synced; ?></td>
@@ -499,6 +678,10 @@ function hl_cvent_status_badge( $status ) {
 						<?php if ( $ev['cvent_event_id'] ) : ?>
 							<button type="submit" name="hostlinks_cvent_unlink" class="button button-small"
 								onclick="return confirm('Unlink CVENT event from #<?php echo $eve_id; ?>?');">Unlink</button>
+							<button type="submit" name="hostlinks_cvent_session_map_open" class="button button-small"
+								<?php echo $ready ? '' : 'disabled'; ?>
+								title="Map session codes from this CVENT event to multiple Hostlinks rows">Session map</button>
+							<input type="hidden" name="session_map_cvent_id" value="<?php echo esc_attr( $ev['cvent_event_id'] ); ?>">
 						<?php endif; ?>
 					</form>
 					<!-- Manual Link (expands inline) -->

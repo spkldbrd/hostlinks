@@ -1048,6 +1048,8 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 			<?php
 			$cvent_rows = array(
 				'CVENT Event ID'    => $ev['cvent_event_id']        ?? '',
+				'Session Code'      => $ev['cvent_session_code']    ?? '',
+				'Session ID'        => $ev['cvent_session_id']      ?? '',
 				'CVENT Title'       => $ev['cvent_event_title']     ?? '',
 				'Match Status'      => $ev['cvent_match_status']    ?? '',
 				'Match Score'       => isset( $ev['cvent_match_score'] ) ? (string) $ev['cvent_match_score'] : '',

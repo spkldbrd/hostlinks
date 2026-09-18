@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.30 — 2026-09-18
+
+### Enhancement: Copy event + tighter Events list inputs
+- Events list rows now have a **Copy** icon next to Edit. Opens Add New Event prefilled from that event (CVENT link and Paid/Free cleared).
+- Events list text/number/url inputs use `padding: 0 6px` so more text is visible in narrow columns.
+
+---
+
 ## v2.11.29 — 2026-09-15
 
 ### New: EmailCraft ingest push

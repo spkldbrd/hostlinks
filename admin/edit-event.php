@@ -1,9 +1,10 @@
 <?php
 /**
- * Unified event form: Add New, Add from CVENT, and Edit.
+ * Unified event form: Add New, Add from CVENT, Copy, and Edit.
  * Accessed via:
  *   ?page=booking-menu&edit_event={id}   → Edit existing event
  *   ?page=booking-menu&add_event=1       → Add new event (blank form)
+ *   ?page=booking-menu&copy_event={id}   → Add new event prefilled from an existing one
  *   ?page=booking-menu&add_cvent={uuid}  → Add from CVENT (pre-populated form)
  * Included from admin/booking.php.
  */
@@ -25,13 +26,17 @@ $timezone = wp_timezone();
 $table    = $wpdb->prefix . 'event_details_list';
 
 // ── Mode detection ────────────────────────────────────────────────────────────
-// Modes: edit, add, cvent, request
+// Modes: edit, add, copy, cvent, request
 //   request: pre-fill the add form from a row in wp_hostlinks_event_requests.
+//   copy:    pre-fill the add form from an existing event_details_list row.
 if ( isset( $_GET['add_cvent'] ) ) {
 	$mode   = 'cvent';
 	$eve_id = 0;
 } elseif ( isset( $_GET['add_request'] ) ) {
 	$mode   = 'request';
+	$eve_id = 0;
+} elseif ( isset( $_GET['copy_event'] ) ) {
+	$mode   = 'copy';
 	$eve_id = 0;
 } elseif ( isset( $_GET['add_event'] ) ) {
 	$mode   = 'add';
@@ -56,6 +61,7 @@ $cvent_start_utc_pre = '';
 $request_id     = (int) ( $_GET['add_request'] ?? 0 );
 $request_row    = null;
 $request_header = '';
+$copy_source_id = (int) ( $_GET['copy_event'] ?? 0 );
 
 // ── Load lookup tables ────────────────────────────────────────────────────────
 $all_types       = $wpdb->get_results( "SELECT event_type_id AS id, event_type_name AS name FROM {$wpdb->prefix}event_type WHERE event_type_status = 1 ORDER BY name", ARRAY_A );
@@ -89,6 +95,9 @@ function _hl_edit_phone( string $raw ): string {
 $notice = '';
 if ( isset( $_GET['saved'] ) ) {
 	$notice = '<div class="notice notice-success is-dismissible"><p>Event added successfully. You can continue editing it here.</p></div>';
+}
+if ( $mode === 'copy' && $notice === '' ) {
+	$notice = '<div class="notice notice-info is-dismissible"><p>Copied from event #' . (int) $copy_source_id . '. Review the fields, change dates or location as needed, then click <strong>Add New Event</strong>. Paid/Free counts and CVENT link are cleared for the new event.</p></div>';
 }
 
 // ── ADD handler (add + cvent + request modes) ───────────────────────────────
@@ -551,6 +560,37 @@ if ( $mode === 'edit' ) {
 		'cvent_match_score'  => '',
 		'cvent_last_synced'  => '',
 	);
+} elseif ( $mode === 'copy' ) {
+	// Clone an existing event into the Add New form. Identity / CVENT / registration
+	// counts are cleared so Save creates a fresh row the user can adjust.
+	if ( $copy_source_id < 1 ) {
+		wp_safe_redirect( $list_url );
+		exit;
+	}
+	$src = $wpdb->get_row(
+		$wpdb->prepare( "SELECT * FROM `{$table}` WHERE eve_id = %d", $copy_source_id ),
+		ARRAY_A
+	);
+	if ( ! $src ) {
+		echo '<div class="wrap"><div class="notice notice-error"><p>Event #' . esc_html( (string) $copy_source_id ) . ' not found.</p></div></div>';
+		return;
+	}
+	$ev = $src;
+	$ev['eve_id']            = 0;
+	$ev['eve_paid']          = 0;
+	$ev['eve_free']          = 0;
+	$ev['eve_status']        = 1;
+	$ev['eve_roster_url']    = '';
+	$ev['cvent_event_id']    = '';
+	$ev['cvent_event_title'] = '';
+	$ev['cvent_event_start_utc'] = null;
+	$ev['cvent_match_status']    = '';
+	$ev['cvent_match_score']     = null;
+	$ev['cvent_last_synced']     = null;
+	$ev['cvent_staleness_hash']  = null;
+	$ev['cvent_prev_paid']       = null;
+	$ev['cvent_prev_free']       = null;
+	$ev['cvent_host_name']       = '';
 } else {
 	// Add or CVENT mode: pre-populate from GET params or use blank defaults.
 	$cvent_uuid_pre      = $mode === 'cvent' ? sanitize_text_field( $_GET['add_cvent']         ) : '';
@@ -766,6 +806,13 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 		if ( $request_header ) {
 			echo '<span style="font-size:14px;color:#50575e;font-weight:400;margin-left:8px;">— ' . esc_html( $request_header ) . '</span>';
 		}
+	} elseif ( $mode === 'copy' ) {
+		echo 'Add New Event';
+		echo '<span style="font-size:14px;color:#50575e;font-weight:400;margin-left:8px;">— copy of #' . (int) $copy_source_id;
+		if ( ! empty( $ev['eve_location'] ) ) {
+			echo ' · ' . esc_html( $ev['eve_location'] );
+		}
+		echo '</span>';
 	} else {
 		echo 'Add New Event';
 	}
@@ -1369,6 +1416,9 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 		} elseif ( $mode === 'request' ) {
 			$submit_label = 'Save to Hostlinks';
 			$cancel_href  = admin_url( 'admin.php?page=hostlinks-event-requests' );
+		} elseif ( $mode === 'copy' ) {
+			$submit_label = 'Add New Event';
+			$cancel_href  = $list_url;
 		} else {
 			$submit_label = 'Add New Event';
 			$cancel_href  = $list_url;

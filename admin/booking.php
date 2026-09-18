@@ -8,7 +8,7 @@ $table13 = $wpdb->prefix . 'event_marketer';
 $table14 = $wpdb->prefix . 'event_instructor';
 
 // ── Full event form (add new, add from CVENT, add from request, or edit) ────
-if ( isset( $_GET['edit_event'] ) || isset( $_GET['add_event'] ) || isset( $_GET['add_cvent'] ) || isset( $_GET['add_request'] ) ) {
+if ( isset( $_GET['edit_event'] ) || isset( $_GET['add_event'] ) || isset( $_GET['add_cvent'] ) || isset( $_GET['add_request'] ) || isset( $_GET['copy_event'] ) ) {
 	require_once __DIR__ . '/edit-event.php';
 	return;
 }
@@ -243,7 +243,7 @@ if ( $tot1 > 0 ) {
         <thead>
           <tr>
             <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
-            <th style="width:40px;"></th>
+            <th style="width:64px;"></th>
             <th>Location</th><th>Paid</th><th>Free</th><th style="width:90px;">Date</th>
             <th style="width:60px;">Type</th><th>Zoom</th><th>Marketer</th>
             <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th><th style="width:64px;" title="Projected total registrations at event date, based on avg daily pace since first CVENT sync">Proj. Total</th>
@@ -262,6 +262,11 @@ if ( $tot1 > 0 ) {
                 title="Edit event" aria-label="Edit event #<?php echo (int) $alldriver['eve_id']; ?>"
                 class="hl-edit-icon">
                 <span class="dashicons dashicons-edit" aria-hidden="true"></span>
+              </a>
+              <a href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&copy_event=' . (int) $alldriver['eve_id'] ) ); ?>"
+                title="Copy event" aria-label="Copy event #<?php echo (int) $alldriver['eve_id']; ?>"
+                class="hl-edit-icon hl-copy-icon">
+                <span class="dashicons dashicons-admin-page" aria-hidden="true"></span>
               </a>
             </td>
             <td>
@@ -450,6 +455,24 @@ th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertica
 .TFtable tr:nth-child(odd){background:#f9f9f9;}
 .TFtable tr:nth-child(even){background:#ededed;}
 
+/* Event list: tighter than WP forms.css (0 12px) so narrow URL/location columns show more text. */
+#myTable input[type=date],
+#myTable input[type=datetime-local],
+#myTable input[type=datetime],
+#myTable input[type=email],
+#myTable input[type=month],
+#myTable input[type=number],
+#myTable input[type=password],
+#myTable input[type=search],
+#myTable input[type=tel],
+#myTable input[type=text],
+#myTable input[type=time],
+#myTable input[type=url],
+#myTable input[type=week] {
+	padding: 0 6px;
+	min-height: 40px;
+}
+
 /* Event list: compact date column.
    The wrap is a positioned inline box. The compact span sits on top as the
    visible label. The real daterangepicker-bound input is overlaid at the same
@@ -467,7 +490,7 @@ select.hl-type-compact{width:64px;padding-left:4px;padding-right:18px;}
 /* Event list: Edit icon column — centered square icon-button using the
    native WordPress dashicons. Flex centering guarantees vertical alignment
    with the row's form-control content regardless of row height. */
-.hl-edit-cell{text-align:center;vertical-align:middle;padding:4px 6px;width:32px;}
+.hl-edit-cell{text-align:center;vertical-align:middle;padding:4px 4px;width:60px;white-space:nowrap;}
 .hl-edit-icon{
 	display:inline-flex;
 	align-items:center;
@@ -480,6 +503,7 @@ select.hl-type-compact{width:64px;padding-left:4px;padding-right:18px;}
 	text-decoration:none;
 	transition:background-color .15s ease, color .15s ease, box-shadow .15s ease;
 	box-sizing:border-box;
+	vertical-align:middle;
 }
 .hl-edit-icon:hover, .hl-edit-icon:focus{
 	background:#2271b1;

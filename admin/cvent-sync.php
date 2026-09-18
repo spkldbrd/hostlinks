@@ -32,14 +32,13 @@ if ( isset( $_POST['hostlinks_cvent_sync_all'] ) ) {
 	}
 }
 
-// Sync One
+// Sync One (expands to all session-mapped siblings on the same CVENT UUID)
 if ( isset( $_POST['hostlinks_cvent_sync_one'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
 	$eve_id = intval( $_POST['hostlinks_cvent_eve_id'] ?? 0 );
 	if ( $eve_id ) {
-		$r = Hostlinks_CVENT_Sync::sync_one( $eve_id, $dry_run );
-		$sync_report = array( 'results' => array( $r ), 'dry_run' => $dry_run, 'synced' => (int)('synced'==$r['action']), 'matched' => (int)('matched'==$r['action']), 'needs_review' => (int)('needs_review'==$r['action']), 'no_candidates' => (int)('no_candidates'==$r['action']), 'errors' => (int)('error'==$r['action']) );
-		if ( ! $dry_run && ( $r['action'] ?? '' ) === 'synced' ) {
+		$sync_report = Hostlinks_CVENT_Sync::sync_one_or_family( $eve_id, $dry_run );
+		if ( ! $dry_run && ( $sync_report['synced'] ?? 0 ) > 0 ) {
 			update_option( 'last_data_updation', current_time( 'Y-m-d' ) );
 		}
 	}
@@ -129,7 +128,7 @@ if ( isset( $_POST['hostlinks_cvent_session_map_save'] ) ) {
 				$session_map_error = $fetched->get_error_message();
 			}
 		} else {
-			$notice = '<div class="notice notice-success is-dismissible"><p>Session map saved for ' . count( $map ) . ' Hostlinks event(s). Run Sync on each to refresh Paid/Free.</p></div>';
+			$notice = '<div class="notice notice-success is-dismissible"><p>Session map saved for ' . count( $map ) . ' Hostlinks event(s). Click <strong>Sync</strong> on any one of them to refresh Paid/Free for the whole session family.</p></div>';
 			$session_map_cvent_id = '';
 		}
 	} elseif ( $session_map_cvent_id && ! $map ) {
@@ -301,6 +300,17 @@ function hl_cvent_status_badge( $status ) {
 				$assigned_by_code[ strtolower( $code ) ] = (int) $_e['eve_id'];
 			}
 		}
+
+		// Auto-suggest unmapped sessions by date + name / Webinar N.
+		$suggest         = Hostlinks_CVENT_Sync::suggest_session_hostlinks_map( $session_map_sessions, $events );
+		$suggested_map   = $suggest['map'] ?? array();
+		$suggested_why   = $suggest['reasons'] ?? array();
+		$suggest_count   = 0;
+		foreach ( $suggested_map as $_code => $_eid ) {
+			if ( empty( $assigned_by_code[ strtolower( (string) $_code ) ] ) ) {
+				$suggest_count++;
+			}
+		}
 		?>
 		<div style="background:#f5f0ff;border:1px solid #c4b5fd;border-radius:6px;padding:16px 18px;margin-bottom:20px;">
 			<h2 style="margin:0 0 8px;font-size:16px;">Session map — multi-event CVENT link</h2>
@@ -319,6 +329,14 @@ function hl_cvent_status_badge( $status ) {
 			<?php elseif ( empty( $session_map_sessions ) ) : ?>
 				<div class="notice notice-warning inline"><p>No sessions returned for this CVENT event. Confirm Agenda sessions exist and the sessions:read scope is granted.</p></div>
 			<?php else : ?>
+				<?php if ( $suggest_count > 0 ) : ?>
+					<div class="notice notice-info inline" style="margin:0 0 12px;">
+						<p style="margin:0;">
+							<strong>Suggested <?php echo (int) $suggest_count; ?> match<?php echo $suggest_count === 1 ? '' : 'es'; ?></strong>
+							from date + name (e.g. same day and “Webinar 1”). Review the dropdowns, then confirm with <strong>Save session map</strong>. Nothing is saved until you confirm.
+						</p>
+					</div>
+				<?php endif; ?>
 				<form method="post">
 					<?php wp_nonce_field( 'hostlinks_cvent_sync' ); ?>
 					<input type="hidden" name="session_map_cvent_id" value="<?php echo esc_attr( $session_map_cvent_id ); ?>">
@@ -339,7 +357,14 @@ function hl_cvent_status_badge( $status ) {
 							if ( $code === '' && $title === '' ) {
 								continue;
 							}
-							$selected = $assigned_by_code[ strtolower( $code ) ] ?? 0;
+							$selected   = $assigned_by_code[ strtolower( $code ) ] ?? 0;
+							$is_suggest = false;
+							$why_label  = '';
+							if ( ! $selected && $code !== '' && ! empty( $suggested_map[ $code ] ) ) {
+								$selected   = (int) $suggested_map[ $code ];
+								$is_suggest = true;
+								$why_label  = (string) ( $suggested_why[ $code ] ?? '' );
+							}
 							?>
 							<tr>
 								<td><code><?php echo esc_html( $code !== '' ? $code : '—' ); ?></code></td>
@@ -359,6 +384,9 @@ function hl_cvent_status_badge( $status ) {
 												</option>
 											<?php endforeach; ?>
 										</select>
+										<?php if ( $is_suggest && $why_label ) : ?>
+											<div style="font-size:11px;color:#5b21b6;margin-top:4px;">Suggested: <?php echo esc_html( $why_label ); ?></div>
+										<?php endif; ?>
 									<?php endif; ?>
 								</td>
 							</tr>
@@ -366,7 +394,9 @@ function hl_cvent_status_badge( $status ) {
 						</tbody>
 					</table>
 					<p style="margin:12px 0 0;">
-						<button type="submit" name="hostlinks_cvent_session_map_save" class="button button-primary">Save session map</button>
+						<button type="submit" name="hostlinks_cvent_session_map_save" class="button button-primary">
+							<?php echo $suggest_count > 0 ? 'Confirm &amp; save session map' : 'Save session map'; ?>
+						</button>
 					</p>
 				</form>
 			<?php endif; ?>
@@ -378,6 +408,9 @@ function hl_cvent_status_badge( $status ) {
 		<div class="notice <?php echo $is_dry ? 'notice-warning' : 'notice-info'; ?> is-dismissible">
 			<p>
 				<?php if ( $is_dry ) : ?><strong>[DRY RUN — no data was saved]</strong> &nbsp;<?php endif; ?>
+				<?php if ( ! empty( $sync_report['family'] ) ) : ?>
+					<strong>Session family:</strong> synced <?php echo count( $sync_report['family_ids'] ?? array() ); ?> Hostlinks events on the same CVENT UUID (order items fetched once). &nbsp;
+				<?php endif; ?>
 				<strong><?php echo $is_dry ? 'Preview complete:' : 'Sync complete:'; ?></strong>
 				<?php echo (int)$sync_report['synced']; ?> <?php echo $is_dry ? 'would sync' : 'synced'; ?> &bull;
 				<?php echo (int)$sync_report['matched']; ?> <?php echo $is_dry ? 'would match' : 'newly matched'; ?> &bull;
@@ -673,7 +706,8 @@ function hl_cvent_status_badge( $status ) {
 				<form method="post" style="display:inline;">
 						<?php wp_nonce_field( 'hostlinks_cvent_sync' ); ?>
 						<input type="hidden" name="hostlinks_cvent_eve_id" value="<?php echo $eve_id; ?>">
-						<button type="submit" name="hostlinks_cvent_sync_one" class="button button-small" <?php echo $ready ? '' : 'disabled'; ?>>Sync</button>
+						<button type="submit" name="hostlinks_cvent_sync_one" class="button button-small" <?php echo $ready ? '' : 'disabled'; ?>
+							title="<?php echo ! empty( $ev['cvent_session_code'] ) ? 'Also syncs other Hostlinks events mapped to the same CVENT session family' : ''; ?>">Sync</button>
 						<button type="submit" name="hostlinks_cvent_rebootstrap" class="button button-small" <?php echo $ready ? '' : 'disabled'; ?>>Re-bootstrap</button>
 						<?php if ( $ev['cvent_event_id'] ) : ?>
 							<button type="submit" name="hostlinks_cvent_unlink" class="button button-small"

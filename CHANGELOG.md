@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.33 — 2026-09-18
+
+### Enhancement: session-family Sync + Session Map auto-suggest
+- **Sync** on any session-mapped Hostlinks row now syncs the whole family (all siblings sharing that CVENT UUID + session codes). Order items / sessions are request-cached so one click is far cheaper than Sync All.
+- **Session map** pre-fills Hostlinks dropdowns using date + name matching (same calendar day and “Webinar N” / session code in the event name, or partial title overlap). Suggestions are shown for confirmation — nothing is saved until you click Confirm & save.
+
+---
+
 ## v2.11.32 — 2026-09-18
 
 ### Fix: session-mapped CVENT sync no longer re-bootstraps

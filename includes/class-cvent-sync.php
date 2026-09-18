@@ -153,6 +153,250 @@ class Hostlinks_CVENT_Sync {
 	 *   filtered_out      : int|null     attendees removed by status filter
 	 * }
 	 */
+	/**
+	 * Sync one event, or the whole session-mapped family sharing its CVENT UUID.
+	 *
+	 * When the row (or any sibling) has a session code on the same umbrella
+	 * CVENT event, Sync updates every session-mapped sibling in one click.
+	 * Order-items / session-list API calls are request-cached so the family
+	 * sync is much cheaper than Sync All.
+	 *
+	 * @param int  $eve_id
+	 * @param bool $dry_run
+	 * @return array Sync report shape: results, dry_run, synced, matched, …
+	 */
+	public static function sync_one_or_family( $eve_id, $dry_run = false ) {
+		global $wpdb;
+		$table = $wpdb->prefix . 'event_details_list';
+
+		$row = $wpdb->get_row(
+			$wpdb->prepare( "SELECT eve_id, cvent_event_id, cvent_session_code FROM `{$table}` WHERE eve_id = %d AND eve_status = 1", $eve_id ),
+			ARRAY_A
+		);
+		if ( ! $row ) {
+			$r = self::result( $eve_id, 'error', 'Event not found or inactive.', dry_run: $dry_run );
+			return array(
+				'results'       => array( $r ),
+				'dry_run'       => $dry_run,
+				'synced'        => 0,
+				'matched'       => 0,
+				'needs_review'  => 0,
+				'no_candidates' => 0,
+				'errors'        => 1,
+				'family'        => false,
+			);
+		}
+
+		$cvent_id = Hostlinks_CVENT_API::sanitize_uuid( $row['cvent_event_id'] ?? '' );
+		$ids      = array( (int) $eve_id );
+
+		if ( $cvent_id ) {
+			$siblings = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT eve_id FROM `{$table}`
+					 WHERE eve_status = 1
+					   AND cvent_event_id = %s
+					   AND cvent_session_code IS NOT NULL
+					   AND TRIM(cvent_session_code) != ''
+					 ORDER BY eve_start ASC",
+					$cvent_id
+				)
+			);
+			if ( count( $siblings ) > 1
+				|| ( count( $siblings ) === 1 && trim( (string) ( $row['cvent_session_code'] ?? '' ) ) !== '' ) ) {
+				$ids = array_map( 'intval', $siblings );
+				if ( ! in_array( (int) $eve_id, $ids, true ) ) {
+					$ids[] = (int) $eve_id;
+				}
+			}
+		}
+
+		$results = array();
+		$counts  = array( 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );
+		foreach ( $ids as $id ) {
+			$r         = self::sync_one( $id, $dry_run );
+			$results[] = $r;
+			$action    = $r['action'] ?? 'error';
+			if ( isset( $counts[ $action ] ) ) {
+				$counts[ $action ]++;
+			} else {
+				$counts['errors']++;
+			}
+		}
+
+		return array_merge(
+			array(
+				'results' => $results,
+				'dry_run' => $dry_run,
+				'family'  => count( $ids ) > 1,
+				'family_ids' => $ids,
+			),
+			$counts
+		);
+	}
+
+	/**
+	 * Suggest Hostlinks event IDs for CVENT sessions (date + name / code).
+	 *
+	 * Does not write anything — Session Map shows these for confirmation.
+	 *
+	 * @param array $sessions  CVENT session records (code, title, start).
+	 * @param array $hl_events Hostlinks rows (eve_id, eve_start, eve_location).
+	 * @return array{
+	 *   map: array<string,int>,
+	 *   reasons: array<string,string>
+	 * }  Keys are session codes (original casing from first occurrence).
+	 */
+	public static function suggest_session_hostlinks_map( array $sessions, array $hl_events ) {
+		$map     = array();
+		$reasons = array();
+		$used    = array(); // eve_id already claimed
+
+		// Index HL events by start date.
+		$by_date = array();
+		foreach ( $hl_events as $hl ) {
+			$eid   = (int) ( $hl['eve_id'] ?? 0 );
+			$start = (string) ( $hl['eve_start'] ?? '' );
+			if ( $eid < 1 || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $start ) ) {
+				continue;
+			}
+			$by_date[ $start ][] = $hl;
+		}
+
+		foreach ( $sessions as $sess ) {
+			$code = trim( (string) ( $sess['code'] ?? '' ) );
+			if ( $code === '' ) {
+				continue;
+			}
+			$code_key = strtolower( $code );
+			if ( isset( $map[ $code ] ) ) {
+				continue;
+			}
+
+			$session_day = '';
+			if ( ! empty( $sess['start'] ) ) {
+				$ts = strtotime( (string) $sess['start'] );
+				if ( $ts ) {
+					$session_day = gmdate( 'Y-m-d', $ts );
+					// Prefer site timezone for calendar day when start has offset.
+					try {
+						$dt = new DateTime( (string) $sess['start'] );
+						$dt->setTimezone( wp_timezone() );
+						$session_day = $dt->format( 'Y-m-d' );
+					} catch ( Exception $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
+					}
+				}
+			}
+
+			$candidates = $session_day !== '' ? ( $by_date[ $session_day ] ?? array() ) : array();
+			$best_id    = 0;
+			$best_score = 0;
+			$best_why   = '';
+
+			$pool = ! empty( $candidates ) ? $candidates : $hl_events;
+			foreach ( $pool as $hl ) {
+				$eid = (int) ( $hl['eve_id'] ?? 0 );
+				if ( $eid < 1 || isset( $used[ $eid ] ) ) {
+					continue;
+				}
+				$loc   = (string) ( $hl['eve_location'] ?? '' );
+				$score = 0;
+				$why   = array();
+
+				$same_day = ( $session_day !== '' && ( $hl['eve_start'] ?? '' ) === $session_day );
+				if ( $same_day ) {
+					$score += 50;
+					$why[]  = 'same date';
+				}
+
+				if ( self::location_contains_session_code( $loc, $code ) ) {
+					$score += 40;
+					$why[]  = 'name contains session code';
+				} elseif ( self::webinar_numbers_match( $loc, $code ) ) {
+					$score += 35;
+					$why[]  = 'webinar number match';
+				} elseif ( self::partial_title_overlap( $loc, (string) ( $sess['title'] ?? '' ) ) ) {
+					$score += 15;
+					$why[]  = 'partial title overlap';
+				}
+
+				// Need date + a name signal (code / webinar # / partial title).
+				// Date alone is too ambiguous when several HL events share a day.
+				if ( $score < 65 ) {
+					continue;
+				}
+				if ( $score > $best_score ) {
+					$best_score = $score;
+					$best_id    = $eid;
+					$best_why   = implode( ' + ', $why );
+				}
+			}
+
+			if ( $best_id > 0 ) {
+				$map[ $code ]       = $best_id;
+				$reasons[ $code ]   = $best_why;
+				$used[ $best_id ]   = true;
+			}
+		}
+
+		return array(
+			'map'     => $map,
+			'reasons' => $reasons,
+		);
+	}
+
+	/**
+	 * @param string $location
+	 * @param string $code
+	 */
+	private static function location_contains_session_code( $location, $code ) {
+		$loc  = strtolower( trim( (string) $location ) );
+		$code = strtolower( trim( (string) $code ) );
+		if ( $loc === '' || $code === '' ) {
+			return false;
+		}
+		return false !== strpos( $loc, $code );
+	}
+
+	/**
+	 * Match "Webinar 1" ↔ "Deep Dive Webinar 1" via trailing number after webinar.
+	 */
+	private static function webinar_numbers_match( $location, $code ) {
+		$loc_n  = null;
+		$code_n = null;
+		if ( preg_match( '/webinar\s*#?\s*(\d+)/i', (string) $location, $m ) ) {
+			$loc_n = (int) $m[1];
+		}
+		if ( preg_match( '/webinar\s*#?\s*(\d+)/i', (string) $code, $m ) ) {
+			$code_n = (int) $m[1];
+		}
+		return ( null !== $loc_n && null !== $code_n && $loc_n === $code_n );
+	}
+
+	/**
+	 * Weak signal: shared significant word (≥4 chars) between session title and location.
+	 */
+	private static function partial_title_overlap( $location, $title ) {
+		$loc   = strtolower( (string) $location );
+		$title = strtolower( (string) $title );
+		if ( $loc === '' || $title === '' ) {
+			return false;
+		}
+		$words = preg_split( '/[^a-z0-9]+/', $title, -1, PREG_SPLIT_NO_EMPTY );
+		foreach ( (array) $words as $w ) {
+			if ( strlen( $w ) < 4 ) {
+				continue;
+			}
+			if ( in_array( $w, array( 'with', 'from', 'that', 'this', 'tool', 'not', 'the', 'and' ), true ) ) {
+				continue;
+			}
+			if ( false !== strpos( $loc, $w ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public static function sync_one( $eve_id, $dry_run = false ) {
 		global $wpdb;
 		$table = $wpdb->prefix . 'event_details_list';

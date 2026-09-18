@@ -202,6 +202,9 @@ class Hostlinks_CVENT_API {
 	const REQUESTED_SCOPE          = 'event/events:read event/attendees:read event/orders:read event/sessions:read event/session-enrollment:read';
 	const REQUESTED_SCOPE_CONTACTS = 'event/events:read event/attendees:read event/orders:read event/sessions:read event/session-enrollment:read contact/contacts:read';
 
+	/** @var array<string, array|WP_Error> Per-request cache for order items / sessions. */
+	private static $request_cache = array();
+
 	// -------------------------------------------------------------------------
 	// HTTP layer
 	// -------------------------------------------------------------------------
@@ -461,7 +464,12 @@ class Hostlinks_CVENT_API {
 	 * @return array|WP_Error  Flat array of order-item records.
 	 */
 	public static function get_order_items( $event_id ) {
-		$event_id  = self::sanitize_uuid( $event_id );
+		$event_id = self::sanitize_uuid( $event_id );
+		$cache_key = 'orders:' . $event_id;
+		if ( array_key_exists( $cache_key, self::$request_cache ) ) {
+			return self::$request_cache[ $cache_key ];
+		}
+
 		$all       = array();
 		$next      = null;
 		$page      = 0;
@@ -475,6 +483,7 @@ class Hostlinks_CVENT_API {
 
 			$result = self::request( 'events/' . $event_id . '/orders/items', $params );
 			if ( is_wp_error( $result ) ) {
+				self::$request_cache[ $cache_key ] = $result;
 				return $result;
 			}
 
@@ -484,6 +493,7 @@ class Hostlinks_CVENT_API {
 			$page++;
 		} while ( $next && $page < $max_pages );
 
+		self::$request_cache[ $cache_key ] = $all;
 		return $all;
 	}
 
@@ -498,6 +508,11 @@ class Hostlinks_CVENT_API {
 	 */
 	public static function get_sessions_for_event( $event_id ) {
 		$event_id  = self::sanitize_uuid( $event_id );
+		$cache_key = 'sessions:' . $event_id;
+		if ( array_key_exists( $cache_key, self::$request_cache ) ) {
+			return self::$request_cache[ $cache_key ];
+		}
+
 		$all       = array();
 		$next      = null;
 		$page      = 0;
@@ -514,6 +529,7 @@ class Hostlinks_CVENT_API {
 
 			$result = self::request( 'sessions', $params );
 			if ( is_wp_error( $result ) ) {
+				self::$request_cache[ $cache_key ] = $result;
 				return $result;
 			}
 
@@ -523,6 +539,7 @@ class Hostlinks_CVENT_API {
 			$page++;
 		} while ( $next && $page < $max_pages );
 
+		self::$request_cache[ $cache_key ] = $all;
 		return $all;
 	}
 

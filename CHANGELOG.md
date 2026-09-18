@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.32 — 2026-09-18
+
+### Fix: session-mapped CVENT sync no longer re-bootstraps
+- Status `session` is now treated as a confirmed link (with `auto` / `manual`). Sync was falling into date-match bootstrap, flipping rows to Needs Review, overwriting the CVENT title, and never counting session enrollments.
+- Rows that still have a Session Code are recovered on the next Sync (status restored to Session, correct umbrella title rewritten).
+
+---
+
 ## v2.11.31 — 2026-09-18
 
 ### New: CVENT session-code map (1 CVENT event → N Hostlinks events)

@@ -113,6 +113,26 @@ class Hostlinks_CVENT_Sync {
 	// -------------------------------------------------------------------------
 
 	/**
+	 * Whether the stored CVENT link should be trusted (skip bootstrap).
+	 * Session-mapped rows use status "session". Also recovers rows that still
+	 * have a session code after a bad sync flipped them to needs_review.
+	 *
+	 * @param string     $status
+	 * @param array|null $row
+	 */
+	private static function is_confirmed_link( $status, $row = null ) {
+		if ( in_array( $status, array( 'auto', 'manual', 'session' ), true ) ) {
+			return true;
+		}
+		if ( is_array( $row )
+			&& trim( (string) ( $row['cvent_session_code'] ?? '' ) ) !== ''
+			&& Hostlinks_CVENT_API::sanitize_uuid( $row['cvent_event_id'] ?? '' ) ) {
+			return true;
+		}
+		return false;
+	}
+
+	/**
 	 * Sync a single Hostlinks event against CVENT.
 	 *
 	 * @param int  $eve_id   Row ID in event_details_list.
@@ -180,7 +200,7 @@ class Hostlinks_CVENT_Sync {
 		$cvent_reg_url = '';
 
 		// ── Step 1: verify stored CVENT ID ───────────────────────────────────
-		if ( $stored_id && in_array( $status, array( 'auto', 'manual' ), true ) ) {
+		if ( $stored_id && self::is_confirmed_link( $status, $row ) ) {
 			$check = Hostlinks_CVENT_API::get_event( $stored_id );
 			if ( is_wp_error( $check ) && strpos( $check->get_error_message(), 'HTTP 404' ) !== false ) {
 				// Stored event gone — clear mapping and re-bootstrap.
@@ -199,25 +219,41 @@ class Hostlinks_CVENT_Sync {
 				$check['registrationUrl'] ?? $check['publicRegistrationUrl'] ?? $check['websiteLink'] ?? ''
 			);
 			self::apply_cvent_host_name( $eve_id, $row, $check, $dry_run );
-			// Verify staleness hash hasn't changed drastically.
-				$new_hash = Hostlinks_CVENT_Matcher::staleness_hash( $check );
-				if ( $new_hash !== ( $row['cvent_staleness_hash'] ?? '' ) ) {
-					if ( ! $dry_run ) {
-						$wpdb->update(
-							$table,
-							array( 'cvent_match_status' => 'needs_review', 'cvent_staleness_hash' => $new_hash ),
-							array( 'eve_id' => $eve_id ),
-							array( '%s', '%s' ),
-							array( '%d' )
-						);
-					}
-					$status = 'needs_review';
+
+			$is_session = ( trim( (string) ( $row['cvent_session_code'] ?? '' ) ) !== '' )
+				|| ( 'session' === $status );
+			$new_hash   = Hostlinks_CVENT_Matcher::staleness_hash( $check );
+
+			// Restore session status + correct title if a prior sync flipped the row
+			// to needs_review / wrong bootstrap title.
+			if ( $is_session && ! $dry_run ) {
+				$fix = array(
+					'cvent_match_status' => 'session',
+					'cvent_event_title'  => (string) ( $check['title'] ?? $row['cvent_event_title'] ?? '' ),
+					'cvent_staleness_hash' => $new_hash,
+					'cvent_match_score'  => null,
+				);
+				$wpdb->update( $table, $fix, array( 'eve_id' => $eve_id ), array( '%s', '%s', '%s', null ), array( '%d' ) );
+				$status = 'session';
+				$row['cvent_match_status'] = 'session';
+			} elseif ( $new_hash !== ( $row['cvent_staleness_hash'] ?? '' ) ) {
+				// Whole-event links: flag for review when CVENT data drifts.
+				if ( ! $dry_run ) {
+					$wpdb->update(
+						$table,
+						array( 'cvent_match_status' => 'needs_review', 'cvent_staleness_hash' => $new_hash ),
+						array( 'eve_id' => $eve_id ),
+						array( '%s', '%s' ),
+						array( '%d' )
+					);
 				}
+				$status = 'needs_review';
+			}
 			}
 		}
 
 		// ── Step 2: bootstrap if no confirmed ID ─────────────────────────────
-		if ( ! $stored_id || ! in_array( $status, array( 'auto', 'manual' ), true ) ) {
+		if ( ! $stored_id || ! self::is_confirmed_link( $status, $row ) ) {
 			$match = Hostlinks_CVENT_Matcher::bootstrap_match( $row );
 
 			if ( 'error' === $match['status'] ) {

@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.34 — 2026-09-23
+
+### Enhancement: EmailCraft ingest window 180 → 360 days
+- Upcoming-events snapshot pushed to EmailCraft now includes the next **360** days of public classes (was 180).
+
+---
+
 ## v2.11.33 — 2026-09-18
 
 ### Enhancement: session-family Sync + Session Map auto-suggest

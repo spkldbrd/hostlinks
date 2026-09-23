@@ -116,7 +116,7 @@ Fired after an existing event is changed or removed from the public upcoming lis
 
 ## EmailCraft ingest
 
-EmailCraft cannot GET Hostlinks REST from its VPS. Hostlinks instead **POSTs** the next 180 days of public classes to `https://emailcraft.grantwritingusa.com/api/events/hostlinks-ingest` using `wp_remote_post()` (never from the browser).
+EmailCraft cannot GET Hostlinks REST from its VPS. Hostlinks instead **POSTs** the next 360 days of public classes to `https://emailcraft.grantwritingusa.com/api/events/hostlinks-ingest` using `wp_remote_post()` (never from the browser).
 
 Configure the ingest URL and key under **Settings → Automation API**. The key comes from EmailCraft Admin → Email → Hostlinks and is stored in the `hostlinks_emailcraft_ingest` option. The public GET `/wp-json/hostlinks/v1/email-events` API is unchanged (EmailCraft’s “Sync via browser” still uses it).
 

@@ -195,7 +195,7 @@ $ec_hint     = $ec_key_set ? ( '••••' . substr( $ec_settings['key'], -4 
 <hr style="margin:28px 0;" />
 <h3 style="font-size:14px;margin:0 0 8px;">EmailCraft ingest (push)</h3>
 <p style="color:#555;max-width:900px;margin-top:0;">
-	Hostlinks POSTs the next 180 days of public classes to EmailCraft from the server (not the browser).
+	Hostlinks POSTs the next 360 days of public classes to EmailCraft from the server (not the browser).
 	Paste the ingest key from <strong>EmailCraft Admin → Email → Hostlinks</strong>. Do not put that key in git.
 	The public GET <code>/email-events</code> feed is unchanged — browser “Sync” in EmailCraft still uses it.
 </p>

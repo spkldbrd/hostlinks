@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.36 — 2026-10-14
+
+### Fix: blank admin screen after “Save to Hostlinks” from New Event Queue
+- Add/Convert form POST now runs on `load-toplevel_page_booking-menu` (before admin HTML), so the redirect to the new event works instead of leaving an empty content area with menus only.
+- Failed inserts show an error and return to the form instead of redirecting to `edit_event=0`.
+
+---
+
 ## v2.11.35 — 2026-10-14
 
 ### New: Allow CVENT sync for private workshops

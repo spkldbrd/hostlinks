@@ -17,6 +17,8 @@ if ( ! current_user_can( 'manage_options' ) ) {
 
 global $wpdb;
 
+$hl_process_only = defined( 'HOSTLINKS_EVENT_FORM_PROCESS_ONLY' ) && HOSTLINKS_EVENT_FORM_PROCESS_ONLY;
+
 $list_url      = admin_url( 'admin.php?page=booking-menu' );
 $queue_url     = admin_url( 'admin.php?page=hostlinks-event-requests' );
 // In request mode, "back" should return to the Event Queue, not the Event List.
@@ -24,6 +26,26 @@ $back_url      = ( isset( $_GET['add_request'] ) ) ? $queue_url : $list_url;
 $back_label    = ( isset( $_GET['add_request'] ) ) ? '&#8592; Event Queue' : '&#8592; Event List';
 $timezone = wp_timezone();
 $table    = $wpdb->prefix . 'event_details_list';
+
+/**
+ * Redirect after create. Prefer HTTP redirect; fall back if headers already sent.
+ *
+ * @param string $url
+ */
+if ( ! function_exists( '_hl_event_form_redirect' ) ) {
+	function _hl_event_form_redirect( $url ) {
+		$url = esc_url_raw( $url );
+		if ( ! headers_sent() ) {
+			wp_safe_redirect( $url );
+			exit;
+		}
+		// Admin chrome already printed — avoid a blank content area.
+		echo '<div class="wrap"><p>Event saved. Redirecting…</p>';
+		echo '<p><a href="' . esc_url( $url ) . '">Continue to the event</a></p></div>';
+		echo '<script>window.location.href = ' . wp_json_encode( $url ) . ';</script>';
+		exit;
+	}
+}
 
 // ── Mode detection ────────────────────────────────────────────────────────────
 // Modes: edit, add, copy, cvent, request
@@ -71,30 +93,40 @@ $all_instructors = $wpdb->get_results( "SELECT event_instructor_id AS id, event_
 // ── Helper: build the eve_tot_date display string ("YYYY/MM/DD - YYYY/MM/DD")
 // Returns '' if either input is not a valid YYYY-MM-DD date. Rejecting garbage
 // prevents strings like "foo - foo" from landing in the DB.
-function _hl_build_tot_date( string $start, string $end ): string {
-	$re = '/^\d{4}-\d{2}-\d{2}$/';
-	if ( ! preg_match( $re, $start ) || ! preg_match( $re, $end ) ) {
-		return '';
+if ( ! function_exists( '_hl_build_tot_date' ) ) {
+	function _hl_build_tot_date( string $start, string $end ): string {
+		$re = '/^\d{4}-\d{2}-\d{2}$/';
+		if ( ! preg_match( $re, $start ) || ! preg_match( $re, $end ) ) {
+			return '';
+		}
+		return str_replace( '-', '/', $start ) . ' - ' . str_replace( '-', '/', $end );
 	}
-	return str_replace( '-', '/', $start ) . ' - ' . str_replace( '-', '/', $end );
 }
 
 // ── Helper: normalize a phone number to XXX-XXX-XXXX ─────────────────────────
-function _hl_edit_phone( string $raw ): string {
-	$digits = preg_replace( '/\D/', '', $raw );
-	if ( strlen( $digits ) === 11 && $digits[0] === '1' ) {
-		$digits = substr( $digits, 1 );
+if ( ! function_exists( '_hl_edit_phone' ) ) {
+	function _hl_edit_phone( string $raw ): string {
+		$digits = preg_replace( '/\D/', '', $raw );
+		if ( strlen( $digits ) === 11 && $digits[0] === '1' ) {
+			$digits = substr( $digits, 1 );
+		}
+		if ( strlen( $digits ) === 10 ) {
+			return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6 );
+		}
+		return $raw;
 	}
-	if ( strlen( $digits ) === 10 ) {
-		return substr( $digits, 0, 3 ) . '-' . substr( $digits, 3, 3 ) . '-' . substr( $digits, 6 );
-	}
-	return $raw;
 }
 
 // ── Notices ───────────────────────────────────────────────────────────────────
 $notice = '';
 if ( isset( $_GET['saved'] ) ) {
 	$notice = '<div class="notice notice-success is-dismissible"><p>Event added successfully. You can continue editing it here.</p></div>';
+}
+$form_err_key = 'hostlinks_event_form_error_' . get_current_user_id();
+$form_err     = get_transient( $form_err_key );
+if ( is_string( $form_err ) && $form_err !== '' ) {
+	delete_transient( $form_err_key );
+	$notice = '<div class="notice notice-error is-dismissible"><p>' . esc_html( $form_err ) . '</p></div>';
 }
 if ( $mode === 'copy' && $notice === '' ) {
 	$notice = '<div class="notice notice-info is-dismissible"><p>Copied from event #' . (int) $copy_source_id . '. Review the fields, change dates or location as needed, then click <strong>Add New Event</strong>. Paid/Free counts and CVENT link are cleared for the new event.</p></div>';
@@ -222,12 +254,11 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 		'eve_zoom_time'   => $eve_zoom_time,
 		'eve_paid'        => $eve_paid,
 		'eve_free'        => $eve_free,
-		'eve_public_hide'     => $eve_public_hide,
-		'cvent_allow_private' => $cvent_allow_private,
-		'eve_status'          => (int) ( $_POST['eve_status'] ?? 1 ),
-		'eve_start'           => $eve_start,
-		'eve_end'             => $eve_end,
-		'eve_tot_date'        => $eve_tot_date,
+		'eve_public_hide' => $eve_public_hide,
+		'eve_status'      => (int) ( $_POST['eve_status'] ?? 1 ),
+		'eve_start'       => $eve_start,
+		'eve_end'         => $eve_end,
+		'eve_tot_date'    => $eve_tot_date,
 		// URLs
 		'eve_host_url'    => $eve_host_url,
 		'eve_roster_url'  => $eve_roster_url,
@@ -268,6 +299,12 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 		'eve_created_at'       => current_time( 'mysql' ),
 	);
 
+	// Optional column (DB 2.8+) — skip if migration has not run yet.
+	$col_allow = $wpdb->get_col( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", 'cvent_allow_private' ) );
+	if ( ! empty( $col_allow ) ) {
+		$insert_data['cvent_allow_private'] = $cvent_allow_private;
+	}
+
 	if ( $mode === 'cvent' ) {
 		$insert_data['cvent_event_id']        = $insert_cvent_uuid;
 		$insert_data['cvent_event_title']     = $insert_cvent_title;
@@ -276,8 +313,28 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 		$insert_data['cvent_last_synced']     = null;
 	}
 
-	$wpdb->insert( $table, $insert_data );
+	$insert_ok  = ( false !== $wpdb->insert( $table, $insert_data ) );
 	$new_eve_id = (int) $wpdb->insert_id;
+
+	if ( ! $insert_ok || $new_eve_id < 1 ) {
+		$err = $wpdb->last_error ? $wpdb->last_error : 'Database insert failed.';
+		set_transient(
+			'hostlinks_event_form_error_' . get_current_user_id(),
+			'Could not create the event. ' . $err,
+			120
+		);
+		$back = $list_url;
+		if ( $mode === 'request' && $request_id ) {
+			$back = admin_url( 'admin.php?page=booking-menu&add_request=' . (int) $request_id );
+		} elseif ( $mode === 'cvent' && $insert_cvent_uuid ) {
+			$back = admin_url( 'admin.php?page=booking-menu&add_cvent=' . rawurlencode( $insert_cvent_uuid ) );
+		} elseif ( $mode === 'copy' && $copy_source_id ) {
+			$back = admin_url( 'admin.php?page=booking-menu&copy_event=' . (int) $copy_source_id );
+		} elseif ( $mode === 'add' ) {
+			$back = admin_url( 'admin.php?page=booking-menu&add_event=1' );
+		}
+		_hl_event_form_redirect( $back );
+	}
 
 	// Auto-populate eve_roster_url if left blank.
 	if ( ! $eve_roster_url && $new_eve_id ) {
@@ -303,26 +360,27 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 		}
 	}
 
-	if ( $new_eve_id ) {
-		do_action( 'hostlinks_event_created', $new_eve_id, $eve_start );
-	}
-
-	// Request mode: mark the originating event request as converted so it
-	// drops off the Pending queue and shows under Completed.
-	if ( $mode === 'request' && $new_eve_id ) {
+	// Request mode: mark converted before side-effects so the queue updates even if a hook fatals.
+	if ( $mode === 'request' ) {
 		$req_id_posted = (int) ( $_POST['hl_request_id'] ?? 0 );
 		if ( $req_id_posted && class_exists( 'Hostlinks_Event_Request_Storage' ) ) {
 			Hostlinks_Event_Request_Storage::update_status( $req_id_posted, 'converted' );
 		}
 	}
 
+	do_action( 'hostlinks_event_created', $new_eve_id, $eve_start );
+
 	// Bust Marketing Ops public REST cache so the front-end sees fresh data immediately.
 	if ( class_exists( 'HMO_REST', false ) && is_callable( array( 'HMO_REST', 'flush_public_events_cache' ) ) ) {
 		HMO_REST::flush_public_events_cache();
 	}
 
-	wp_safe_redirect( admin_url( 'admin.php?page=booking-menu&edit_event=' . $new_eve_id . '&saved=1' ) );
-	exit;
+	_hl_event_form_redirect( admin_url( 'admin.php?page=booking-menu&edit_event=' . $new_eve_id . '&saved=1' ) );
+}
+
+// Early load-hook include only processes Add POST (above). Do not render HTML twice.
+if ( $hl_process_only ) {
+	return;
 }
 
 // ── EDIT handler ──────────────────────────────────────────────────────────────

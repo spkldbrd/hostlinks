@@ -9,6 +9,28 @@ class Hostlinks_Admin_Menus {
 		add_action( 'admin_menu',    array( $this, 'register_menus' ) );
 		add_action( 'admin_menu',    array( $this, 'reorder_menus' ), 9999 );
 		add_action( 'admin_notices', array( $this, 'new_events_notice' ) );
+		// Run Add/Convert POST before admin HTML so wp_safe_redirect works
+		// (page callbacks run after menus — redirect then yields a blank content area).
+		add_action( 'load-toplevel_page_booking-menu', array( $this, 'process_event_add_form' ) );
+	}
+
+	/**
+	 * Handle "Add New Event" / "Save to Hostlinks" (queue convert) before any admin output.
+	 */
+	public function process_event_add_form() {
+		if ( empty( $_POST['hl_add_event_submit'] ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		if ( ! isset( $_GET['add_event'] ) && ! isset( $_GET['add_cvent'] ) && ! isset( $_GET['add_request'] ) && ! isset( $_GET['copy_event'] ) ) {
+			return;
+		}
+		if ( ! defined( 'HOSTLINKS_EVENT_FORM_PROCESS_ONLY' ) ) {
+			define( 'HOSTLINKS_EVENT_FORM_PROCESS_ONLY', true );
+		}
+		require HOSTLINKS_PLUGIN_DIR . 'admin/edit-event.php';
 	}
 
 	public function register_menus() {

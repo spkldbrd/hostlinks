@@ -276,6 +276,8 @@ Schema upgrades run automatically on every page load via `maybe_upgrade()` using
 | 2.1 | Added 15 host/venue/contacts/hotels columns to `event_details_list` |
 | 2.2 | Added `eve_email_url` to `event_details_list` |
 | 2.3 | Version stamp (no schema change) |
+| 2.7 | Added `cvent_session_code` + `cvent_session_id` |
+| 2.8 | Added `cvent_allow_private` (opt private workshops into CVENT sync) |
 
 ### Event Status Conventions
 

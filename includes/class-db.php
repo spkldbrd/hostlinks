@@ -134,6 +134,15 @@ class Hostlinks_DB {
 		}
 	}
 
+	// v2.8 — allow rare PRIVATE workshops to opt into CVENT registration sync.
+	if ( version_compare( $installed, '2.8', '<' ) ) {
+		$tbl      = $wpdb->prefix . 'event_details_list';
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+		if ( ! in_array( 'cvent_allow_private', $existing, true ) ) {
+			$wpdb->query( "ALTER TABLE `{$tbl}` ADD `cvent_allow_private` tinyint(1) NOT NULL DEFAULT 0 AFTER `cvent_match_status`" );
+		}
+	}
+
 	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
 	if ( version_compare( $installed, '2.1', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'event_details_list';
@@ -279,6 +288,7 @@ class Hostlinks_DB {
 			cvent_event_start_utc datetime DEFAULT NULL,
 			cvent_match_score tinyint unsigned DEFAULT NULL,
 			cvent_match_status varchar(20) DEFAULT 'unlinked',
+			cvent_allow_private tinyint(1) NOT NULL DEFAULT 0,
 			cvent_last_synced datetime DEFAULT NULL,
 			cvent_staleness_hash varchar(64) DEFAULT NULL,
 			cvent_prev_paid int(11) DEFAULT NULL,

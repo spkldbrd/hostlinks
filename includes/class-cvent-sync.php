@@ -417,20 +417,21 @@ class Hostlinks_CVENT_Sync {
 		) );
 		$row['eve_type_name'] = strtolower( trim( $type_name ?? '' ) );
 
-		// Skip PRIVATE-marketer events — they are not listed in CVENT.
+		// Skip PRIVATE workshops unless staff opted in (Edit Event → Allow CVENT sync).
+		$allow_private = ! empty( $row['cvent_allow_private'] );
 		$marketer_name = $wpdb->get_var( $wpdb->prepare(
 			"SELECT event_marketer_name FROM `{$wpdb->prefix}event_marketer` WHERE event_marketer_id = %d",
 			(int) ( $row['eve_marketer'] ?? 0 )
 		) );
-		if ( strtoupper( trim( $marketer_name ?? '' ) ) === 'PRIVATE' ) {
-			return self::result( $eve_id, 'no_candidates', 'Skipped — Private event (not in CVENT).', dry_run: $dry_run );
+		if ( ! $allow_private && strtoupper( trim( $marketer_name ?? '' ) ) === 'PRIVATE' ) {
+			return self::result( $eve_id, 'no_candidates', 'Skipped — Private event (not in CVENT). Enable “Allow CVENT sync” on Edit Event to override.', dry_run: $dry_run );
 		}
 
 		// Skip events whose location contains "| private" (with or without space,
 		// any case). These are private/internal events stored with a pipe modifier
 		// in HL (e.g. "GM MT Zoom | Private") and are not listed in CVENT.
-		if ( preg_match( '/\|\s*private\b/i', $row['eve_location'] ?? '' ) ) {
-			return self::result( $eve_id, 'no_candidates', 'Skipped — Private event (location contains "| Private").', dry_run: $dry_run );
+		if ( ! $allow_private && preg_match( '/\|\s*private\b/i', $row['eve_location'] ?? '' ) ) {
+			return self::result( $eve_id, 'no_candidates', 'Skipped — Private event (location contains "| Private"). Enable “Allow CVENT sync” on Edit Event to override.', dry_run: $dry_run );
 		}
 
 		// Always capture current HL counts for comparison display in every result.
@@ -631,9 +632,16 @@ class Hostlinks_CVENT_Sync {
 
 		$mktr = $wpdb->prefix . 'event_marketer';
 
+		// Private workshops are excluded unless cvent_allow_private = 1.
+		$private_ok = "( edl.cvent_allow_private = 1
+			OR (
+				(m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
+				AND UPPER(edl.eve_location) NOT LIKE '%|PRIVATE%'
+				AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'
+			) )";
+
 		if ( $limit > 0 ) {
 			// Limit mode: only upcoming events (starting today or later), nearest first.
-			// Excludes PRIVATE-marketer events and events whose location contains "| Private".
 			$today = gmdate( 'Y-m-d' );
 			$rows  = $wpdb->get_results(
 				$wpdb->prepare(
@@ -641,9 +649,7 @@ class Hostlinks_CVENT_Sync {
 					 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
 					 WHERE edl.eve_status = 1
 					   AND edl.eve_start >= %s
-					   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
-					   AND UPPER(edl.eve_location) NOT LIKE '%|PRIVATE%'
-					   AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'
+					   AND {$private_ok}
 					 ORDER BY edl.eve_start ASC
 					 LIMIT %d",
 					$today,
@@ -653,7 +659,6 @@ class Hostlinks_CVENT_Sync {
 			);
 		} else {
 			// Normal mode: all events ending within the last 60 days or in the future.
-			// Excludes PRIVATE-marketer events and events whose location contains "| Private".
 			$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
 			$rows   = $wpdb->get_results(
 				$wpdb->prepare(
@@ -661,9 +666,7 @@ class Hostlinks_CVENT_Sync {
 					 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
 					 WHERE edl.eve_status = 1
 					   AND edl.eve_end >= %s
-					   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
-					   AND UPPER(edl.eve_location) NOT LIKE '%|PRIVATE%'
-					   AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'",
+					   AND {$private_ok}",
 					$cutoff
 				),
 				ARRAY_A

@@ -113,7 +113,8 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 	$eve_zoom_time  = sanitize_text_field( $_POST['eve_zoom_time'] ?? '' );
 	$eve_paid       = (int) ( $_POST['eve_paid']  ?? 0 );
 	$eve_free       = (int) ( $_POST['eve_free']  ?? 0 );
-	$eve_public_hide = isset( $_POST['eve_public_hide'] ) ? 1 : 0;
+	$eve_public_hide     = isset( $_POST['eve_public_hide'] ) ? 1 : 0;
+	$cvent_allow_private = isset( $_POST['cvent_allow_private'] ) ? 1 : 0;
 
 	// Date fields
 	$eve_start    = sanitize_text_field( $_POST['eve_start_date'] ?? '' );
@@ -221,11 +222,12 @@ if ( $mode !== 'edit' && isset( $_POST['hl_add_event_submit'] ) ) {
 		'eve_zoom_time'   => $eve_zoom_time,
 		'eve_paid'        => $eve_paid,
 		'eve_free'        => $eve_free,
-		'eve_public_hide' => $eve_public_hide,
-		'eve_status'      => (int) ( $_POST['eve_status'] ?? 1 ),
-		'eve_start'       => $eve_start,
-		'eve_end'         => $eve_end,
-		'eve_tot_date'    => $eve_tot_date,
+		'eve_public_hide'     => $eve_public_hide,
+		'cvent_allow_private' => $cvent_allow_private,
+		'eve_status'          => (int) ( $_POST['eve_status'] ?? 1 ),
+		'eve_start'           => $eve_start,
+		'eve_end'             => $eve_end,
+		'eve_tot_date'        => $eve_tot_date,
 		// URLs
 		'eve_host_url'    => $eve_host_url,
 		'eve_roster_url'  => $eve_roster_url,
@@ -336,8 +338,9 @@ if ( $mode === 'edit' && isset( $_POST['hl_edit_full_event'] ) ) {
 	$eve_zoom_time = sanitize_text_field( $_POST['eve_zoom_time'] ?? '' );
 	$eve_paid      = (int) ( $_POST['eve_paid']  ?? 0 );
 	$eve_free      = (int) ( $_POST['eve_free']  ?? 0 );
-	$eve_public_hide = isset( $_POST['eve_public_hide'] ) ? 1 : 0;
-	$eve_status    = (int) ( $_POST['eve_status'] ?? 1 );
+	$eve_public_hide     = isset( $_POST['eve_public_hide'] ) ? 1 : 0;
+	$cvent_allow_private = isset( $_POST['cvent_allow_private'] ) ? 1 : 0;
+	$eve_status          = (int) ( $_POST['eve_status'] ?? 1 );
 
 	// Date fields
 	$eve_start    = sanitize_text_field( $_POST['eve_start_date'] ?? '' );
@@ -414,11 +417,12 @@ if ( $mode === 'edit' && isset( $_POST['hl_edit_full_event'] ) ) {
 		'eve_zoom_time'   => $eve_zoom_time,
 		'eve_paid'        => $eve_paid,
 		'eve_free'        => $eve_free,
-		'eve_public_hide' => $eve_public_hide,
-		'eve_status'      => $eve_status,
-		'eve_start'       => $eve_start,
-		'eve_end'         => $eve_end,
-		'eve_tot_date'    => $eve_tot_date,
+		'eve_public_hide'     => $eve_public_hide,
+		'cvent_allow_private' => $cvent_allow_private,
+		'eve_status'          => $eve_status,
+		'eve_start'           => $eve_start,
+		'eve_end'             => $eve_end,
+		'eve_tot_date'        => $eve_tot_date,
 		// URLs
 		'eve_host_url'    => $eve_host_url,
 		'eve_roster_url'  => $eve_roster_url,
@@ -591,6 +595,9 @@ if ( $mode === 'edit' ) {
 	$ev['cvent_prev_paid']       = null;
 	$ev['cvent_prev_free']       = null;
 	$ev['cvent_host_name']       = '';
+	$ev['cvent_session_code']    = '';
+	$ev['cvent_session_id']      = '';
+	$ev['cvent_allow_private']   = 0;
 } else {
 	// Add or CVENT mode: pre-populate from GET params or use blank defaults.
 	$cvent_uuid_pre      = $mode === 'cvent' ? sanitize_text_field( $_GET['add_cvent']         ) : '';
@@ -610,7 +617,8 @@ if ( $mode === 'edit' ) {
 		'eve_paid'        => 0,
 		'eve_free'        => 0,
 		'eve_status'      => 1,
-		'eve_public_hide' => 0,
+		'eve_public_hide'     => 0,
+		'cvent_allow_private' => 0,
 		'max_attendees'   => '',
 		'eve_host_url'    => '',
 		'eve_roster_url'  => '',
@@ -1070,6 +1078,14 @@ $us_states = [ 'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL',
 		<?php else : ?>
 		<p style="color:#888;font-style:italic;margin:0;">No CVENT link — this event will be added manually.</p>
 		<?php endif; ?>
+		<p style="margin:10px 0 0;">
+			<label>
+				<input type="checkbox" name="cvent_allow_private" value="1"
+					<?php checked( 1, (int) ( $ev['cvent_allow_private'] ?? 0 ) ); ?>>
+				<strong>Allow CVENT sync</strong> for this private workshop
+			</label>
+			<br><small style="color:#666;">By default, marketer <code>PRIVATE</code> and locations with <code>| Private</code> are skipped. Check this only when the workshop also has a CVENT registration you want counted.</small>
+		</p>
 
 		<!-- Shipping Details -->
 		<h2 class="hl-edit-section-title">Shipping Details</h2>

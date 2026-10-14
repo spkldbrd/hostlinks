@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.35 — 2026-10-14
+
+### New: Allow CVENT sync for private workshops
+- Edit Event → **Allow CVENT sync** checkbox. Private marketer / `| Private` locations still skip by default; check this only when a private workshop also uses CVENT registration counts.
+- DB: `cvent_allow_private` on `event_details_list` (DB version 2.8). Opted-in rows appear on CVENT Sync and are included in Sync All.
+
+---
+
 ## v2.11.34 — 2026-09-23
 
 ### Enhancement: EmailCraft ingest window 180 → 360 days

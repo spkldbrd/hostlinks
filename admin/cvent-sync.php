@@ -182,7 +182,7 @@ global $wpdb;
 $tbl  = $wpdb->prefix . 'event_details_list';
 $mktr = $wpdb->prefix . 'event_marketer';
 // Show only events ending within the last 60 days or in the future.
-// Exclude PRIVATE-marketer events and events whose location contains "| Private".
+// Exclude PRIVATE workshops unless cvent_allow_private is checked.
 $cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
 $events = $wpdb->get_results(
 	$wpdb->prepare(
@@ -191,14 +191,19 @@ $events = $wpdb->get_results(
 		        edl.cvent_event_id, edl.cvent_session_code, edl.cvent_session_id,
 		        edl.cvent_event_title, edl.cvent_match_score,
 		        edl.cvent_match_status, edl.cvent_last_synced,
-		        edl.cvent_prev_paid, edl.cvent_prev_free
+		        edl.cvent_prev_paid, edl.cvent_prev_free, edl.cvent_allow_private
 		 FROM `{$tbl}` edl
 		 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
 		 WHERE edl.eve_status = 1
 		   AND edl.eve_end >= %s
-		   AND (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
-		   AND UPPER(edl.eve_location) NOT LIKE '%|PRIVATE%'
-		   AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'
+		   AND (
+		     edl.cvent_allow_private = 1
+		     OR (
+		       (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
+		       AND UPPER(edl.eve_location) NOT LIKE '%|PRIVATE%'
+		       AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'
+		     )
+		   )
 		 ORDER BY edl.eve_start DESC",
 		$cutoff
 	),
@@ -676,6 +681,9 @@ function hl_cvent_status_badge( $status ) {
 				<td><?php echo hl_cvent_status_badge( $status ); ?>
 					<?php if ( ! empty( $ev['cvent_session_code'] ) ) : ?>
 						<br><span style="font-size:11px;color:#7c3aed;">Session: <?php echo esc_html( $ev['cvent_session_code'] ); ?></span>
+					<?php endif; ?>
+					<?php if ( ! empty( $ev['cvent_allow_private'] ) ) : ?>
+						<br><span style="font-size:11px;color:#996800;" title="Private workshop opted into CVENT sync">Private + CVENT</span>
 					<?php endif; ?>
 				</td>
 				<td style="font-size:12px;"><?php echo $cv_title; ?></td>

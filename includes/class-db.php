@@ -697,4 +697,115 @@ class Hostlinks_DB {
 		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return null !== $wpdb->get_var( "SELECT id FROM `{$tbl}` LIMIT 1" );
 	}
+
+	/**
+	 * Per-day, per-marketer signup totals from stored CVENT order dates.
+	 *
+	 * Same shape as the Reports eve_start query:
+	 *   period (Y-m-d), marketer, total_regs, paid_regs, event_count
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function get_marketer_daily_order_rows( string $date_from, string $date_to ): array {
+		global $wpdb;
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_from )
+			|| ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_to ) ) {
+			return array();
+		}
+
+		$tbl = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$edl = $wpdb->prefix . 'event_details_list';
+		$mkt = $wpdb->prefix . 'event_marketer';
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT r.order_date AS period,
+				        m.event_marketer_name AS marketer,
+				        COUNT(*) AS total_regs,
+				        SUM(r.is_paid) AS paid_regs,
+				        COUNT(DISTINCT r.eve_id) AS event_count
+				 FROM `{$tbl}` r
+				 INNER JOIN `{$edl}` e ON e.eve_id = r.eve_id AND e.eve_status = '1'
+				 INNER JOIN `{$mkt}` m ON e.eve_marketer = m.event_marketer_id
+				 WHERE r.order_date >= %s AND r.order_date <= %s
+				 GROUP BY r.order_date, m.event_marketer_id
+				 ORDER BY r.order_date ASC, m.event_marketer_name ASC",
+				$date_from,
+				$date_to
+			),
+			ARRAY_A
+		);
+
+		return is_array( $rows ) ? $rows : array();
+	}
+
+	/**
+	 * Distinct events (and regs) per marketer for an order-date range — for Marketer Summary.
+	 *
+	 * @return array<string,array{total:int,paid:int,events:int}>
+	 */
+	public static function get_marketer_order_summary( string $date_from, string $date_to ): array {
+		global $wpdb;
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_from )
+			|| ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_to ) ) {
+			return array();
+		}
+
+		$tbl = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$edl = $wpdb->prefix . 'event_details_list';
+		$mkt = $wpdb->prefix . 'event_marketer';
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT m.event_marketer_name AS marketer,
+				        COUNT(*) AS total_regs,
+				        SUM(r.is_paid) AS paid_regs,
+				        COUNT(DISTINCT r.eve_id) AS event_count
+				 FROM `{$tbl}` r
+				 INNER JOIN `{$edl}` e ON e.eve_id = r.eve_id AND e.eve_status = '1'
+				 INNER JOIN `{$mkt}` m ON e.eve_marketer = m.event_marketer_id
+				 WHERE r.order_date >= %s AND r.order_date <= %s
+				 GROUP BY m.event_marketer_id
+				 ORDER BY total_regs DESC",
+				$date_from,
+				$date_to
+			),
+			ARRAY_A
+		);
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$out[ $row['marketer'] ] = array(
+				'total'  => (int) $row['total_regs'],
+				'paid'   => (int) $row['paid_regs'],
+				'events' => (int) $row['event_count'],
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Distinct active events that received at least one order in the date range.
+	 */
+	public static function count_events_with_orders( string $date_from, string $date_to ): int {
+		global $wpdb;
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_from )
+			|| ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_to ) ) {
+			return 0;
+		}
+
+		$tbl = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$edl = $wpdb->prefix . 'event_details_list';
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(DISTINCT r.eve_id)
+				 FROM `{$tbl}` r
+				 INNER JOIN `{$edl}` e ON e.eve_id = r.eve_id AND e.eve_status = '1'
+				 WHERE r.order_date >= %s AND r.order_date <= %s",
+				$date_from,
+				$date_to
+			)
+		);
+	}
 }

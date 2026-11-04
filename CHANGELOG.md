@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.43 — 2026-11-04
+
+### Fix: Day-over-Day Trends use order dates
+- Past 14/30 Days marketer trends, summary cards, and Marketer Summary now use stored CVENT **order dates** (same source as Daily Totals), not event start.
+
+---
+
 ## v2.11.42 — 2026-11-04
 
 ### Fix: Daily Totals hover label

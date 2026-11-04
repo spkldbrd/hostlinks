@@ -29,26 +29,28 @@ if ( $range_mode === 'current_year' ) {
 	$date_end = gmdate( 'Y-m-d' );
 }
 
-$date_fmt_sql = $bucket_by_day
-	? "DATE_FORMAT(e.eve_start, '%%Y-%%m-%%d')"
-	: "DATE_FORMAT(e.eve_start, '%%Y-%%m')";
-
-$rows = $wpdb->get_results( $wpdb->prepare(
-	"SELECT {$date_fmt_sql} AS period,
-	        m.event_marketer_name               AS marketer,
-	        SUM(e.eve_paid + e.eve_free)        AS total_regs,
-	        SUM(e.eve_paid)                     AS paid_regs,
-	        COUNT(e.eve_id)                     AS event_count
-	 FROM   {$table11} e
-	 JOIN   {$table13} m ON e.eve_marketer = m.event_marketer_id
-	 WHERE  e.eve_status = '1'
-	   AND  e.eve_start  >= %s
-	   AND  e.eve_start  <= %s
-	 GROUP  BY period, m.event_marketer_id
-	 ORDER  BY period ASC, m.event_marketer_name ASC",
-	$cutoff,
-	$date_end
-), ARRAY_A );
+// Day ranges use stored CVENT order dates (signups that day).
+// Month / year / custom ranges still bucket by event start.
+if ( $bucket_by_day ) {
+	$rows = Hostlinks_DB::get_marketer_daily_order_rows( $cutoff, $date_end );
+} else {
+	$rows = $wpdb->get_results( $wpdb->prepare(
+		"SELECT DATE_FORMAT(e.eve_start, '%%Y-%%m') AS period,
+		        m.event_marketer_name               AS marketer,
+		        SUM(e.eve_paid + e.eve_free)        AS total_regs,
+		        SUM(e.eve_paid)                     AS paid_regs,
+		        COUNT(e.eve_id)                     AS event_count
+		 FROM   {$table11} e
+		 JOIN   {$table13} m ON e.eve_marketer = m.event_marketer_id
+		 WHERE  e.eve_status = '1'
+		   AND  e.eve_start  >= %s
+		   AND  e.eve_start  <= %s
+		 GROUP  BY period, m.event_marketer_id
+		 ORDER  BY period ASC, m.event_marketer_name ASC",
+		$cutoff,
+		$date_end
+	), ARRAY_A );
+}
 
 // ── Build full period labels (no gaps even if data is missing) ────────────────
 $labels = array();
@@ -125,10 +127,20 @@ if ( $bucket_by_day ) {
 }
 
 // ── Summary stats ─────────────────────────────────────────────────────────────
-$total_events        = array_sum( array_map( 'array_sum', $datasets_count ) );
 $total_registrations = array_sum( array_map( 'array_sum', $datasets_total ) );
 $total_paid          = array_sum( array_map( 'array_sum', $datasets_paid ) );
-$avg_per_event       = $total_events > 0 ? round( $total_registrations / $total_events, 1 ) : 0;
+if ( $bucket_by_day ) {
+	// Don't sum daily distinct-event counts (would double-count across days).
+	$total_events = Hostlinks_DB::count_events_with_orders( $cutoff, $date_end );
+} else {
+	$total_events = array_sum( array_map( 'array_sum', $datasets_count ) );
+}
+$avg_per_event = $total_events > 0 ? round( $total_registrations / $total_events, 1 ) : 0;
+
+// Marketer summary event counts (distinct events in range for day mode).
+$marketer_order_summary = $bucket_by_day
+	? Hostlinks_DB::get_marketer_order_summary( $cutoff, $date_end )
+	: array();
 
 // ── Active marketer names (for "Current Marketers" filter) ───────────────────
 $active_marketer_names = $wpdb->get_col(
@@ -278,7 +290,7 @@ $chart_data = array(
 			<div>
 				<h2 class="hl-reports-title"><?php echo esc_html( $trends_title ); ?></h2>
 				<?php if ( $bucket_by_day ) : ?>
-				<p style="margin:.25rem 0 0;font-size:.85rem;color:#666;">By event start date (classes that day)</p>
+				<p style="margin:.25rem 0 0;font-size:.85rem;color:#666;">By CVENT order date (signups that day)</p>
 				<?php endif; ?>
 			</div>
 			<div class="hl-reports-toggles">
@@ -318,9 +330,13 @@ $chart_data = array(
 				// Sort marketers by total regs descending for the table
 				$summary_rows = array();
 				foreach ( $all_marketers as $i => $name ) {
-					$tot   = array_sum( $datasets_total[ $i ] );
-					$paid  = array_sum( $datasets_paid[ $i ] );
-					$cnt   = array_sum( $datasets_count[ $i ] );
+					$tot  = array_sum( $datasets_total[ $i ] );
+					$paid = array_sum( $datasets_paid[ $i ] );
+					if ( $bucket_by_day && isset( $marketer_order_summary[ $name ] ) ) {
+						$cnt = (int) $marketer_order_summary[ $name ]['events'];
+					} else {
+						$cnt = array_sum( $datasets_count[ $i ] );
+					}
 					$summary_rows[] = array(
 						'name'  => $name,
 						'total' => $tot,

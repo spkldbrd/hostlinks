@@ -31,6 +31,7 @@ class Hostlinks_Toolbar {
 	public static function reports_day_options(): array {
 		return array(
 			14 => 'Past 14 Days',
+			30 => 'Past 30 Days',
 		);
 	}
 

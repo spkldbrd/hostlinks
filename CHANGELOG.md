@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.39 — 2026-11-04
+
+### New: Past 30 Days on Reports
+- Reports range dropdown includes **Past 30 Days** (same daily bar chart + day-over-day marketer trends as 14 days).
+
+---
+
 ## v2.11.38 — 2026-11-04
 
 ### New: Company daily bar chart on Past 14 Days

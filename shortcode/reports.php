@@ -564,7 +564,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			data: {
 				labels: d.labels,
 				datasets: [{
-					label: 'Company total',
+					label: 'Total',
 					data: d.companyDaily[barMode],
 					backgroundColor: 'rgba(13, 162, 231, 0.75)',
 					borderColor: '#0da2e7',

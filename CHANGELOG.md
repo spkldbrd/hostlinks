@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.42 — 2026-11-04
+
+### Fix: Daily Totals hover label
+- Bar tooltip dataset name is **Total** (was “Company total”).
+
+---
+
 ## v2.11.41 — 2026-11-04
 
 ### New: Click Daily Totals bar for registrant list

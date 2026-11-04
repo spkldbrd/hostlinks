@@ -9,8 +9,10 @@ $table13 = $wpdb->prefix . 'event_marketer';
 $__range        = Hostlinks_Toolbar::parse_reports_range_from_request();
 $range_mode     = $__range['range_mode'];
 $months_back    = $__range['months_back'];
+$days_back      = $__range['days_back'];
 $date_from      = $__range['date_from'];
 $date_to        = $__range['date_to'];
+$bucket_by_day  = ( $range_mode === 'days' );
 
 // ── Resolve cutoff / end dates from mode ──────────────────────────────────────
 if ( $range_mode === 'current_year' ) {
@@ -19,13 +21,20 @@ if ( $range_mode === 'current_year' ) {
 } elseif ( $range_mode === 'custom' ) {
 	$cutoff   = gmdate( 'Y-m-01', strtotime( $date_from ) );
 	$date_end = $date_to;
+} elseif ( $range_mode === 'days' ) {
+	$date_end = gmdate( 'Y-m-d' );
+	$cutoff   = gmdate( 'Y-m-d', strtotime( '-' . ( $days_back - 1 ) . ' days' ) );
 } else {
 	$cutoff   = gmdate( 'Y-m-01', strtotime( "-{$months_back} months" ) );
 	$date_end = gmdate( 'Y-m-d' );
 }
 
+$date_fmt_sql = $bucket_by_day
+	? "DATE_FORMAT(e.eve_start, '%%Y-%%m-%%d')"
+	: "DATE_FORMAT(e.eve_start, '%%Y-%%m')";
+
 $rows = $wpdb->get_results( $wpdb->prepare(
-	"SELECT DATE_FORMAT(e.eve_start, '%%Y-%%m') AS month,
+	"SELECT {$date_fmt_sql} AS period,
 	        m.event_marketer_name               AS marketer,
 	        SUM(e.eve_paid + e.eve_free)        AS total_regs,
 	        SUM(e.eve_paid)                     AS paid_regs,
@@ -35,19 +44,27 @@ $rows = $wpdb->get_results( $wpdb->prepare(
 	 WHERE  e.eve_status = '1'
 	   AND  e.eve_start  >= %s
 	   AND  e.eve_start  <= %s
-	 GROUP  BY month, m.event_marketer_id
-	 ORDER  BY month ASC, m.event_marketer_name ASC",
+	 GROUP  BY period, m.event_marketer_id
+	 ORDER  BY period ASC, m.event_marketer_name ASC",
 	$cutoff,
 	$date_end
 ), ARRAY_A );
 
-// ── Build full month labels (no gaps even if data is missing) ─────────────────
-$labels    = array();
-$ts        = strtotime( $cutoff );
-$end_ym    = gmdate( 'Y-m', strtotime( $date_end ) );
-while ( gmdate( 'Y-m', $ts ) <= $end_ym ) {
-	$labels[] = gmdate( 'Y-m', $ts );
-	$ts        = strtotime( '+1 month', $ts );
+// ── Build full period labels (no gaps even if data is missing) ────────────────
+$labels = array();
+$ts     = strtotime( $cutoff );
+if ( $bucket_by_day ) {
+	$end_ts = strtotime( $date_end );
+	while ( $ts <= $end_ts ) {
+		$labels[] = gmdate( 'Y-m-d', $ts );
+		$ts        = strtotime( '+1 day', $ts );
+	}
+} else {
+	$end_ym = gmdate( 'Y-m', strtotime( $date_end ) );
+	while ( gmdate( 'Y-m', $ts ) <= $end_ym ) {
+		$labels[] = gmdate( 'Y-m', $ts );
+		$ts        = strtotime( '+1 month', $ts );
+	}
 }
 
 // ── Collect unique marketer names ─────────────────────────────────────────────
@@ -58,10 +75,10 @@ foreach ( $rows as $row ) {
 $all_marketers = array_keys( $all_marketers );
 sort( $all_marketers );
 
-// ── Index rows by [month][marketer] ──────────────────────────────────────────
+// ── Index rows by [period][marketer] ─────────────────────────────────────────
 $idx = array();
 foreach ( $rows as $row ) {
-	$idx[ $row['month'] ][ $row['marketer'] ] = $row;
+	$idx[ $row['period'] ][ $row['marketer'] ] = $row;
 }
 
 // ── Build per-marketer dataset arrays ─────────────────────────────────────────
@@ -75,8 +92,8 @@ foreach ( $all_marketers as $i => $name ) {
 	$paid_arr    = array();
 	$count_arr   = array();
 	$grand_total = 0;
-	foreach ( $labels as $ym ) {
-		$r           = isset( $idx[ $ym ][ $name ] ) ? $idx[ $ym ][ $name ] : null;
+	foreach ( $labels as $period ) {
+		$r           = isset( $idx[ $period ][ $name ] ) ? $idx[ $period ][ $name ] : null;
 		$total_arr[] = $r ? (int) $r['total_regs']  : 0;
 		$paid_arr[]  = $r ? (int) $r['paid_regs']   : 0;
 		$count_arr[] = $r ? (int) $r['event_count'] : 0;
@@ -92,10 +109,20 @@ foreach ( $all_marketers as $i => $name ) {
 arsort( $marketer_totals );
 $top5_indices = array_values( array_slice( array_keys( $marketer_totals ), 0, 5 ) );
 
-// ── Display labels: 'Y-m' → 'Jan 2025' ───────────────────────────────────────
-$display_labels = array_map( function( $ym ) {
-	return gmdate( 'M Y', strtotime( $ym . '-01' ) );
-}, $labels );
+// ── Display labels ────────────────────────────────────────────────────────────
+if ( $bucket_by_day ) {
+	$display_labels = array_map( function( $ymd ) {
+		return gmdate( 'M j', strtotime( $ymd ) );
+	}, $labels );
+	$period_label = gmdate( 'M j, Y', strtotime( $cutoff ) ) . ' – ' . gmdate( 'M j, Y', strtotime( $date_end ) );
+	$trends_title = 'Day-over-Day Trends';
+} else {
+	$display_labels = array_map( function( $ym ) {
+		return gmdate( 'M Y', strtotime( $ym . '-01' ) );
+	}, $labels );
+	$period_label = gmdate( 'M Y', strtotime( $cutoff ) ) . ' – ' . gmdate( 'M Y', strtotime( $date_end ) );
+	$trends_title = 'Month-over-Month Trends';
+}
 
 // ── Summary stats ─────────────────────────────────────────────────────────────
 $total_events        = array_sum( array_map( 'array_sum', $datasets_count ) );
@@ -184,7 +211,7 @@ $chart_data = array(
 	<?php /* ── Main chart card ── */ ?>
 	<div class="hl-reports-card">
 		<div class="hl-reports-header">
-			<h2 class="hl-reports-title">Month-over-Month Trends</h2>
+			<h2 class="hl-reports-title"><?php echo esc_html( $trends_title ); ?></h2>
 			<div class="hl-reports-toggles">
 				<button class="hl-toggle-btn hl-toggle-btn--active" data-mode="total">Registrations</button>
 				<button class="hl-toggle-btn" data-mode="paid">Paid Only</button>
@@ -204,7 +231,7 @@ $chart_data = array(
 	<div class="hl-reports-card" style="margin-top:1rem;">
 		<div class="hl-reports-header">
 			<h2 class="hl-reports-title">Marketer Summary</h2>
-			<span style="font-size:.85rem;color:#666;">Period: <?php echo esc_html( gmdate( 'M Y', strtotime( $cutoff ) ) ); ?> – <?php echo esc_html( gmdate( 'M Y' ) ); ?></span>
+			<span style="font-size:.85rem;color:#666;">Period: <?php echo esc_html( $period_label ); ?></span>
 		</div>
 		<table class="hl-summary-table">
 			<thead>

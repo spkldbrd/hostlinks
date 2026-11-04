@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.37 — 2026-11-04
+
+### New: Past 14 Days on Reports
+- Reports range dropdown includes **Past 14 Days**, showing daily registration / paid / event totals for each of the last 14 calendar days (inclusive of today).
+
+---
+
 ## v2.11.36 — 2026-10-14
 
 ### Fix: blank admin screen after “Save to Hostlinks” from New Event Queue

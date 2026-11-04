@@ -24,15 +24,28 @@ class Hostlinks_Toolbar {
 	}
 
 	/**
+	 * Day options for daily-bucketed reports (keys = days inclusive of today).
+	 *
+	 * @return array<int,string>
+	 */
+	public static function reports_day_options(): array {
+		return array(
+			14 => 'Past 14 Days',
+		);
+	}
+
+	/**
 	 * Parse $_GET the same way as the Reports shortcode for range filtering.
 	 *
-	 * @return array{range_mode:string,months_back:int,date_from:string,date_to:string}
+	 * @return array{range_mode:string,months_back:int,days_back:int,date_from:string,date_to:string}
 	 */
 	public static function parse_reports_range_from_request(): array {
 		$months_options = self::reports_month_options();
+		$days_options   = self::reports_day_options();
 
 		$range_mode  = 'months';
 		$months_back = 12;
+		$days_back   = 14;
 		$date_from   = '';
 		$date_to     = '';
 
@@ -47,6 +60,9 @@ class Hostlinks_Toolbar {
 				|| ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_to ) ) {
 				$range_mode = 'months';
 			}
+		} elseif ( isset( $_GET['days'] ) && isset( $days_options[ (int) $_GET['days'] ] ) ) {
+			$range_mode = 'days';
+			$days_back  = (int) $_GET['days'];
 		} elseif ( isset( $_GET['months'] ) && isset( $months_options[ (int) $_GET['months'] ] ) ) {
 			$months_back = (int) $_GET['months'];
 		}
@@ -54,6 +70,7 @@ class Hostlinks_Toolbar {
 		return array(
 			'range_mode'  => $range_mode,
 			'months_back' => $months_back,
+			'days_back'   => $days_back,
 			'date_from'   => $date_from,
 			'date_to'     => $date_to,
 		);
@@ -148,9 +165,11 @@ class Hostlinks_Toolbar {
 	 */
 	public static function render_reports_style_actions_bar( string $active, string $shortcode_for_all ): void {
 		$months_options = self::reports_month_options();
+		$days_options   = self::reports_day_options();
 		$range          = self::parse_reports_range_from_request();
 		$range_mode     = $range['range_mode'];
 		$months_back    = $range['months_back'];
+		$days_back      = $range['days_back'];
 		$date_from      = $range['date_from'];
 		$date_to        = $range['date_to'];
 
@@ -166,6 +185,12 @@ class Hostlinks_Toolbar {
 		<a href="<?php echo esc_url( $past_events_url ); ?>" class="hostlinks-btn">Past Events</a>
 
 		<select id="hl-reports-range" class="hostlinks-year-filter" aria-label="Date range" style="margin-left:auto;">
+			<?php foreach ( $days_options as $val => $lbl ) : ?>
+			<option value="days:<?php echo (int) $val; ?>"
+				<?php selected( $range_mode === 'days' && $days_back === $val ); ?>>
+				<?php echo esc_html( $lbl ); ?>
+			</option>
+			<?php endforeach; ?>
 			<?php foreach ( $months_options as $val => $lbl ) : ?>
 			<option value="months:<?php echo (int) $val; ?>"
 				<?php selected( $range_mode === 'months' && $months_back === $val ); ?>>
@@ -211,15 +236,18 @@ class Hostlinks_Toolbar {
 			if (!sel || !custom || !fromEl || !toEl || !goBtn || !base) return;
 			sel.addEventListener('change', function() {
 				var v = this.value;
+				var sep = base.indexOf('?') === -1 ? '?' : '&';
 				if (v === 'custom') {
 					custom.style.display = 'inline-flex';
 				} else if (v === 'current_year') {
 					custom.style.display = 'none';
-					window.location.href = base + (base.indexOf('?') === -1 ? '?' : '&') + 'range=current_year';
+					window.location.href = base + sep + 'range=current_year';
+				} else if (v.indexOf('days:') === 0) {
+					custom.style.display = 'none';
+					window.location.href = base + sep + 'days=' + v.replace('days:', '');
 				} else {
 					custom.style.display = 'none';
-					var months = v.replace('months:', '');
-					window.location.href = base + (base.indexOf('?') === -1 ? '?' : '&') + 'months=' + months;
+					window.location.href = base + sep + 'months=' + v.replace('months:', '');
 				}
 			});
 			goBtn.addEventListener('click', function() {

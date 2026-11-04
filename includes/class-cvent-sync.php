@@ -980,6 +980,7 @@ class Hostlinks_CVENT_Sync {
 		//   - Retroactive PAID→FREE changes where staff later adds a free
 		//     discount code; the next sync re-fetches all items and upgrades.
 		$seen            = array(); // attendeeId → 'free'|'paid'
+		$order_dates     = array(); // attendeeId → earliest order date (Y-m-d, site TZ)
 		$preview         = array();
 		$preview_added   = array(); // attendeeIds already in preview
 		$cancelled_count = 0; // items explicitly marked active=false
@@ -1005,7 +1006,16 @@ class Hostlinks_CVENT_Sync {
 				continue;
 			}
 
-			// Once an attendee is FREE, no subsequent item can downgrade them.
+			// Earliest order/registration date across this attendee's active items.
+			$item_order_date = self::normalize_order_date_from_item( $item );
+			if ( $item_order_date !== '' ) {
+				if ( ! isset( $order_dates[ $att_key ] ) || $item_order_date < $order_dates[ $att_key ] ) {
+					$order_dates[ $att_key ] = $item_order_date;
+				}
+			}
+
+			// Once an attendee is FREE, no subsequent item can downgrade them —
+			// but we still collect order dates above before this continue.
 			if ( isset( $seen[ $att_key ] ) && $seen[ $att_key ] === 'free' ) {
 				continue;
 			}
@@ -1053,6 +1063,7 @@ class Hostlinks_CVENT_Sync {
 					'counted_as'       => $is_free ? 'FREE' : 'PAID',
 					'source'           => 'order_items',
 					'session'          => $session_code !== '' ? $session_code : null,
+					'order_date'       => $order_dates[ $att_key ] ?? null,
 				);
 			}
 		}
@@ -1144,6 +1155,19 @@ class Hostlinks_CVENT_Sync {
 			),
 			array( '%d', '%s', '%d', '%d' )
 		);
+
+		// Persist per-attendee order dates for Daily Totals (by signup day).
+		$order_reg_rows = array();
+		foreach ( $seen as $att_key => $kind ) {
+			if ( empty( $order_dates[ $att_key ] ) ) {
+				continue;
+			}
+			$order_reg_rows[ $att_key ] = array(
+				'order_date' => $order_dates[ $att_key ],
+				'is_paid'    => ( $kind === 'paid' ) ? 1 : 0,
+			);
+		}
+		Hostlinks_DB::replace_cvent_order_regs( (int) $eve_id, $order_reg_rows );
 	}
 
 		$msg = $dry_run
@@ -1175,12 +1199,43 @@ class Hostlinks_CVENT_Sync {
 	}
 
 	/**
-	 * Fetch all attendees for a CVENT event (paginated).
-	 * Endpoint: GET /ea/attendees/filter?filter=eventId eq '{id}'&limit=200
-	 *
-	 * @param string $cvent_event_id
-	 * @return array|WP_Error
+	 * Extract order/registration date from a CVENT order item as Y-m-d in site TZ.
+	 * Prefers item "created" (same as roster); falls back to common aliases and attendee registeredAt.
 	 */
+	private static function normalize_order_date_from_item( array $item ): string {
+		$raw = '';
+		foreach ( array( 'created', 'createdDate', 'registrationDate', 'orderDate', 'dateCreated', 'registeredDate' ) as $f ) {
+			$v = trim( (string) ( $item[ $f ] ?? '' ) );
+			if ( $v !== '' ) {
+				$raw = $v;
+				break;
+			}
+		}
+		if ( $raw === '' && ! empty( $item['attendee'] ) && is_array( $item['attendee'] ) ) {
+			foreach ( array( 'registeredAt', 'created', 'registrationDate', 'createdDate' ) as $f ) {
+				$v = trim( (string) ( $item['attendee'][ $f ] ?? '' ) );
+				if ( $v !== '' ) {
+					$raw = $v;
+					break;
+				}
+			}
+		}
+		if ( $raw === '' ) {
+			return '';
+		}
+
+		try {
+			$dt = new DateTimeImmutable( $raw );
+			$dt = $dt->setTimezone( wp_timezone() );
+			return $dt->format( 'Y-m-d' );
+		} catch ( Exception $e ) {
+			if ( preg_match( '/^(\d{4}-\d{2}-\d{2})/', $raw, $m ) ) {
+				return $m[1];
+			}
+			return '';
+		}
+	}
+
 	/**
 	 * Thin wrapper — consolidates to the API class which handles pagination,
 	 * UUID sanitisation, and endpoint selection.

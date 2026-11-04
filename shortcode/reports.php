@@ -172,26 +172,20 @@ usort( $yoy_marketers, function( $a, $b ) use ( $yoy_idx, $yoy_current_year ) {
 	return $tb - $ta;
 } );
 
-// ── Company-wide daily totals (14-day bar chart) ──────────────────────────────
-$company_daily = array(
+// ── Company-wide daily totals by CVENT order date (14/30-day bar chart) ───────
+$company_daily      = array(
 	'total' => array(),
 	'paid'  => array(),
 	'count' => array(),
 );
+$has_order_reg_data = false;
 if ( $bucket_by_day ) {
-	$n = count( $labels );
-	for ( $i = 0; $i < $n; $i++ ) {
-		$day_total = 0;
-		$day_paid  = 0;
-		$day_count = 0;
-		foreach ( $all_marketers as $mi => $_name ) {
-			$day_total += (int) ( $datasets_total[ $mi ][ $i ] ?? 0 );
-			$day_paid  += (int) ( $datasets_paid[ $mi ][ $i ] ?? 0 );
-			$day_count += (int) ( $datasets_count[ $mi ][ $i ] ?? 0 );
-		}
-		$company_daily['total'][] = $day_total;
-		$company_daily['paid'][]  = $day_paid;
-		$company_daily['count'][] = $day_count;
+	$order_totals       = Hostlinks_DB::get_company_daily_order_totals( $cutoff, $date_end );
+	$has_order_reg_data = Hostlinks_DB::has_cvent_order_regs();
+	foreach ( $labels as $ymd ) {
+		$company_daily['total'][] = (int) ( $order_totals['total'][ $ymd ] ?? 0 );
+		$company_daily['paid'][]  = (int) ( $order_totals['paid'][ $ymd ] ?? 0 );
+		$company_daily['count'][] = (int) ( $order_totals['events'][ $ymd ] ?? 0 );
 	}
 }
 
@@ -204,8 +198,9 @@ $chart_data = array(
 	'count'         => $datasets_count,
 	'top5'          => $top5_indices,
 	'active'        => array_values( $active_marketer_names ),
-	'bucketByDay'   => $bucket_by_day,
-	'companyDaily'  => $company_daily,
+	'bucketByDay'     => $bucket_by_day,
+	'companyDaily'    => $company_daily,
+	'hasOrderRegData' => $has_order_reg_data,
 );
 ?>
 <div class="hostlinks-page">
@@ -234,10 +229,18 @@ $chart_data = array(
 	</div>
 
 	<?php if ( $bucket_by_day ) : ?>
-	<?php /* ── Company daily bar chart (14-day mode) ── */ ?>
+	<?php /* ── Company daily bar chart by order/signup date ── */ ?>
 	<div class="hl-reports-card">
 		<div class="hl-reports-header">
-			<h2 class="hl-reports-title">Daily Totals</h2>
+			<div>
+				<h2 class="hl-reports-title">Daily Totals</h2>
+				<p style="margin:.25rem 0 0;font-size:.85rem;color:#666;">
+					By CVENT order date (signups that day)
+					<?php if ( ! $has_order_reg_data ) : ?>
+						— run a CVENT sync to populate
+					<?php endif; ?>
+				</p>
+			</div>
 			<div class="hl-reports-toggles" id="hl-daily-bar-toggles">
 				<button type="button" class="hl-toggle-btn hl-toggle-btn--active" data-bar-mode="total">Registrations</button>
 				<button type="button" class="hl-toggle-btn" data-bar-mode="paid">Paid Only</button>
@@ -253,7 +256,12 @@ $chart_data = array(
 	<?php /* ── Main chart card ── */ ?>
 	<div class="hl-reports-card"<?php echo $bucket_by_day ? ' style="margin-top:1rem;"' : ''; ?>>
 		<div class="hl-reports-header">
-			<h2 class="hl-reports-title"><?php echo esc_html( $trends_title ); ?></h2>
+			<div>
+				<h2 class="hl-reports-title"><?php echo esc_html( $trends_title ); ?></h2>
+				<?php if ( $bucket_by_day ) : ?>
+				<p style="margin:.25rem 0 0;font-size:.85rem;color:#666;">By event start date (classes that day)</p>
+				<?php endif; ?>
+			</div>
 			<div class="hl-reports-toggles">
 				<button class="hl-toggle-btn hl-toggle-btn--active" data-mode="total">Registrations</button>
 				<button class="hl-toggle-btn" data-mode="paid">Paid Only</button>

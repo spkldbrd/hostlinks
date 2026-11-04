@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.40 — 2026-11-04
+
+### New: Daily Totals by CVENT order date
+- CVENT sync stores each attendee’s earliest order/registration date (`hostlinks_cvent_order_regs`, DB 2.9).
+- Past 14/30 Days **Daily Totals** bar chart uses those signup dates (company-wide). Day-over-day marketer chart remains by event start.
+- After update, run a CVENT sync (or Sync All) to populate order dates.
+
+---
+
 ## v2.11.39 — 2026-11-04
 
 ### New: Past 30 Days on Reports

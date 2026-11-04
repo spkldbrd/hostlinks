@@ -143,6 +143,11 @@ class Hostlinks_DB {
 		}
 	}
 
+	// v2.9 — per-attendee CVENT order dates for daily signup reporting.
+	if ( version_compare( $installed, '2.9', '<' ) ) {
+		self::create_tables();
+	}
+
 	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
 	if ( version_compare( $installed, '2.1', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'event_details_list';
@@ -368,6 +373,21 @@ class Hostlinks_DB {
 		) $charset_collate;";
 		dbDelta( $sql );
 
+		// Per-attendee order dates from CVENT sync (for Daily Totals by signup day).
+		$sql = "CREATE TABLE {$wpdb->prefix}hostlinks_cvent_order_regs (
+			id bigint(20) NOT NULL AUTO_INCREMENT,
+			eve_id bigint(20) NOT NULL,
+			attendee_id varchar(100) NOT NULL DEFAULT '',
+			order_date date NOT NULL,
+			is_paid tinyint(1) NOT NULL DEFAULT 1,
+			synced_at datetime NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY eve_attendee (eve_id,attendee_id),
+			KEY order_date (order_date),
+			KEY eve_id (eve_id)
+		) $charset_collate;";
+		dbDelta( $sql );
+
 		// Event request intake table — stores pending requests separately from live events.
 		$sql = "CREATE TABLE {$wpdb->prefix}hostlinks_event_requests (
 			id bigint(20) NOT NULL AUTO_INCREMENT,
@@ -492,5 +512,103 @@ class Hostlinks_DB {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Replace stored CVENT order-date rows for one Hostlinks event.
+	 *
+	 * Each entry: attendee_id => [ 'order_date' => 'Y-m-d', 'is_paid' => 0|1 ]
+	 * Callers pass the full current set; cancelled attendees disappear on delete.
+	 *
+	 * @param int                  $eve_id
+	 * @param array<string,array{order_date:string,is_paid:int}> $rows
+	 */
+	public static function replace_cvent_order_regs( int $eve_id, array $rows ): void {
+		global $wpdb;
+		$tbl = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$wpdb->delete( $tbl, array( 'eve_id' => $eve_id ), array( '%d' ) );
+
+		if ( empty( $rows ) ) {
+			return;
+		}
+
+		$now = current_time( 'mysql' );
+		foreach ( $rows as $attendee_id => $info ) {
+			$attendee_id = sanitize_text_field( (string) $attendee_id );
+			$order_date  = (string) ( $info['order_date'] ?? '' );
+			if ( $attendee_id === '' || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $order_date ) ) {
+				continue;
+			}
+			$wpdb->insert(
+				$tbl,
+				array(
+					'eve_id'      => $eve_id,
+					'attendee_id' => $attendee_id,
+					'order_date'  => $order_date,
+					'is_paid'     => ! empty( $info['is_paid'] ) ? 1 : 0,
+					'synced_at'   => $now,
+				),
+				array( '%d', '%s', '%s', '%d', '%s' )
+			);
+		}
+	}
+
+	/**
+	 * Company-wide daily signup totals from stored CVENT order dates.
+	 *
+	 * @return array{total:array<string,int>,paid:array<string,int>,events:array<string,int>}
+	 *         Keys are Y-m-d dates present in the range (missing days omitted).
+	 */
+	public static function get_company_daily_order_totals( string $date_from, string $date_to ): array {
+		global $wpdb;
+		$tbl  = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$edl  = $wpdb->prefix . 'event_details_list';
+		$out  = array(
+			'total'  => array(),
+			'paid'   => array(),
+			'events' => array(),
+		);
+
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_from )
+			|| ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_to ) ) {
+			return $out;
+		}
+
+		// Only count regs on active Hostlinks events.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT r.order_date AS d,
+				        COUNT(*) AS total_regs,
+				        SUM(r.is_paid) AS paid_regs,
+				        COUNT(DISTINCT r.eve_id) AS event_count
+				 FROM `{$tbl}` r
+				 INNER JOIN `{$edl}` e ON e.eve_id = r.eve_id AND e.eve_status = '1'
+				 WHERE r.order_date >= %s AND r.order_date <= %s
+				 GROUP BY r.order_date
+				 ORDER BY r.order_date ASC",
+				$date_from,
+				$date_to
+			),
+			ARRAY_A
+		);
+
+		foreach ( (array) $rows as $row ) {
+			$d                   = $row['d'];
+			$out['total'][ $d ]  = (int) $row['total_regs'];
+			$out['paid'][ $d ]   = (int) $row['paid_regs'];
+			$out['events'][ $d ] = (int) $row['event_count'];
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Whether any order-date rows exist (for empty-state messaging on Reports).
+	 */
+	public static function has_cvent_order_regs(): bool {
+		global $wpdb;
+		$tbl = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return null !== $wpdb->get_var( "SELECT id FROM `{$tbl}` LIMIT 1" );
 	}
 }

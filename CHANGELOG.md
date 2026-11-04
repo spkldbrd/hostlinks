@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.38 — 2026-11-04
+
+### New: Company daily bar chart on Past 14 Days
+- Past 14 Days shows a **Daily Totals** bar chart (company-wide, not per marketer) with the value labeled on each bar. Toggles for Registrations / Paid / Events.
+
+---
+
 ## v2.11.37 — 2026-11-04
 
 ### New: Past 14 Days on Reports

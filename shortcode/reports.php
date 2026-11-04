@@ -172,15 +172,40 @@ usort( $yoy_marketers, function( $a, $b ) use ( $yoy_idx, $yoy_current_year ) {
 	return $tb - $ta;
 } );
 
+// ── Company-wide daily totals (14-day bar chart) ──────────────────────────────
+$company_daily = array(
+	'total' => array(),
+	'paid'  => array(),
+	'count' => array(),
+);
+if ( $bucket_by_day ) {
+	$n = count( $labels );
+	for ( $i = 0; $i < $n; $i++ ) {
+		$day_total = 0;
+		$day_paid  = 0;
+		$day_count = 0;
+		foreach ( $all_marketers as $mi => $_name ) {
+			$day_total += (int) ( $datasets_total[ $mi ][ $i ] ?? 0 );
+			$day_paid  += (int) ( $datasets_paid[ $mi ][ $i ] ?? 0 );
+			$day_count += (int) ( $datasets_count[ $mi ][ $i ] ?? 0 );
+		}
+		$company_daily['total'][] = $day_total;
+		$company_daily['paid'][]  = $day_paid;
+		$company_daily['count'][] = $day_count;
+	}
+}
+
 // ── JSON payload for Chart.js ─────────────────────────────────────────────────
 $chart_data = array(
-	'labels'    => $display_labels,
-	'marketers' => $all_marketers,
-	'total'     => $datasets_total,
-	'paid'      => $datasets_paid,
-	'count'     => $datasets_count,
-	'top5'      => $top5_indices,
-	'active'    => array_values( $active_marketer_names ),
+	'labels'        => $display_labels,
+	'marketers'     => $all_marketers,
+	'total'         => $datasets_total,
+	'paid'          => $datasets_paid,
+	'count'         => $datasets_count,
+	'top5'          => $top5_indices,
+	'active'        => array_values( $active_marketer_names ),
+	'bucketByDay'   => $bucket_by_day,
+	'companyDaily'  => $company_daily,
 );
 ?>
 <div class="hostlinks-page">
@@ -208,8 +233,25 @@ $chart_data = array(
 		</div>
 	</div>
 
-	<?php /* ── Main chart card ── */ ?>
+	<?php if ( $bucket_by_day ) : ?>
+	<?php /* ── Company daily bar chart (14-day mode) ── */ ?>
 	<div class="hl-reports-card">
+		<div class="hl-reports-header">
+			<h2 class="hl-reports-title">Daily Totals</h2>
+			<div class="hl-reports-toggles" id="hl-daily-bar-toggles">
+				<button type="button" class="hl-toggle-btn hl-toggle-btn--active" data-bar-mode="total">Registrations</button>
+				<button type="button" class="hl-toggle-btn" data-bar-mode="paid">Paid Only</button>
+				<button type="button" class="hl-toggle-btn" data-bar-mode="count">Events</button>
+			</div>
+		</div>
+		<div class="hl-chart-wrap">
+			<canvas id="hlDailyBarChart"></canvas>
+		</div>
+	</div>
+	<?php endif; ?>
+
+	<?php /* ── Main chart card ── */ ?>
+	<div class="hl-reports-card"<?php echo $bucket_by_day ? ' style="margin-top:1rem;"' : ''; ?>>
 		<div class="hl-reports-header">
 			<h2 class="hl-reports-title"><?php echo esc_html( $trends_title ); ?></h2>
 			<div class="hl-reports-toggles">
@@ -429,7 +471,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		},
 	});
 
-	// Mode toggle buttons (Registrations / Paid Only / Events)
+	// Mode toggle buttons (Registrations / Paid Only / Events) — line chart only
 	document.querySelectorAll('.hl-toggle-btn[data-mode]').forEach(function(btn) {
 		btn.addEventListener('click', function() {
 			document.querySelectorAll('.hl-toggle-btn[data-mode]').forEach(function(b) {
@@ -461,6 +503,86 @@ document.addEventListener('DOMContentLoaded', function() {
 			this.classList.toggle('hl-toggle-btn--active', showCurrentOnly);
 			chart.data.datasets = buildDatasets();
 			chart.update();
+		});
+	}
+
+	// Company-wide daily bar chart (Past 14 Days)
+	var barCanvas = document.getElementById('hlDailyBarChart');
+	if (barCanvas && d.bucketByDay && d.companyDaily) {
+		var barMode = 'total';
+		var barLabelsPlugin = {
+			id: 'hlBarValueLabels',
+			afterDatasetsDraw: function(c) {
+				var ctx2 = c.ctx;
+				c.data.datasets.forEach(function(ds, di) {
+					var meta = c.getDatasetMeta(di);
+					if (meta.hidden) return;
+					meta.data.forEach(function(el, i) {
+						var v = ds.data[i];
+						if (v === null || v === undefined) return;
+						var pos = el.tooltipPosition();
+						ctx2.save();
+						ctx2.fillStyle = '#334155';
+						ctx2.font = '600 12px system-ui, sans-serif';
+						ctx2.textAlign = 'center';
+						ctx2.textBaseline = 'bottom';
+						ctx2.fillText(String(v), pos.x, pos.y - 6);
+						ctx2.restore();
+					});
+				});
+			},
+		};
+		var barChart = new Chart(barCanvas.getContext('2d'), {
+			type: 'bar',
+			data: {
+				labels: d.labels,
+				datasets: [{
+					label: 'Company total',
+					data: d.companyDaily[barMode],
+					backgroundColor: 'rgba(13, 162, 231, 0.75)',
+					borderColor: '#0da2e7',
+					borderWidth: 1,
+					borderRadius: 4,
+					maxBarThickness: 48,
+				}],
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				layout: { padding: { top: 24 } },
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						callbacks: {
+							title: function(items) { return items[0].label; },
+						},
+					},
+				},
+				scales: {
+					x: {
+						grid: { display: false },
+						ticks: { font: { size: 12 }, maxRotation: 45 },
+					},
+					y: {
+						beginAtZero: true,
+						grace: '12%',
+						grid: { color: 'rgba(0,0,0,.05)' },
+						ticks: { font: { size: 12 }, precision: 0 },
+					},
+				},
+			},
+			plugins: [barLabelsPlugin],
+		});
+		document.querySelectorAll('#hl-daily-bar-toggles .hl-toggle-btn[data-bar-mode]').forEach(function(btn) {
+			btn.addEventListener('click', function() {
+				document.querySelectorAll('#hl-daily-bar-toggles .hl-toggle-btn[data-bar-mode]').forEach(function(b) {
+					b.classList.remove('hl-toggle-btn--active');
+				});
+				this.classList.add('hl-toggle-btn--active');
+				barMode = this.dataset.barMode;
+				barChart.data.datasets[0].data = d.companyDaily[barMode];
+				barChart.update();
+			});
 		});
 	}
 })();

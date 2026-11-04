@@ -465,7 +465,8 @@ class Hostlinks_CVENT_API {
 	 */
 	public static function get_order_items( $event_id ) {
 		$event_id = self::sanitize_uuid( $event_id );
-		$cache_key = 'orders:' . $event_id;
+		// v2 cache: expand=attendee so sync can store registrant name/email for Daily Totals drill-down.
+		$cache_key = 'orders:v2:' . $event_id;
 		if ( array_key_exists( $cache_key, self::$request_cache ) ) {
 			return self::$request_cache[ $cache_key ];
 		}
@@ -476,7 +477,10 @@ class Hostlinks_CVENT_API {
 		$max_pages = 20;
 
 		do {
-			$params = array( 'limit' => 200 );
+			$params = array(
+				'limit'  => 200,
+				'expand' => 'attendee',
+			);
 			if ( $next ) {
 				$params['token'] = $next;
 			}

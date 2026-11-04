@@ -569,6 +569,118 @@
   background: hsl(215 20% 97%);
 }
 
+/* ─── Daily Totals day drill-down modal ─────────────────────────────────────── */
+
+.hl-day-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.hl-day-modal[hidden] {
+  display: none !important;
+}
+.hl-day-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+.hl-day-modal__panel {
+  position: relative;
+  z-index: 1;
+  width: min(920px, 100%);
+  max-height: min(80vh, 720px);
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+.hl-day-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid hsl(215 15% 90%);
+}
+.hl-day-modal__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: hsl(215 28% 17%);
+}
+.hl-day-modal__close {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0 .25rem;
+}
+.hl-day-modal__close:hover {
+  color: #0f172a;
+}
+.hl-day-modal__body {
+  padding: 0;
+  overflow: auto;
+  flex: 1;
+}
+.hl-day-modal__loading,
+.hl-day-modal__empty {
+  margin: 0;
+  padding: 1.5rem 1.25rem;
+  color: #64748b;
+}
+.hl-day-modal__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .88rem;
+}
+.hl-day-modal__table th,
+.hl-day-modal__table td {
+  padding: .55rem .85rem;
+  text-align: left;
+  border-bottom: 1px solid hsl(215 15% 92%);
+  vertical-align: top;
+}
+.hl-day-modal__table th {
+  position: sticky;
+  top: 0;
+  background: hsl(215 20% 97%);
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: hsl(215 15% 45%);
+  z-index: 1;
+}
+.hl-day-modal__table tbody tr:hover {
+  background: hsl(210 100% 97%);
+}
+.hl-day-modal__paid {
+  display: inline-block;
+  padding: .1rem .45rem;
+  border-radius: 4px;
+  font-size: .75rem;
+  font-weight: 600;
+  background: #dcfce7;
+  color: #166534;
+}
+.hl-day-modal__free {
+  display: inline-block;
+  padding: .1rem .45rem;
+  border-radius: 4px;
+  font-size: .75rem;
+  font-weight: 600;
+  background: #e2e8f0;
+  color: #334155;
+}
+
 /* ─── Reports dark mode ─────────────────────────────────────────────────────── */
 
 .wp-dark-mode-active .hl-stat-card,
@@ -615,6 +727,31 @@
 .wp-dark-mode-active .hl-summary-table tbody tr:hover,
 .darklooks-mode-changer-enabled .hl-summary-table tbody tr:hover {
   background: hsl(215 20% 20%);
+}
+
+.wp-dark-mode-active .hl-day-modal__panel,
+.darklooks-mode-changer-enabled .hl-day-modal__panel {
+  background: hsl(215 20% 16%);
+}
+.wp-dark-mode-active .hl-day-modal__title,
+.darklooks-mode-changer-enabled .hl-day-modal__title {
+  color: hsl(210 25% 90%);
+}
+.wp-dark-mode-active .hl-day-modal__header,
+.darklooks-mode-changer-enabled .hl-day-modal__header {
+  border-color: hsl(215 20% 22%);
+}
+.wp-dark-mode-active .hl-day-modal__table th,
+.darklooks-mode-changer-enabled .hl-day-modal__table th {
+  background: hsl(215 20% 20%);
+  color: hsl(215 15% 55%);
+}
+.wp-dark-mode-active .hl-day-modal__table th,
+.wp-dark-mode-active .hl-day-modal__table td,
+.darklooks-mode-changer-enabled .hl-day-modal__table th,
+.darklooks-mode-changer-enabled .hl-day-modal__table td {
+  border-color: hsl(215 20% 22%);
+  color: hsl(210 25% 85%);
 }
 
 /* ── Access denied message ─────────────────────────────────────────────────── */

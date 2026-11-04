@@ -201,6 +201,11 @@ $chart_data = array(
 	'bucketByDay'     => $bucket_by_day,
 	'companyDaily'    => $company_daily,
 	'hasOrderRegData' => $has_order_reg_data,
+	'dateKeys'        => $bucket_by_day ? $labels : array(),
+	'dayAjax'         => array(
+		'url'   => admin_url( 'admin-ajax.php' ),
+		'nonce' => wp_create_nonce( 'hostlinks_day_order_regs' ),
+	),
 );
 ?>
 <div class="hostlinks-page">
@@ -247,8 +252,22 @@ $chart_data = array(
 				<button type="button" class="hl-toggle-btn" data-bar-mode="count">Events</button>
 			</div>
 		</div>
-		<div class="hl-chart-wrap">
+		<div class="hl-chart-wrap" style="cursor:pointer;" title="Click a bar to see registrants">
 			<canvas id="hlDailyBarChart"></canvas>
+		</div>
+		<p style="margin:.5rem 0 0;font-size:.8rem;color:#888;">Click a bar to list that day's registrants</p>
+	</div>
+
+	<div id="hl-day-regs-modal" class="hl-day-modal" hidden>
+		<div class="hl-day-modal__backdrop" data-hl-day-close></div>
+		<div class="hl-day-modal__panel" role="dialog" aria-modal="true" aria-labelledby="hl-day-regs-title">
+			<div class="hl-day-modal__header">
+				<h3 id="hl-day-regs-title" class="hl-day-modal__title">Registrants</h3>
+				<button type="button" class="hl-day-modal__close" data-hl-day-close aria-label="Close">&times;</button>
+			</div>
+			<div id="hl-day-regs-body" class="hl-day-modal__body">
+				<p class="hl-day-modal__loading">Loading…</p>
+			</div>
 		</div>
 	</div>
 	<?php endif; ?>
@@ -558,11 +577,22 @@ document.addEventListener('DOMContentLoaded', function() {
 				responsive: true,
 				maintainAspectRatio: false,
 				layout: { padding: { top: 24 } },
+				onClick: function(evt, elements) {
+					if (!elements || !elements.length) return;
+					var idx = elements[0].index;
+					var ymd = (d.dateKeys && d.dateKeys[idx]) ? d.dateKeys[idx] : null;
+					if (!ymd) return;
+					openDayRegsModal(ymd, d.labels[idx] || ymd);
+				},
+				onHover: function(evt, elements) {
+					evt.native.target.style.cursor = elements && elements.length ? 'pointer' : 'default';
+				},
 				plugins: {
 					legend: { display: false },
 					tooltip: {
 						callbacks: {
 							title: function(items) { return items[0].label; },
+							afterBody: function() { return 'Click for registrant list'; },
 						},
 					},
 				},
@@ -592,6 +622,74 @@ document.addEventListener('DOMContentLoaded', function() {
 				barChart.update();
 			});
 		});
+
+		var modal = document.getElementById('hl-day-regs-modal');
+		var modalTitle = document.getElementById('hl-day-regs-title');
+		var modalBody = document.getElementById('hl-day-regs-body');
+		function closeDayRegsModal() {
+			if (!modal) return;
+			modal.hidden = true;
+			document.body.style.overflow = '';
+		}
+		function escHtml(s) {
+			return String(s == null ? '' : s)
+				.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+				.replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+		}
+		function openDayRegsModal(ymd, label) {
+			if (!modal || !d.dayAjax) return;
+			modal.hidden = false;
+			document.body.style.overflow = 'hidden';
+			modalTitle.textContent = 'Registrants — ' + label;
+			modalBody.innerHTML = '<p class="hl-day-modal__loading">Loading…</p>';
+			var url = d.dayAjax.url
+				+ (d.dayAjax.url.indexOf('?') === -1 ? '?' : '&')
+				+ 'action=hostlinks_day_order_regs&date=' + encodeURIComponent(ymd)
+				+ '&_nonce=' + encodeURIComponent(d.dayAjax.nonce);
+			fetch(url, { credentials: 'same-origin' })
+				.then(function(r) { return r.json(); })
+				.then(function(json) {
+					if (!json || !json.success) {
+						modalBody.innerHTML = '<p class="hl-day-modal__empty">'
+							+ escHtml((json && json.data) || 'Could not load registrants.') + '</p>';
+						return;
+					}
+					var rows = json.data.rows || [];
+					modalTitle.textContent = 'Registrants — ' + label + ' (' + rows.length + ')';
+					if (!rows.length) {
+						modalBody.innerHTML = '<p class="hl-day-modal__empty">No stored order-date registrants for this day. Run a CVENT sync if this looks empty.</p>';
+						return;
+					}
+					var html = '<table class="hl-day-modal__table"><thead><tr>'
+						+ '<th>Name</th><th>Email</th><th>Company</th><th>Event</th><th>Type</th>'
+						+ '</tr></thead><tbody>';
+					rows.forEach(function(row) {
+						var badge = row.paid === 'Paid'
+							? '<span class="hl-day-modal__paid">Paid</span>'
+							: '<span class="hl-day-modal__free">Free</span>';
+						html += '<tr>'
+							+ '<td>' + escHtml(row.name) + '</td>'
+							+ '<td>' + escHtml(row.email || '—') + '</td>'
+							+ '<td>' + escHtml(row.company || '—') + '</td>'
+							+ '<td>' + escHtml(row.event) + '</td>'
+							+ '<td>' + badge + '</td>'
+							+ '</tr>';
+					});
+					html += '</tbody></table>';
+					modalBody.innerHTML = html;
+				})
+				.catch(function() {
+					modalBody.innerHTML = '<p class="hl-day-modal__empty">Could not load registrants.</p>';
+				});
+		}
+		if (modal) {
+			modal.querySelectorAll('[data-hl-day-close]').forEach(function(el) {
+				el.addEventListener('click', closeDayRegsModal);
+			});
+			document.addEventListener('keydown', function(e) {
+				if (e.key === 'Escape' && modal && !modal.hidden) closeDayRegsModal();
+			});
+		}
 	}
 })();
 }); // DOMContentLoaded

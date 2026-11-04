@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.41 — 2026-11-04
+
+### New: Click Daily Totals bar for registrant list
+- Click a Past 14/30 Days bar to open a modal: Name, Email, Company, Event, Paid/Free.
+- Sync now stores registrant identity on order-date rows (DB 2.10) via `expand=attendee` on order items.
+- Re-sync after update so names fill in (older rows may show — until then).
+
+---
+
 ## v2.11.40 — 2026-11-04
 
 ### New: Daily Totals by CVENT order date

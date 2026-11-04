@@ -13,6 +13,8 @@ class Hostlinks_Shortcodes {
 		add_shortcode( 'hostlinks_roster',    array( $this, 'render_roster' ) );
 		add_action( 'wp_ajax_hostlinks_get_roster',        array( $this, 'ajax_get_roster' ) );
 		add_action( 'wp_ajax_nopriv_hostlinks_get_roster', array( $this, 'ajax_get_roster' ) );
+		add_action( 'wp_ajax_hostlinks_day_order_regs',        array( $this, 'ajax_day_order_regs' ) );
+		add_action( 'wp_ajax_nopriv_hostlinks_day_order_regs', array( $this, 'ajax_day_order_regs' ) );
 	}
 
 	public function render_eventlisto() {
@@ -90,6 +92,32 @@ class Hostlinks_Shortcodes {
 			'html'                 => $html,
 			'refresh_locked_until' => $lock_until,
 		) );
+	}
+
+	/**
+	 * Daily Totals bar click — list registrants who ordered on a given date.
+	 */
+	public function ajax_day_order_regs() {
+		if ( empty( $_GET['_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_nonce'] ) ), 'hostlinks_day_order_regs' ) ) {
+			wp_send_json_error( 'Invalid request.' );
+		}
+		if ( ! Hostlinks_Access::can_view_shortcode( 'hostlinks_reports' ) ) {
+			wp_send_json_error( 'Access denied.' );
+		}
+
+		$date = isset( $_GET['date'] ) ? sanitize_text_field( wp_unslash( $_GET['date'] ) ) : '';
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+			wp_send_json_error( 'Invalid date.' );
+		}
+
+		$rows = Hostlinks_DB::get_order_regs_for_date( $date );
+		wp_send_json_success(
+			array(
+				'date'  => $date,
+				'count' => count( $rows ),
+				'rows'  => $rows,
+			)
+		);
 	}
 }
 

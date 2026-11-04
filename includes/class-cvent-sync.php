@@ -980,7 +980,7 @@ class Hostlinks_CVENT_Sync {
 		//   - Retroactive PAID→FREE changes where staff later adds a free
 		//     discount code; the next sync re-fetches all items and upgrades.
 		$seen            = array(); // attendeeId → 'free'|'paid'
-		$order_dates     = array(); // attendeeId → earliest order date (Y-m-d, site TZ)
+		$order_meta      = array(); // attendeeId → order_date + name/email/company
 		$preview         = array();
 		$preview_added   = array(); // attendeeIds already in preview
 		$cancelled_count = 0; // items explicitly marked active=false
@@ -1006,12 +1006,25 @@ class Hostlinks_CVENT_Sync {
 				continue;
 			}
 
-			// Earliest order/registration date across this attendee's active items.
-			$item_order_date = self::normalize_order_date_from_item( $item );
-			if ( $item_order_date !== '' ) {
-				if ( ! isset( $order_dates[ $att_key ] ) || $item_order_date < $order_dates[ $att_key ] ) {
-					$order_dates[ $att_key ] = $item_order_date;
+			// Earliest order date + best-effort registrant identity for Daily Totals drill-down.
+			if ( ! isset( $order_meta[ $att_key ] ) ) {
+				$order_meta[ $att_key ] = array_merge(
+					array( 'order_date' => '' ),
+					self::extract_attendee_identity( $item )
+				);
+			} else {
+				$ident = self::extract_attendee_identity( $item );
+				foreach ( array( 'first_name', 'last_name', 'email', 'company' ) as $ik ) {
+					if ( $order_meta[ $att_key ][ $ik ] === '' && $ident[ $ik ] !== '' ) {
+						$order_meta[ $att_key ][ $ik ] = $ident[ $ik ];
+					}
 				}
+			}
+			$item_order_date = self::normalize_order_date_from_item( $item );
+			if ( $item_order_date !== ''
+				&& ( $order_meta[ $att_key ]['order_date'] === ''
+					|| $item_order_date < $order_meta[ $att_key ]['order_date'] ) ) {
+				$order_meta[ $att_key ]['order_date'] = $item_order_date;
 			}
 
 			// Once an attendee is FREE, no subsequent item can downgrade them —
@@ -1063,7 +1076,7 @@ class Hostlinks_CVENT_Sync {
 					'counted_as'       => $is_free ? 'FREE' : 'PAID',
 					'source'           => 'order_items',
 					'session'          => $session_code !== '' ? $session_code : null,
-					'order_date'       => $order_dates[ $att_key ] ?? null,
+					'order_date'       => $order_meta[ $att_key ]['order_date'] ?? null,
 				);
 			}
 		}
@@ -1156,15 +1169,20 @@ class Hostlinks_CVENT_Sync {
 			array( '%d', '%s', '%d', '%d' )
 		);
 
-		// Persist per-attendee order dates for Daily Totals (by signup day).
+		// Persist per-attendee order dates + identity for Daily Totals drill-down.
 		$order_reg_rows = array();
 		foreach ( $seen as $att_key => $kind ) {
-			if ( empty( $order_dates[ $att_key ] ) ) {
+			$meta = $order_meta[ $att_key ] ?? null;
+			if ( empty( $meta['order_date'] ) ) {
 				continue;
 			}
 			$order_reg_rows[ $att_key ] = array(
-				'order_date' => $order_dates[ $att_key ],
+				'order_date' => $meta['order_date'],
 				'is_paid'    => ( $kind === 'paid' ) ? 1 : 0,
+				'first_name' => $meta['first_name'] ?? '',
+				'last_name'  => $meta['last_name'] ?? '',
+				'email'      => $meta['email'] ?? '',
+				'company'    => $meta['company'] ?? '',
 			);
 		}
 		Hostlinks_DB::replace_cvent_order_regs( (int) $eve_id, $order_reg_rows );
@@ -1196,6 +1214,23 @@ class Hostlinks_CVENT_Sync {
 		}
 
 		return $r;
+	}
+
+	/**
+	 * Best-effort name/email/company from an order item's expanded attendee (or contact).
+	 *
+	 * @return array{first_name:string,last_name:string,email:string,company:string}
+	 */
+	private static function extract_attendee_identity( array $item ): array {
+		$att     = ( ! empty( $item['attendee'] ) && is_array( $item['attendee'] ) ) ? $item['attendee'] : array();
+		$contact = ( ! empty( $att['contact'] ) && is_array( $att['contact'] ) ) ? $att['contact'] : array();
+
+		return array(
+			'first_name' => trim( (string) ( $att['firstName'] ?? $contact['firstName'] ?? '' ) ),
+			'last_name'  => trim( (string) ( $att['lastName'] ?? $contact['lastName'] ?? '' ) ),
+			'email'      => trim( (string) ( $att['email'] ?? $contact['email'] ?? '' ) ),
+			'company'    => trim( (string) ( $att['company'] ?? $att['companyName'] ?? $contact['company'] ?? $contact['companyName'] ?? '' ) ),
+		);
 	}
 
 	/**

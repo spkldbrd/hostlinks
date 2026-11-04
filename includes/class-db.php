@@ -148,6 +148,27 @@ class Hostlinks_DB {
 		self::create_tables();
 	}
 
+	// v2.10 — registrant name/email/company on order_regs for Daily Totals drill-down.
+	if ( version_compare( $installed, '2.10', '<' ) ) {
+		$tbl      = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+		if ( is_array( $existing ) ) {
+			$cols = array(
+				'first_name' => "varchar(100) NOT NULL DEFAULT ''",
+				'last_name'  => "varchar(100) NOT NULL DEFAULT ''",
+				'email'      => "varchar(255) NOT NULL DEFAULT ''",
+				'company'    => "varchar(255) NOT NULL DEFAULT ''",
+			);
+			foreach ( $cols as $col => $definition ) {
+				if ( ! in_array( $col, $existing, true ) ) {
+					$wpdb->query( "ALTER TABLE `{$tbl}` ADD `{$col}` {$definition}" );
+				}
+			}
+		} else {
+			self::create_tables();
+		}
+	}
+
 	// v2.1 — add venue, additional details, host contacts, and hotels columns to event_details_list.
 	if ( version_compare( $installed, '2.1', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'event_details_list';
@@ -380,6 +401,10 @@ class Hostlinks_DB {
 			attendee_id varchar(100) NOT NULL DEFAULT '',
 			order_date date NOT NULL,
 			is_paid tinyint(1) NOT NULL DEFAULT 1,
+			first_name varchar(100) NOT NULL DEFAULT '',
+			last_name varchar(100) NOT NULL DEFAULT '',
+			email varchar(255) NOT NULL DEFAULT '',
+			company varchar(255) NOT NULL DEFAULT '',
 			synced_at datetime NOT NULL,
 			PRIMARY KEY  (id),
 			UNIQUE KEY eve_attendee (eve_id,attendee_id),
@@ -517,11 +542,13 @@ class Hostlinks_DB {
 	/**
 	 * Replace stored CVENT order-date rows for one Hostlinks event.
 	 *
-	 * Each entry: attendee_id => [ 'order_date' => 'Y-m-d', 'is_paid' => 0|1 ]
+	 * Each entry: attendee_id => [
+	 *   order_date, is_paid, first_name?, last_name?, email?, company?
+	 * ]
 	 * Callers pass the full current set; cancelled attendees disappear on delete.
 	 *
-	 * @param int                  $eve_id
-	 * @param array<string,array{order_date:string,is_paid:int}> $rows
+	 * @param int   $eve_id
+	 * @param array $rows
 	 */
 	public static function replace_cvent_order_regs( int $eve_id, array $rows ): void {
 		global $wpdb;
@@ -546,11 +573,70 @@ class Hostlinks_DB {
 					'attendee_id' => $attendee_id,
 					'order_date'  => $order_date,
 					'is_paid'     => ! empty( $info['is_paid'] ) ? 1 : 0,
+					'first_name'  => sanitize_text_field( (string) ( $info['first_name'] ?? '' ) ),
+					'last_name'   => sanitize_text_field( (string) ( $info['last_name'] ?? '' ) ),
+					'email'       => sanitize_email( (string) ( $info['email'] ?? '' ) ),
+					'company'     => sanitize_text_field( (string) ( $info['company'] ?? '' ) ),
 					'synced_at'   => $now,
 				),
-				array( '%d', '%s', '%s', '%d', '%s' )
+				array( '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s' )
 			);
 		}
+	}
+
+	/**
+	 * Registrant rows for one order date (company-wide), for Daily Totals drill-down.
+	 *
+	 * @return array<int,array{name:string,email:string,company:string,event:string,paid:string,eve_id:int}>
+	 */
+	public static function get_order_regs_for_date( string $order_date ): array {
+		global $wpdb;
+		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $order_date ) ) {
+			return array();
+		}
+
+		$tbl = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$edl = $wpdb->prefix . 'event_details_list';
+
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT r.first_name, r.last_name, r.email, r.company, r.is_paid, r.eve_id,
+				        e.eve_location, e.cvent_event_title, e.eve_start
+				 FROM `{$tbl}` r
+				 INNER JOIN `{$edl}` e ON e.eve_id = r.eve_id AND e.eve_status = '1'
+				 WHERE r.order_date = %s
+				 ORDER BY e.eve_location ASC, r.last_name ASC, r.first_name ASC",
+				$order_date
+			),
+			ARRAY_A
+		);
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$first = trim( (string) ( $row['first_name'] ?? '' ) );
+			$last  = trim( (string) ( $row['last_name'] ?? '' ) );
+			$name  = trim( $last . ( $last && $first ? ', ' : '' ) . $first );
+			if ( $name === '' ) {
+				$name = '—';
+			}
+			$event = trim( (string) ( $row['eve_location'] ?? '' ) );
+			if ( $event === '' ) {
+				$event = trim( (string) ( $row['cvent_event_title'] ?? '' ) );
+			}
+			if ( $event === '' ) {
+				$event = 'Event #' . (int) $row['eve_id'];
+			}
+			$out[] = array(
+				'name'    => $name,
+				'email'   => (string) ( $row['email'] ?? '' ),
+				'company' => (string) ( $row['company'] ?? '' ),
+				'event'   => $event,
+				'paid'    => ! empty( $row['is_paid'] ) ? 'Paid' : 'Free',
+				'eve_id'  => (int) $row['eve_id'],
+			);
+		}
+
+		return $out;
 	}
 
 	/**

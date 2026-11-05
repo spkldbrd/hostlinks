@@ -39,7 +39,7 @@ if ( isset( $_POST['deleteentire'] ) ) {
 			$wpdb->update( $table11, array( 'eve_status' => 2 ), array( 'eve_id' => intval( $user ) ), array( '%d' ), array( '%d' ) );
 		}
 		do_action( 'hostlinks_event_updated' );
-		update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
+		update_option( 'last_data_updation', wp_date( 'Y-m-d H:i:s', null, $timezone ) );
 		$sucessmsgnew = '<div class="updated below-h2" id="message"><p>Event(s) deleted. <a href="admin.php?page=booking-menu&syear=' . esc_attr( $syear ) . '">Back to list</a></p></div>';
 	}
 
@@ -114,7 +114,7 @@ if ( isset( $_POST['deleteentire'] ) ) {
 					);
 				}
 			}
-			update_option( 'last_data_updation', wp_date( 'Y-m-d', null, $timezone ) );
+			update_option( 'last_data_updation', wp_date( 'Y-m-d H:i:s', null, $timezone ) );
 			do_action( 'hostlinks_event_updated' );
 			// Bust Marketing Ops public REST cache so the front-end sees fresh data immediately.
 			if ( class_exists( 'HMO_REST', false ) && is_callable( array( 'HMO_REST', 'flush_public_events_cache' ) ) ) {

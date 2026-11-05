@@ -80,10 +80,24 @@ class Hostlinks_Toolbar {
 		);
 	}
 
+	/**
+	 * "Updated: …" stamp for the Hostlinks toolbar (site timezone).
+	 * Prefers Y-m-d H:i:s (set by CVENT sync); falls back to legacy Y-m-d.
+	 */
 	public static function last_updated_display(): string {
-		$_upd_raw = get_option( 'last_data_updation', '' );
-		$_upd_dt  = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;
-		return $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->format( 'm/d' );
+		$_upd_raw = (string) get_option( 'last_data_updation', '' );
+		$tz       = wp_timezone();
+		if ( $_upd_raw !== '' ) {
+			$_upd_dt = DateTime::createFromFormat( 'Y-m-d H:i:s', $_upd_raw, $tz );
+			if ( $_upd_dt instanceof DateTime ) {
+				return $_upd_dt->format( 'm/d g:i a' );
+			}
+			$_upd_dt = DateTime::createFromFormat( 'Y-m-d', $_upd_raw, $tz );
+			if ( $_upd_dt instanceof DateTime ) {
+				return $_upd_dt->format( 'm/d' );
+			}
+		}
+		return ( new DateTime( 'now', $tz ) )->format( 'm/d g:i a' );
 	}
 
 	/**

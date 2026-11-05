@@ -28,7 +28,7 @@ if ( isset( $_POST['hostlinks_cvent_sync_all'] ) ) {
 	$sync_limit  = ( $dry_run && $limit_test ) ? 10 : 0;
 	$sync_report = Hostlinks_CVENT_Sync::sync_all( $dry_run, $sync_limit );
 	if ( ! $dry_run && ( $sync_report['synced'] ?? 0 ) > 0 ) {
-		update_option( 'last_data_updation', current_time( 'Y-m-d' ) );
+		update_option( 'last_data_updation', current_time( 'mysql' ) );
 	}
 }
 
@@ -39,7 +39,7 @@ if ( isset( $_POST['hostlinks_cvent_sync_one'] ) ) {
 	if ( $eve_id ) {
 		$sync_report = Hostlinks_CVENT_Sync::sync_one_or_family( $eve_id, $dry_run );
 		if ( ! $dry_run && ( $sync_report['synced'] ?? 0 ) > 0 ) {
-			update_option( 'last_data_updation', current_time( 'Y-m-d' ) );
+			update_option( 'last_data_updation', current_time( 'mysql' ) );
 		}
 	}
 }

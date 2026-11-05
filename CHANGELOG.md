@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.49 — 2026-11-05
+
+### Change: Updated stamp includes time
+- Toolbar “Updated:” shows date and time (e.g. `11/05 10:14 am`) after auto or manual CVENT sync.
+
+---
+
 ## v2.11.48 — 2026-11-05
 
 ### Improve: Daily Totals registrant modal

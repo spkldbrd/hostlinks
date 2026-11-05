@@ -109,9 +109,7 @@ if ( ! preg_match( '/^#[0-9a-f]{6}$/i', $hl_a2_color ) ) { $hl_a2_color = '#dc26
 // ── Pass 2: render ─────────────────────────────────────────────────────────
 $today         = new DateTime();
 $current_month = null;
-$_upd_raw      = get_option( 'last_data_updation', '' );
-$_upd_dt       = $_upd_raw ? DateTime::createFromFormat( 'Y-m-d', $_upd_raw ) : null;
-$last_updated  = $_upd_dt ? $_upd_dt->format( 'm/d' ) : ( new DateTime() )->format( 'm/d' );
+$last_updated  = Hostlinks_Toolbar::last_updated_display();
 
 $past_events_url      = Hostlinks_Page_URLs::get_past_events();
 $upcoming_url         = Hostlinks_Page_URLs::get_upcoming();

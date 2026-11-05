@@ -71,7 +71,7 @@ class Hostlinks_CVENT_Scheduler {
 
 		// Update the frontend "last data updated" date shown in the calendar view.
 		if ( ( $result['synced'] ?? 0 ) > 0 ) {
-			update_option( 'last_data_updation', current_time( 'Y-m-d' ) );
+			update_option( 'last_data_updation', current_time( 'mysql' ) );
 		}
 
 		// Store a compact log of the last run.

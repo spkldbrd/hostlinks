@@ -204,11 +204,24 @@ $events = $wpdb->get_results(
 		       AND UPPER(edl.eve_location) NOT LIKE '%| PRIVATE%'
 		     )
 		   )
-		 ORDER BY edl.eve_start DESC",
+		ORDER BY edl.eve_start DESC",
 		$cutoff
 	),
 	ARRAY_A
 );
+
+// Admin-bar "CVENT Sync Review" deep-link: only rows that need manual linking.
+$review_only = isset( $_GET['review'] ) && (string) $_GET['review'] === '1';
+if ( $review_only ) {
+	$events = array_values(
+		array_filter(
+			(array) $events,
+			static function( $ev ) {
+				return ( $ev['cvent_match_status'] ?? '' ) === 'needs_review';
+			}
+		)
+	);
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -227,6 +240,17 @@ function hl_cvent_status_badge( $status ) {
 ?>
 <div class="wrap">
 	<h1>CVENT Sync</h1>
+
+	<?php if ( $review_only ) : ?>
+		<div class="notice notice-warning" style="margin-top:12px;">
+			<p>
+				<strong>CVENT Sync Review:</strong>
+				Showing <?php echo count( $events ); ?> event<?php echo count( $events ) === 1 ? '' : 's'; ?>
+				that need a manual link.
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=cvent-sync' ) ); ?>">Show all events →</a>
+			</p>
+		</div>
+	<?php endif; ?>
 
 	<!-- Daily API call counter -->
 	<?php

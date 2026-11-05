@@ -9,9 +9,42 @@ class Hostlinks_Admin_Menus {
 		add_action( 'admin_menu',    array( $this, 'register_menus' ) );
 		add_action( 'admin_menu',    array( $this, 'reorder_menus' ), 9999 );
 		add_action( 'admin_notices', array( $this, 'new_events_notice' ) );
+		add_action( 'admin_bar_menu', array( $this, 'admin_bar_cvent_review' ), 80 );
+		add_action( 'admin_head',     array( $this, 'admin_bar_cvent_review_css' ) );
 		// Run Add/Convert POST before admin HTML so wp_safe_redirect works
 		// (page callbacks run after menus — redirect then yields a blank content area).
 		add_action( 'load-toplevel_page_booking-menu', array( $this, 'process_event_add_form' ) );
+	}
+
+	/**
+	 * Active events (same window as CVENT Sync list) with cvent_match_status = needs_review.
+	 */
+	public static function count_cvent_needs_review(): int {
+		global $wpdb;
+		$tbl    = $wpdb->prefix . 'event_details_list';
+		$mktr   = $wpdb->prefix . 'event_marketer';
+		$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*)
+				 FROM `{$tbl}` edl
+				 LEFT JOIN `{$mktr}` m ON m.event_marketer_id = edl.eve_marketer
+				 WHERE edl.eve_status = 1
+				   AND edl.eve_end >= %s
+				   AND edl.cvent_match_status = %s
+				   AND (
+				     edl.cvent_allow_private = 1
+				     OR (
+				       (m.event_marketer_name IS NULL OR UPPER(m.event_marketer_name) != 'PRIVATE')
+				       AND UPPER(edl.eve_location) NOT LIKE '%%|PRIVATE%%'
+				       AND UPPER(edl.eve_location) NOT LIKE '%%| PRIVATE%%'
+				     )
+				   )",
+				$cutoff,
+				'needs_review'
+			)
+		);
 	}
 
 	/**
@@ -47,7 +80,14 @@ class Hostlinks_Admin_Menus {
 		// The first submenu entry replaces the auto-generated duplicate of the parent
 		add_submenu_page( 'booking-menu', 'Events',          'Events',          'manage_options', 'booking-menu',              array( $this, 'page_events' ) );
 		add_submenu_page( 'booking-menu', 'Add New Event',   'Add New Event',   'manage_options', 'admin.php?page=booking-menu&add_event=1' );
-		add_submenu_page( 'booking-menu', 'CVENT Sync',      'CVENT Sync',      'manage_options', 'cvent-sync',                array( $this, 'page_cvent_sync' ) );
+
+		$review_count = self::count_cvent_needs_review();
+		$sync_label   = 'CVENT Sync';
+		if ( $review_count > 0 ) {
+			$sync_label .= ' <span class="awaiting-mod update-plugins" style="margin-left:4px;">'
+				. esc_html( (string) $review_count ) . '</span>';
+		}
+		add_submenu_page( 'booking-menu', 'CVENT Sync', $sync_label, 'manage_options', 'cvent-sync', array( $this, 'page_cvent_sync' ) );
 
 		// New CVENT Events — show a badge count when new events are waiting.
 		$new_count  = (int) get_option( 'hostlinks_cvent_new_count', 0 );
@@ -175,6 +215,78 @@ class Hostlinks_Admin_Menus {
 				$submenu['booking-menu'][] = $pinned[ $slug ];
 			}
 		}
+	}
+
+	/**
+	 * Top admin bar alert when CVENT matches need manual review.
+	 *
+	 * @param WP_Admin_Bar $wp_admin_bar
+	 */
+	public function admin_bar_cvent_review( $wp_admin_bar ) {
+		if ( ! current_user_can( 'manage_options' ) || ! is_admin_bar_showing() ) {
+			return;
+		}
+		$count = self::count_cvent_needs_review();
+		if ( $count <= 0 ) {
+			return;
+		}
+
+		$wp_admin_bar->add_node(
+			array(
+				'id'    => 'hostlinks-cvent-sync-review',
+				'title' => sprintf(
+					'CVENT Sync Review <span class="hostlinks-ab-count">%s</span>',
+					esc_html( (string) $count )
+				),
+				'href'  => admin_url( 'admin.php?page=cvent-sync&review=1' ),
+				'meta'  => array(
+					'title' => sprintf(
+						/* translators: %d: number of events */
+						_n(
+							'%d CVENT match needs manual review',
+							'%d CVENT matches need manual review',
+							$count,
+							'hostlinks'
+						),
+						$count
+					),
+				),
+			)
+		);
+	}
+
+	/**
+	 * Circle badge styling for the admin-bar CVENT Sync Review item.
+	 */
+	public function admin_bar_cvent_review_css() {
+		if ( ! is_admin_bar_showing() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		?>
+		<style id="hostlinks-ab-cvent-review">
+		#wpadminbar #wp-admin-bar-hostlinks-cvent-sync-review > .ab-item {
+			background: #d63638 !important;
+			color: #fff !important;
+		}
+		#wpadminbar #wp-admin-bar-hostlinks-cvent-sync-review:hover > .ab-item {
+			background: #b32d2e !important;
+			color: #fff !important;
+		}
+		#wpadminbar #wp-admin-bar-hostlinks-cvent-sync-review .hostlinks-ab-count {
+			display: inline-block;
+			min-width: 1.1em;
+			padding: 0 6px;
+			margin-left: 6px;
+			border-radius: 10px;
+			background: #fff;
+			color: #d63638;
+			font-size: 11px;
+			font-weight: 700;
+			line-height: 1.6;
+			vertical-align: 1px;
+		}
+		</style>
+		<?php
 	}
 
 	/**

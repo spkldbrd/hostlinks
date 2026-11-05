@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.46 — 2026-11-05
+
+### New: CVENT Sync Review admin alert
+- When events have **Needs Review**, a red **CVENT Sync Review** item with a count bubble appears in the WordPress admin bar (admins only).
+- Clicking it opens CVENT Sync filtered to those rows for manual linking.
+- The Hostlinks → CVENT Sync submenu also shows the count badge.
+
+---
+
 ## v2.11.45 — 2026-11-05
 
 ### Fix: Daily Totals registrant modal names + scroll

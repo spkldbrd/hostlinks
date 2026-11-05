@@ -81,23 +81,82 @@ class Hostlinks_Toolbar {
 	}
 
 	/**
-	 * "Updated: …" stamp for the Hostlinks toolbar (site timezone).
-	 * Prefers Y-m-d H:i:s (set by CVENT sync); falls back to legacy Y-m-d.
+	 * Persist the "Updated" stamp (site timezone mysql datetime).
+	 * Call after automatic or manual full CVENT sync.
 	 */
-	public static function last_updated_display(): string {
-		$_upd_raw = (string) get_option( 'last_data_updation', '' );
-		$tz       = wp_timezone();
-		if ( $_upd_raw !== '' ) {
-			$_upd_dt = DateTime::createFromFormat( 'Y-m-d H:i:s', $_upd_raw, $tz );
-			if ( $_upd_dt instanceof DateTime ) {
-				return $_upd_dt->format( 'm/d g:i a' );
-			}
-			$_upd_dt = DateTime::createFromFormat( 'Y-m-d', $_upd_raw, $tz );
-			if ( $_upd_dt instanceof DateTime ) {
-				return $_upd_dt->format( 'm/d' );
+	public static function touch_last_updated(): void {
+		update_option( 'last_data_updation', current_time( 'mysql' ) );
+	}
+
+	/**
+	 * Parse a site-timezone datetime string (mysql or date-only).
+	 */
+	private static function parse_updated_datetime( string $raw ): ?DateTime {
+		$raw = trim( $raw );
+		if ( $raw === '' ) {
+			return null;
+		}
+		$tz = wp_timezone();
+		$dt = DateTime::createFromFormat( 'Y-m-d H:i:s', $raw, $tz );
+		if ( $dt instanceof DateTime ) {
+			return $dt;
+		}
+		$dt = DateTime::createFromFormat( 'Y-m-d', $raw, $tz );
+		return ( $dt instanceof DateTime ) ? $dt : null;
+	}
+
+	/**
+	 * Best available last-updated DateTime (site timezone).
+	 * Prefers last_data_updation with time; otherwise uses CVENT sync log / last auto-run.
+	 *
+	 * @return array{0:?DateTime,1:bool} [datetime, has_time]
+	 */
+	public static function last_updated_datetime(): array {
+		$raw = trim( (string) get_option( 'last_data_updation', '' ) );
+		if ( preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $raw ) ) {
+			$dt = self::parse_updated_datetime( $raw );
+			if ( $dt instanceof DateTime ) {
+				return array( $dt, true );
 			}
 		}
-		return ( new DateTime( 'now', $tz ) )->format( 'm/d g:i a' );
+
+		$best = null;
+		$log  = get_option( 'hostlinks_cvent_schedule_log', null );
+		if ( is_array( $log ) && ! empty( $log['time'] ) ) {
+			$from_log = self::parse_updated_datetime( (string) $log['time'] );
+			if ( $from_log instanceof DateTime ) {
+				$best = $from_log;
+			}
+		}
+
+		$auto = self::parse_updated_datetime( (string) get_option( 'hostlinks_cvent_last_auto_run', '' ) );
+		if ( $auto instanceof DateTime && ( ! $best instanceof DateTime || $auto > $best ) ) {
+			$best = $auto;
+		}
+
+		if ( $best instanceof DateTime ) {
+			// Upgrade legacy date-only stamp so later loads stay fast.
+			update_option( 'last_data_updation', $best->format( 'Y-m-d H:i:s' ) );
+			return array( $best, true );
+		}
+
+		$primary = self::parse_updated_datetime( $raw );
+		if ( $primary instanceof DateTime ) {
+			return array( $primary, false );
+		}
+
+		return array( null, false );
+	}
+
+	/**
+	 * "Updated: …" stamp for the Hostlinks toolbar (site timezone).
+	 */
+	public static function last_updated_display(): string {
+		list( $dt, $has_time ) = self::last_updated_datetime();
+		if ( $dt instanceof DateTime ) {
+			return $has_time ? $dt->format( 'm/d g:i a' ) : $dt->format( 'm/d' );
+		}
+		return ( new DateTime( 'now', wp_timezone() ) )->format( 'm/d g:i a' );
 	}
 
 	/**

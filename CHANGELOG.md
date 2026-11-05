@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.50 — 2026-11-05
+
+### Fix: Updated stamp shows time without re-sync
+- If the stamp was still date-only, pull time from the last CVENT auto-sync log when available.
+- Full auto/manual sync always refreshes the stamp with date + time.
+
+---
+
 ## v2.11.49 — 2026-11-05
 
 ### Change: Updated stamp includes time

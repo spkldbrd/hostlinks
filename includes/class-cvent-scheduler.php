@@ -69,8 +69,10 @@ class Hostlinks_CVENT_Scheduler {
 			? Hostlinks_CVENT_API::get_call_count_today()
 			: $calls_before;
 
-		// Update the frontend "last data updated" date shown in the calendar view.
-		if ( ( $result['synced'] ?? 0 ) > 0 ) {
+		// Stamp toolbar "Updated:" after every completed auto sync (date + time).
+		if ( class_exists( 'Hostlinks_Toolbar', false ) ) {
+			Hostlinks_Toolbar::touch_last_updated();
+		} else {
 			update_option( 'last_data_updation', current_time( 'mysql' ) );
 		}
 

@@ -1176,13 +1176,22 @@ class Hostlinks_CVENT_Sync {
 			if ( empty( $meta['order_date'] ) ) {
 				continue;
 			}
-			$order_reg_rows[ $att_key ] = array(
-				'order_date' => $meta['order_date'],
-				'is_paid'    => ( $kind === 'paid' ) ? 1 : 0,
+			$ident = array(
 				'first_name' => $meta['first_name'] ?? '',
 				'last_name'  => $meta['last_name'] ?? '',
 				'email'      => $meta['email'] ?? '',
 				'company'    => $meta['company'] ?? '',
+			);
+			// Order-item expand often returns id-only stubs — fetch full attendee when blank.
+			$ident = self::fill_missing_attendee_identity( $att_key, $ident );
+
+			$order_reg_rows[ $att_key ] = array(
+				'order_date' => $meta['order_date'],
+				'is_paid'    => ( $kind === 'paid' ) ? 1 : 0,
+				'first_name' => $ident['first_name'],
+				'last_name'  => $ident['last_name'],
+				'email'      => $ident['email'],
+				'company'    => $ident['company'],
 			);
 		}
 		Hostlinks_DB::replace_cvent_order_regs( (int) $eve_id, $order_reg_rows );
@@ -1222,7 +1231,15 @@ class Hostlinks_CVENT_Sync {
 	 * @return array{first_name:string,last_name:string,email:string,company:string}
 	 */
 	private static function extract_attendee_identity( array $item ): array {
-		$att     = ( ! empty( $item['attendee'] ) && is_array( $item['attendee'] ) ) ? $item['attendee'] : array();
+		$att = ( ! empty( $item['attendee'] ) && is_array( $item['attendee'] ) ) ? $item['attendee'] : array();
+		return self::identity_from_attendee_record( $att );
+	}
+
+	/**
+	 * @param array $att CVENT attendee record (may include nested contact).
+	 * @return array{first_name:string,last_name:string,email:string,company:string}
+	 */
+	public static function identity_from_attendee_record( array $att ): array {
 		$contact = ( ! empty( $att['contact'] ) && is_array( $att['contact'] ) ) ? $att['contact'] : array();
 
 		return array(
@@ -1231,6 +1248,42 @@ class Hostlinks_CVENT_Sync {
 			'email'      => trim( (string) ( $att['email'] ?? $contact['email'] ?? '' ) ),
 			'company'    => trim( (string) ( $att['company'] ?? $att['companyName'] ?? $contact['company'] ?? $contact['companyName'] ?? '' ) ),
 		);
+	}
+
+	/**
+	 * If identity fields are empty, GET /attendees/{id} (same fallback roster uses).
+	 *
+	 * @param array{first_name:string,last_name:string,email:string,company:string} $ident
+	 * @return array{first_name:string,last_name:string,email:string,company:string}
+	 */
+	public static function fill_missing_attendee_identity( string $attendee_id, array $ident ): array {
+		$ident = array_merge(
+			array(
+				'first_name' => '',
+				'last_name'  => '',
+				'email'      => '',
+				'company'    => '',
+			),
+			$ident
+		);
+		if ( $ident['first_name'] !== '' || $ident['last_name'] !== '' || $ident['email'] !== '' ) {
+			return $ident;
+		}
+		$attendee_id = Hostlinks_CVENT_API::sanitize_uuid( $attendee_id ) ?: $attendee_id;
+		if ( $attendee_id === '' ) {
+			return $ident;
+		}
+		$fetched = Hostlinks_CVENT_API::get_attendee( $attendee_id );
+		if ( is_wp_error( $fetched ) || ! is_array( $fetched ) ) {
+			return $ident;
+		}
+		$from = self::identity_from_attendee_record( $fetched );
+		foreach ( array( 'first_name', 'last_name', 'email', 'company' ) as $k ) {
+			if ( $ident[ $k ] === '' && $from[ $k ] !== '' ) {
+				$ident[ $k ] = $from[ $k ];
+			}
+		}
+		return $ident;
 	}
 
 	/**

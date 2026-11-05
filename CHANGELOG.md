@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.45 — 2026-11-05
+
+### Fix: Daily Totals registrant modal names + scroll
+- Opening a day modal fills blank Name/Email/Company from CVENT (and saves them) when order-item expand had id-only stubs.
+- Sync also fetches full attendee records when identity is missing.
+- Modal list shows ~10 rows then scrolls inside the dialog.
+
+---
+
 ## v2.11.44 — 2026-11-04
 
 ### Change: Reports default range is Past 30 Days

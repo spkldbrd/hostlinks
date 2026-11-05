@@ -587,9 +587,12 @@ class Hostlinks_DB {
 	/**
 	 * Registrant rows for one order date (company-wide), for Daily Totals drill-down.
 	 *
+	 * When $enrich_blank is true, blank name/email rows are filled via CVENT
+	 * GET /attendees/{id} and persisted (fixes rows synced before identity storage).
+	 *
 	 * @return array<int,array{name:string,email:string,company:string,event:string,paid:string,eve_id:int}>
 	 */
-	public static function get_order_regs_for_date( string $order_date ): array {
+	public static function get_order_regs_for_date( string $order_date, bool $enrich_blank = false ): array {
 		global $wpdb;
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $order_date ) ) {
 			return array();
@@ -600,7 +603,7 @@ class Hostlinks_DB {
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT r.first_name, r.last_name, r.email, r.company, r.is_paid, r.eve_id,
+				"SELECT r.id, r.attendee_id, r.first_name, r.last_name, r.email, r.company, r.is_paid, r.eve_id,
 				        e.eve_location, e.cvent_event_title, e.eve_start
 				 FROM `{$tbl}` r
 				 INNER JOIN `{$edl}` e ON e.eve_id = r.eve_id AND e.eve_status = '1'
@@ -615,7 +618,42 @@ class Hostlinks_DB {
 		foreach ( (array) $rows as $row ) {
 			$first = trim( (string) ( $row['first_name'] ?? '' ) );
 			$last  = trim( (string) ( $row['last_name'] ?? '' ) );
-			$name  = trim( $last . ( $last && $first ? ', ' : '' ) . $first );
+			$email = trim( (string) ( $row['email'] ?? '' ) );
+			$co    = trim( (string) ( $row['company'] ?? '' ) );
+
+			if ( $enrich_blank && $first === '' && $last === '' && $email === ''
+				&& ! empty( $row['attendee_id'] )
+				&& class_exists( 'Hostlinks_CVENT_Sync', false ) ) {
+				$ident = Hostlinks_CVENT_Sync::fill_missing_attendee_identity(
+					(string) $row['attendee_id'],
+					array(
+						'first_name' => $first,
+						'last_name'  => $last,
+						'email'      => $email,
+						'company'    => $co,
+					)
+				);
+				if ( $ident['first_name'] !== '' || $ident['last_name'] !== '' || $ident['email'] !== '' || $ident['company'] !== '' ) {
+					$first = $ident['first_name'];
+					$last  = $ident['last_name'];
+					$email = $ident['email'];
+					$co    = $ident['company'];
+					$wpdb->update(
+						$tbl,
+						array(
+							'first_name' => $first,
+							'last_name'  => $last,
+							'email'      => $email,
+							'company'    => $co,
+						),
+						array( 'id' => (int) $row['id'] ),
+						array( '%s', '%s', '%s', '%s' ),
+						array( '%d' )
+					);
+				}
+			}
+
+			$name = trim( $last . ( $last && $first ? ', ' : '' ) . $first );
 			if ( $name === '' ) {
 				$name = '—';
 			}
@@ -628,8 +666,8 @@ class Hostlinks_DB {
 			}
 			$out[] = array(
 				'name'    => $name,
-				'email'   => (string) ( $row['email'] ?? '' ),
-				'company' => (string) ( $row['company'] ?? '' ),
+				'email'   => $email,
+				'company' => $co,
 				'event'   => $event,
 				'paid'    => ! empty( $row['is_paid'] ) ? 'Paid' : 'Free',
 				'eve_id'  => (int) $row['eve_id'],

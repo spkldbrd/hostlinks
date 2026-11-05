@@ -629,7 +629,9 @@
 .hl-day-modal__body {
   padding: 0;
   overflow: auto;
-  flex: 1;
+  flex: 1 1 auto;
+  /* ~10 data rows + sticky header, then scroll inside the modal */
+  max-height: 28rem;
 }
 .hl-day-modal__loading,
 .hl-day-modal__empty {

@@ -110,7 +110,8 @@ class Hostlinks_Shortcodes {
 			wp_send_json_error( 'Invalid date.' );
 		}
 
-		$rows = Hostlinks_DB::get_order_regs_for_date( $date );
+		// Enrich blank name/email from CVENT on open (and persist) so older syncs fill in.
+		$rows = Hostlinks_DB::get_order_regs_for_date( $date, true );
 		wp_send_json_success(
 			array(
 				'date'  => $date,

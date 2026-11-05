@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.44 — 2026-11-04
+
+### Change: Reports default range is Past 30 Days
+- Opening Reports with no query string now defaults to **Past 30 Days** (was 1 Year / months).
+
+---
+
 ## v2.11.43 — 2026-11-04
 
 ### Fix: Day-over-Day Trends use order dates

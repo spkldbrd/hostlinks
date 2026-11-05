@@ -44,9 +44,10 @@ class Hostlinks_Toolbar {
 		$months_options = self::reports_month_options();
 		$days_options   = self::reports_day_options();
 
-		$range_mode  = 'months';
+		// Default: Past 30 Days (order-date daily view).
+		$range_mode  = 'days';
 		$months_back = 12;
-		$days_back   = 14;
+		$days_back   = 30;
 		$date_from   = '';
 		$date_to     = '';
 
@@ -59,12 +60,14 @@ class Hostlinks_Toolbar {
 			$date_to    = sanitize_text_field( wp_unslash( $_GET['to'] ) );
 			if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_from )
 				|| ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_to ) ) {
-				$range_mode = 'months';
+				$range_mode  = 'days';
+				$days_back   = 30;
 			}
 		} elseif ( isset( $_GET['days'] ) && isset( $days_options[ (int) $_GET['days'] ] ) ) {
 			$range_mode = 'days';
 			$days_back  = (int) $_GET['days'];
 		} elseif ( isset( $_GET['months'] ) && isset( $months_options[ (int) $_GET['months'] ] ) ) {
+			$range_mode  = 'months';
 			$months_back = (int) $_GET['months'];
 		}
 

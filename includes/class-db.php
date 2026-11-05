@@ -590,7 +590,7 @@ class Hostlinks_DB {
 	 * When $enrich_blank is true, blank name/email rows are filled via CVENT
 	 * GET /attendees/{id} and persisted (fixes rows synced before identity storage).
 	 *
-	 * @return array<int,array{name:string,email:string,company:string,event:string,paid:string,eve_id:int}>
+	 * @return array<int,array{name:string,email:string,company:string,event:string,paid:string,eve_id:int,cvent_event_id:string}>
 	 */
 	public static function get_order_regs_for_date( string $order_date, bool $enrich_blank = false ): array {
 		global $wpdb;
@@ -604,7 +604,7 @@ class Hostlinks_DB {
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT r.id, r.attendee_id, r.first_name, r.last_name, r.email, r.company, r.is_paid, r.eve_id,
-				        e.eve_location, e.cvent_event_title, e.eve_start
+				        e.eve_location, e.cvent_event_title, e.eve_start, e.cvent_event_id
 				 FROM `{$tbl}` r
 				 INNER JOIN `{$edl}` e ON e.eve_id = r.eve_id AND e.eve_status = '1'
 				 WHERE r.order_date = %s
@@ -664,13 +664,23 @@ class Hostlinks_DB {
 			if ( $event === '' ) {
 				$event = 'Event #' . (int) $row['eve_id'];
 			}
+			$cvent_id = '';
+			if ( class_exists( 'Hostlinks_CVENT_API', false ) ) {
+				$cvent_id = Hostlinks_CVENT_API::sanitize_uuid( (string) ( $row['cvent_event_id'] ?? '' ) ) ?: '';
+			} else {
+				$cvent_id = preg_match( '/^[0-9a-f-]{36}$/i', (string) ( $row['cvent_event_id'] ?? '' ) )
+					? (string) $row['cvent_event_id']
+					: '';
+			}
+
 			$out[] = array(
-				'name'    => $name,
-				'email'   => $email,
-				'company' => $co,
-				'event'   => $event,
-				'paid'    => ! empty( $row['is_paid'] ) ? 'Paid' : 'Free',
-				'eve_id'  => (int) $row['eve_id'],
+				'name'           => $name,
+				'email'          => $email,
+				'company'        => $co,
+				'event'          => $event,
+				'paid'           => ! empty( $row['is_paid'] ) ? 'Paid' : 'Free',
+				'eve_id'         => (int) $row['eve_id'],
+				'cvent_event_id' => $cvent_id,
 			);
 		}
 

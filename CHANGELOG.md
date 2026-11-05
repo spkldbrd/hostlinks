@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.48 — 2026-11-05
+
+### Improve: Daily Totals registrant modal
+- Loading state shows a spinner while rows load.
+- Event name links to the CVENT event home page (`evtstub`) in a new tab.
+
+---
+
 ## v2.11.47 — 2026-11-05
 
 ### New: Multiple daily CVENT sync times

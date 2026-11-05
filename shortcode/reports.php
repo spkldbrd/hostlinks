@@ -278,7 +278,7 @@ $chart_data = array(
 				<button type="button" class="hl-day-modal__close" data-hl-day-close aria-label="Close">&times;</button>
 			</div>
 			<div id="hl-day-regs-body" class="hl-day-modal__body">
-				<p class="hl-day-modal__loading">Loading…</p>
+				<p class="hl-day-modal__loading"><span class="hl-day-modal__spinner" aria-hidden="true"></span> Loading…</p>
 			</div>
 		</div>
 	</div>
@@ -657,7 +657,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			modal.hidden = false;
 			document.body.style.overflow = 'hidden';
 			modalTitle.textContent = 'Registrants — ' + label;
-			modalBody.innerHTML = '<p class="hl-day-modal__loading">Loading…</p>';
+			modalBody.innerHTML = '<p class="hl-day-modal__loading"><span class="hl-day-modal__spinner" aria-hidden="true"></span> Loading…</p>';
 			var url = d.dayAjax.url
 				+ (d.dayAjax.url.indexOf('?') === -1 ? '?' : '&')
 				+ 'action=hostlinks_day_order_regs&date=' + encodeURIComponent(ymd)
@@ -683,11 +683,19 @@ document.addEventListener('DOMContentLoaded', function() {
 						var badge = row.paid === 'Paid'
 							? '<span class="hl-day-modal__paid">Paid</span>'
 							: '<span class="hl-day-modal__free">Free</span>';
+						var eventCell = escHtml(row.event);
+						if (row.cvent_event_id) {
+							var evtUrl = 'https://events.app.cvent.com/events/home?evtstub='
+								+ encodeURIComponent(row.cvent_event_id);
+							eventCell = '<a class="hl-day-modal__event-link" href="' + evtUrl
+								+ '" target="_blank" rel="noopener noreferrer">'
+								+ escHtml(row.event) + '</a>';
+						}
 						html += '<tr>'
 							+ '<td>' + escHtml(row.name) + '</td>'
 							+ '<td>' + escHtml(row.email || '—') + '</td>'
 							+ '<td>' + escHtml(row.company || '—') + '</td>'
-							+ '<td>' + escHtml(row.event) + '</td>'
+							+ '<td>' + eventCell + '</td>'
 							+ '<td>' + badge + '</td>'
 							+ '</tr>';
 					});

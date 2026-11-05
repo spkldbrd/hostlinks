@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.47 — 2026-11-05
+
+### New: Multiple daily CVENT sync times
+- Schedule up to **3 sync times per day** on the CVENT settings page (Add/Remove).
+- Free-tier API warning plus today’s usage, remaining budget, and estimated daily calls based on scheduled runs.
+- Scheduler stores measured API calls per auto-sync for better estimates.
+
+---
+
 ## v2.11.46 — 2026-11-05
 
 ### New: CVENT Sync Review admin alert

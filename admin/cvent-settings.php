@@ -7,11 +7,23 @@ if ( ! defined( 'ABSPATH' ) ) {
 $schedule_notice = '';
 if ( isset( $_POST['hostlinks_cvent_schedule_save'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_settings' );
-	$sched_days = array_map( 'intval', (array) ( $_POST['cvent_schedule_days'] ?? array() ) );
+	$sched_days  = array_map( 'intval', (array) ( $_POST['cvent_schedule_days'] ?? array() ) );
+	$hours       = array_map( 'intval', (array) ( $_POST['cvent_schedule_hour'] ?? array() ) );
+	$minutes     = array_map( 'intval', (array) ( $_POST['cvent_schedule_minute'] ?? array() ) );
+	$sched_times = array();
+	$n           = max( count( $hours ), count( $minutes ) );
+	for ( $i = 0; $i < $n && count( $sched_times ) < Hostlinks_CVENT_Scheduler::MAX_TIMES; $i++ ) {
+		$sched_times[] = array(
+			'hour'   => $hours[ $i ] ?? 9,
+			'minute' => $minutes[ $i ] ?? 0,
+		);
+	}
+	if ( empty( $sched_times ) ) {
+		$sched_times[] = array( 'hour' => 9, 'minute' => 0 );
+	}
 	Hostlinks_CVENT_Scheduler::save_settings(
 		! empty( $_POST['cvent_schedule_enabled'] ),
-		$_POST['cvent_schedule_hour']       ?? 9,
-		$_POST['cvent_schedule_minute']     ?? 0,
+		$sched_times,
 		$sched_days,
 		$_POST['cvent_schedule_offset_max'] ?? 45
 	);
@@ -277,8 +289,10 @@ $s = Hostlinks_CVENT_API::get_settings();
 	<?php echo $schedule_notice; ?>
 	<?php
 	$sched          = Hostlinks_CVENT_Scheduler::get_settings();
+	$sched_times    = Hostlinks_CVENT_Scheduler::normalize_times( $sched );
 	$last_log       = Hostlinks_CVENT_Scheduler::get_last_log();
 	$next_run       = Hostlinks_CVENT_Scheduler::next_run_display();
+	$api_est        = Hostlinks_CVENT_Scheduler::api_usage_estimate();
 	$tz_label       = wp_timezone_string();
 	$last_auto_run  = get_option( 'hostlinks_cvent_last_auto_run', '' );
 	$next_sched_raw = get_option( 'hostlinks_cvent_next_scheduled_run', '' );
@@ -295,9 +309,71 @@ $s = Hostlinks_CVENT_API::get_settings();
 		}
 	}
 	?>
-	<p>Automatically run a full CVENT sync on selected days at a set time with a random offset to make the schedule appear natural. Only events from the last 60 days forward are processed. Dry-run mode is <strong>not</strong> used — results are written live.</p>
+	<p>Automatically run a full CVENT sync on selected days at up to <strong>3 times per day</strong>, each with a random offset so the schedule looks natural. Only events from the last 60 days forward are processed. Dry-run mode is <strong>not</strong> used — results are written live.</p>
 
-	<table class="widefat striped" style="max-width:500px;margin-bottom:12px;">
+	<div class="notice notice-warning inline" style="margin:12px 0 16px;padding:10px 14px;">
+		<p style="margin:0;">
+			<strong>Free-tier API limit:</strong> CVENT allows about
+			<strong><?php echo number_format( Hostlinks_CVENT_Scheduler::API_DAILY_LIMIT ); ?></strong> API calls per day (UTC).
+			Each scheduled sync uses roughly the same call volume as a full Sync All.
+			Adding a 2nd or 3rd daily run multiplies usage — you may hit the daily limit and fail later syncs.
+		</p>
+	</div>
+
+	<table class="widefat striped" style="max-width:560px;margin-bottom:12px;">
+		<thead><tr><th colspan="2">API usage today (UTC)</th></tr></thead>
+		<tbody>
+			<tr>
+				<td><strong>Calls used today</strong></td>
+				<td>
+					<?php
+					$pct = min( 100, round( $api_est['calls_today'] / max( 1, $api_est['daily_limit'] ) * 100 ) );
+					$bar = $pct >= 90 ? '#d63638' : ( $pct >= 70 ? '#dba617' : '#0a6b00' );
+					?>
+					<strong style="color:<?php echo esc_attr( $bar ); ?>;"><?php echo number_format( $api_est['calls_today'] ); ?></strong>
+					/ <?php echo number_format( $api_est['daily_limit'] ); ?>
+					<span style="display:inline-block;width:140px;height:8px;background:#ddd;border-radius:3px;margin-left:10px;vertical-align:middle;">
+						<span style="display:block;width:<?php echo (int) $pct; ?>%;height:8px;background:<?php echo esc_attr( $bar ); ?>;border-radius:3px;"></span>
+					</span>
+				</td>
+			</tr>
+			<tr>
+				<td><strong>Remaining today</strong></td>
+				<td><?php echo number_format( $api_est['remaining_today'] ); ?></td>
+			</tr>
+			<tr>
+				<td><strong>Est. calls / sync</strong></td>
+				<td>
+					~<?php echo number_format( $api_est['estimated_per_sync'] ); ?>
+					<?php if ( null === $api_est['last_sync_calls'] ) : ?>
+						<em style="color:#888;">(estimate — measured after next auto-sync)</em>
+					<?php else : ?>
+						<em style="color:#888;">(from last auto-sync)</em>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<td><strong>Scheduled runs / day</strong></td>
+				<td><?php echo (int) $api_est['times_per_day']; ?></td>
+			</tr>
+			<tr>
+				<td><strong>Est. daily usage if all runs fire</strong></td>
+				<td>
+					<?php if ( $api_est['times_per_day'] > 0 ) : ?>
+						~<?php echo number_format( $api_est['estimated_daily'] ); ?>
+						/ <?php echo number_format( $api_est['daily_limit'] ); ?>
+						<?php if ( $api_est['over_limit'] ) : ?>
+							<span style="color:#d63638;font-weight:600;"> — may exceed free-tier limit</span>
+						<?php endif; ?>
+					<?php else : ?>
+						<em style="color:#888;">Scheduler disabled</em>
+					<?php endif; ?>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<table class="widefat striped" style="max-width:560px;margin-bottom:12px;">
 		<thead><tr><th colspan="2">Scheduler Status</th></tr></thead>
 		<tbody>
 			<tr>
@@ -318,6 +394,9 @@ $s = Hostlinks_CVENT_API::get_settings();
 						— <?php echo (int) $last_log['synced']; ?> synced,
 						<?php echo (int) $last_log['errors']; ?> errors,
 						<?php echo (int) $last_log['needs_review']; ?> need review
+						<?php if ( isset( $last_log['api_calls'] ) ) : ?>
+							· <?php echo (int) $last_log['api_calls']; ?> API calls
+						<?php endif; ?>
 					<?php else : ?>
 						<em style="color:#888;">No sync log yet</em>
 					<?php endif; ?>
@@ -343,7 +422,7 @@ $s = Hostlinks_CVENT_API::get_settings();
 	<?php if ( $last_log ) : ?>
 	<details style="margin-bottom:12px;">
 		<summary style="cursor:pointer;font-weight:600;">Last Auto-Sync Result detail</summary>
-		<table class="widefat striped" style="max-width:500px;margin-top:8px;">
+		<table class="widefat striped" style="max-width:560px;margin-top:8px;">
 			<tbody>
 				<tr><td><strong>Events processed</strong></td><td><?php echo (int) $last_log['total_events']; ?></td></tr>
 				<tr><td><strong>Synced (counts written)</strong></td><td><?php echo (int) $last_log['synced']; ?></td></tr>
@@ -351,12 +430,13 @@ $s = Hostlinks_CVENT_API::get_settings();
 				<tr><td><strong>Needs review</strong></td><td><?php echo (int) $last_log['needs_review']; ?></td></tr>
 				<tr><td><strong>No candidates</strong></td><td><?php echo (int) $last_log['no_candidates']; ?></td></tr>
 				<tr><td><strong>Errors</strong></td><td><?php echo (int) $last_log['errors']; ?></td></tr>
+				<tr><td><strong>API calls this run</strong></td><td><?php echo isset( $last_log['api_calls'] ) ? (int) $last_log['api_calls'] : '—'; ?></td></tr>
 			</tbody>
 		</table>
 	</details>
 	<?php endif; ?>
 
-	<form method="post">
+	<form method="post" id="hl-cvent-schedule-form">
 		<?php wp_nonce_field( 'hostlinks_cvent_settings' ); ?>
 		<table class="form-table" role="presentation">
 			<tr>
@@ -387,24 +467,82 @@ $s = Hostlinks_CVENT_API::get_settings();
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label>Base time</label></th>
+				<th scope="row"><label>Sync times</label></th>
 				<td>
-					<select name="cvent_schedule_hour" style="width:80px;">
-					<?php for ( $h = 0; $h < 24; $h++ ) : ?>
-						<option value="<?php echo $h; ?>" <?php selected( (int) $sched['hour'], $h ); ?>>
-							<?php echo str_pad( $h, 2, '0', STR_PAD_LEFT ); ?>
-						</option>
-					<?php endfor; ?>
-					</select>
-					:
-					<select name="cvent_schedule_minute" style="width:80px;">
-					<?php foreach ( array( 0, 15, 30, 45 ) as $m ) : ?>
-						<option value="<?php echo $m; ?>" <?php selected( (int) $sched['minute'], $m ); ?>>
-							<?php echo str_pad( $m, 2, '0', STR_PAD_LEFT ); ?>
-						</option>
-					<?php endforeach; ?>
-					</select>
-					<p class="description">Site timezone: <strong><?php echo esc_html( $tz_label ); ?></strong>. Default: 9:00 AM.</p>
+					<p class="description" style="margin-top:0;">Site timezone: <strong><?php echo esc_html( $tz_label ); ?></strong>. Max <?php echo (int) Hostlinks_CVENT_Scheduler::MAX_TIMES; ?> times per day.</p>
+					<div id="hl-cvent-times" data-max="<?php echo (int) Hostlinks_CVENT_Scheduler::MAX_TIMES; ?>">
+						<?php foreach ( $sched_times as $ti => $slot ) : ?>
+						<div class="hl-cvent-time-row" style="margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+							<select name="cvent_schedule_hour[]" style="width:80px;">
+							<?php for ( $h = 0; $h < 24; $h++ ) : ?>
+								<option value="<?php echo $h; ?>" <?php selected( (int) $slot['hour'], $h ); ?>>
+									<?php echo str_pad( (string) $h, 2, '0', STR_PAD_LEFT ); ?>
+								</option>
+							<?php endfor; ?>
+							</select>
+							:
+							<select name="cvent_schedule_minute[]" style="width:80px;">
+							<?php foreach ( array( 0, 15, 30, 45 ) as $m ) : ?>
+								<option value="<?php echo $m; ?>" <?php selected( (int) $slot['minute'], $m ); ?>>
+									<?php echo str_pad( (string) $m, 2, '0', STR_PAD_LEFT ); ?>
+								</option>
+							<?php endforeach; ?>
+							</select>
+							<button type="button" class="button hl-cvent-time-remove" <?php echo count( $sched_times ) <= 1 ? 'disabled' : ''; ?>>Remove</button>
+						</div>
+						<?php endforeach; ?>
+					</div>
+					<p style="margin:8px 0 0;">
+						<button type="button" class="button" id="hl-cvent-time-add"
+							<?php echo count( $sched_times ) >= Hostlinks_CVENT_Scheduler::MAX_TIMES ? 'disabled' : ''; ?>>
+							+ Add time
+						</button>
+					</p>
+					<template id="hl-cvent-time-template">
+						<div class="hl-cvent-time-row" style="margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+							<select name="cvent_schedule_hour[]" style="width:80px;">
+							<?php for ( $h = 0; $h < 24; $h++ ) : ?>
+								<option value="<?php echo $h; ?>" <?php selected( 9, $h ); ?>>
+									<?php echo str_pad( (string) $h, 2, '0', STR_PAD_LEFT ); ?>
+								</option>
+							<?php endfor; ?>
+							</select>
+							:
+							<select name="cvent_schedule_minute[]" style="width:80px;">
+							<?php foreach ( array( 0, 15, 30, 45 ) as $m ) : ?>
+								<option value="<?php echo $m; ?>"><?php echo str_pad( (string) $m, 2, '0', STR_PAD_LEFT ); ?></option>
+							<?php endforeach; ?>
+							</select>
+							<button type="button" class="button hl-cvent-time-remove">Remove</button>
+						</div>
+					</template>
+					<script>
+					(function(){
+						var wrap = document.getElementById('hl-cvent-times');
+						var addBtn = document.getElementById('hl-cvent-time-add');
+						var tpl = document.getElementById('hl-cvent-time-template');
+						if (!wrap || !addBtn || !tpl) return;
+						var max = parseInt(wrap.getAttribute('data-max') || '3', 10);
+						function rows(){ return wrap.querySelectorAll('.hl-cvent-time-row'); }
+						function refresh(){
+							var n = rows().length;
+							addBtn.disabled = n >= max;
+							wrap.querySelectorAll('.hl-cvent-time-remove').forEach(function(b){ b.disabled = n <= 1; });
+						}
+						addBtn.addEventListener('click', function(){
+							if (rows().length >= max) return;
+							wrap.appendChild(tpl.content.cloneNode(true));
+							refresh();
+						});
+						wrap.addEventListener('click', function(e){
+							var btn = e.target.closest('.hl-cvent-time-remove');
+							if (!btn || rows().length <= 1) return;
+							btn.closest('.hl-cvent-time-row').remove();
+							refresh();
+						});
+						refresh();
+					})();
+					</script>
 				</td>
 			</tr>
 			<tr>
@@ -417,7 +555,7 @@ $s = Hostlinks_CVENT_API::get_settings();
 						</option>
 					<?php endforeach; ?>
 					</select>
-					<p class="description">A random offset is added or subtracted from the base time on each run, making the schedule look like a human triggered it. Default: ±45 min.</p>
+					<p class="description">A random offset is added or subtracted from each base time on each run. Default: ±45 min.</p>
 				</td>
 			</tr>
 		</table>
@@ -441,12 +579,21 @@ $s = Hostlinks_CVENT_API::get_settings();
 
 	<hr />
 	<h2>API Call Budget (Free Tier)</h2>
-	<table class="widefat striped" style="max-width:500px;">
+	<table class="widefat striped" style="max-width:560px;">
 		<thead><tr><th>Limit</th><th>Value</th></tr></thead>
 		<tbody>
-			<tr><td>Daily calls</td><td>1,000</td></tr>
+			<tr><td>Daily calls</td><td><?php echo number_format( Hostlinks_CVENT_Scheduler::API_DAILY_LIMIT ); ?> (resets midnight UTC)</td></tr>
 			<tr><td>Per second</td><td>2</td></tr>
-			<tr><td>Estimated calls / sync</td><td>~1 + number of active events</td></tr>
+			<tr><td>Calls used today</td><td><?php echo number_format( $api_est['calls_today'] ); ?></td></tr>
+			<tr><td>Est. calls / sync</td><td>~<?php echo number_format( $api_est['estimated_per_sync'] ); ?></td></tr>
+			<tr><td>Est. with current schedule</td><td>
+				<?php if ( $api_est['times_per_day'] > 0 ) : ?>
+					~<?php echo number_format( $api_est['estimated_daily'] ); ?> / day
+					(<?php echo (int) $api_est['times_per_day']; ?> × ~<?php echo number_format( $api_est['estimated_per_sync'] ); ?>)
+				<?php else : ?>
+					—
+				<?php endif; ?>
+			</td></tr>
 		</tbody>
 	</table>
 

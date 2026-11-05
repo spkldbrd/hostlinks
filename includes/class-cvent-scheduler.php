@@ -6,18 +6,19 @@
  *
  * Uses wp_schedule_single_event() rather than a repeating interval so that:
  *   - Day-of-week filtering is respected (skip weekends, etc.).
- *   - A random ±offset is applied to each day's scheduled time, making the
- *     run pattern appear less robotic.
+ *   - A random ±offset is applied to each run, making the schedule appear
+ *     less robotic.
+ *   - Up to 3 base times per day are supported.
  *
  * After each run, the next single event is scheduled immediately with a fresh
- * random offset. maybe_reschedule() runs on every page load to self-heal if
- * the cron is missing or settings have changed.
+ * random offset. maybe_reschedule() runs on admin_init to self-heal if the
+ * cron is missing or settings have changed.
  *
  * Option shape ('hostlinks_cvent_schedule'):
  *   enabled    bool     Whether the scheduler is active.
- *   hour       int      Base hour (0–23, site timezone). Default 9.
- *   minute     int      Base minute (0–59). Default 0.
- *   days       int[]    Days of week to run: 0=Sun,1=Mon,…,6=Sat. Default [1-5].
+ *   times      array    Up to 3 {hour, minute} slots (site timezone).
+ *   hour/minute int     Legacy single time (migrated into times[]).
+ *   days       int[]    Days of week to run: 0=Sun…6=Sat. Default [1-5].
  *   offset_max int      Max random ± offset in minutes. Default 45.
  */
 
@@ -31,13 +32,15 @@ class Hostlinks_CVENT_Scheduler {
 	const OPTION_KEY = 'hostlinks_cvent_schedule';
 	const LOG_KEY    = 'hostlinks_cvent_schedule_log';
 	const HASH_KEY   = 'hostlinks_cvent_schedule_hash';
+	const MAX_TIMES  = 3;
+	const API_DAILY_LIMIT = 1000;
 
 	// -------------------------------------------------------------------------
 	// Bootstrap
 	// -------------------------------------------------------------------------
 
 	public static function init() {
-		add_action( self::HOOK,  array( __CLASS__, 'run' ) );
+		add_action( self::HOOK, array( __CLASS__, 'run' ) );
 		// Restrict self-healing to admin page loads — wp_next_scheduled() runs a
 		// DB query, so firing on every frontend request is unnecessary overhead.
 		add_action( 'admin_init', array( __CLASS__, 'maybe_reschedule' ) );
@@ -56,7 +59,15 @@ class Hostlinks_CVENT_Scheduler {
 		// hung/errored sync leaves a breadcrumb on the settings page.
 		update_option( 'hostlinks_cvent_last_auto_run', current_time( 'mysql' ), false );
 
+		$calls_before = class_exists( 'Hostlinks_CVENT_API', false )
+			? Hostlinks_CVENT_API::get_call_count_today()
+			: 0;
+
 		$result = Hostlinks_CVENT_Sync::sync_all( false ); // live run
+
+		$calls_after = class_exists( 'Hostlinks_CVENT_API', false )
+			? Hostlinks_CVENT_API::get_call_count_today()
+			: $calls_before;
 
 		// Update the frontend "last data updated" date shown in the calendar view.
 		if ( ( $result['synced'] ?? 0 ) > 0 ) {
@@ -72,6 +83,7 @@ class Hostlinks_CVENT_Scheduler {
 			'no_candidates' => $result['no_candidates'] ?? 0,
 			'errors'        => $result['errors']        ?? 0,
 			'total_events'  => count( $result['results'] ?? array() ),
+			'api_calls'     => max( 0, $calls_after - $calls_before ),
 		);
 		update_option( self::LOG_KEY, $log, false );
 
@@ -94,7 +106,7 @@ class Hostlinks_CVENT_Scheduler {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Called on every page load. Self-heals the schedule if:
+	 * Called on admin_init. Self-heals the schedule if:
 	 *   - Schedule is disabled → clears any queued event.
 	 *   - Settings changed     → clears old event, queues new one.
 	 *   - No event is queued   → queues one.
@@ -142,88 +154,147 @@ class Hostlinks_CVENT_Scheduler {
 	}
 
 	/**
-	 * Calculate the Unix timestamp for the next valid run.
+	 * Calculate the Unix timestamp for the next valid run among configured times.
 	 *
-	 * Finds the next day (from now, looking up to 8 days ahead) that is in the
-	 * configured days-of-week list, sets the base time, then applies a random
-	 * ±offset_max minute jitter.
-	 *
-	 * @param array $settings  Result of get_settings().
-	 * @return int|null  Unix timestamp, or null if no valid day found.
+	 * @param array $settings Result of get_settings().
+	 * @return int|null Unix timestamp, or null if no valid day found.
 	 */
 	private static function next_run_timestamp( $settings ) {
-		$days       = (array) ( $settings['days']       ?? array( 1, 2, 3, 4, 5 ) );
-		$hour       = (int)   ( $settings['hour']       ?? 9 );
-		$minute     = (int)   ( $settings['minute']     ?? 0 );
-		$offset_max = (int)   ( $settings['offset_max'] ?? 45 );
+		$days       = (array) ( $settings['days'] ?? array( 1, 2, 3, 4, 5 ) );
+		$times      = self::normalize_times( $settings );
+		$offset_max = (int) ( $settings['offset_max'] ?? 45 );
 
-		if ( empty( $days ) ) {
+		if ( empty( $days ) || empty( $times ) ) {
 			return null;
 		}
 
 		$tz            = wp_timezone();
 		$now           = new DateTime( 'now', $tz );
-		$random_offset = ( $offset_max > 0 ) ? rand( -$offset_max, $offset_max ) : 0;
+		$random_offset = ( $offset_max > 0 ) ? wp_rand( -$offset_max, $offset_max ) : 0;
+		$best          = null;
 
 		// Look forward up to 8 days.
 		for ( $i = 0; $i <= 8; $i++ ) {
-			$candidate = clone $now;
+			$day = clone $now;
 			if ( $i > 0 ) {
-				$candidate->modify( "+{$i} day" );
+				$day->modify( "+{$i} day" );
 			}
 
-			// PHP date('w'): 0 = Sunday, 1 = Monday, …, 6 = Saturday.
-			$dow = (int) $candidate->format( 'w' );
+			// PHP date('w'): 0 = Sunday … 6 = Saturday.
+			$dow = (int) $day->format( 'w' );
 			if ( ! in_array( $dow, $days, true ) ) {
 				continue;
 			}
 
-			$candidate->setTime( $hour, $minute, 0 );
+			foreach ( $times as $slot ) {
+				$candidate = clone $day;
+				$candidate->setTime( (int) $slot['hour'], (int) $slot['minute'], 0 );
 
-			// Apply random offset.
-			if ( $random_offset !== 0 ) {
-				$abs = abs( $random_offset );
-				$candidate->modify( ( $random_offset > 0 ? '+' : '-' ) . "{$abs} minutes" );
-			}
+				if ( $random_offset !== 0 ) {
+					$abs = abs( $random_offset );
+					$candidate->modify( ( $random_offset > 0 ? '+' : '-' ) . "{$abs} minutes" );
+				}
 
-			if ( $candidate > $now ) {
-				return $candidate->getTimestamp();
+				if ( $candidate > $now && ( null === $best || $candidate < $best ) ) {
+					$best = $candidate;
+				}
 			}
 		}
 
-		return null;
+		return $best ? $best->getTimestamp() : null;
 	}
 
 	// -------------------------------------------------------------------------
 	// Settings helpers
 	// -------------------------------------------------------------------------
 
+	/**
+	 * Normalize up to MAX_TIMES unique hour/minute slots (migrate legacy hour/minute).
+	 *
+	 * @param array $settings
+	 * @return array<int,array{hour:int,minute:int}>
+	 */
+	public static function normalize_times( array $settings ): array {
+		$raw = $settings['times'] ?? null;
+		if ( ! is_array( $raw ) || empty( $raw ) ) {
+			$raw = array(
+				array(
+					'hour'   => (int) ( $settings['hour'] ?? 9 ),
+					'minute' => (int) ( $settings['minute'] ?? 0 ),
+				),
+			);
+		}
+
+		$out = array();
+		foreach ( $raw as $t ) {
+			if ( ! is_array( $t ) ) {
+				continue;
+			}
+			$h   = max( 0, min( 23, (int) ( $t['hour'] ?? 0 ) ) );
+			$m   = max( 0, min( 59, (int) ( $t['minute'] ?? 0 ) ) );
+			$key = sprintf( '%02d:%02d', $h, $m );
+			$out[ $key ] = array(
+				'hour'   => $h,
+				'minute' => $m,
+			);
+			if ( count( $out ) >= self::MAX_TIMES ) {
+				break;
+			}
+		}
+
+		if ( empty( $out ) ) {
+			$out['09:00'] = array( 'hour' => 9, 'minute' => 0 );
+		}
+
+		ksort( $out );
+		return array_values( $out );
+	}
+
 	public static function get_settings() {
 		$defaults = array(
 			'enabled'    => false,
-			'hour'       => 9,
-			'minute'     => 0,
+			'times'      => array( array( 'hour' => 9, 'minute' => 0 ) ),
+			'hour'       => 9, // legacy
+			'minute'     => 0, // legacy
 			'days'       => array( 1, 2, 3, 4, 5 ), // Mon–Fri
 			'offset_max' => 45,
 		);
-		$saved = get_option( self::OPTION_KEY, array() );
-		return wp_parse_args( $saved, $defaults );
+		$saved              = get_option( self::OPTION_KEY, array() );
+		$merged             = wp_parse_args( is_array( $saved ) ? $saved : array(), $defaults );
+		$merged['times']    = self::normalize_times( $merged );
+		$merged['hour']     = $merged['times'][0]['hour'];
+		$merged['minute']   = $merged['times'][0]['minute'];
+		return $merged;
 	}
 
-	public static function save_settings( $enabled, $hour, $minute, $days = array(), $offset_max = 45 ) {
+	/**
+	 * @param bool  $enabled
+	 * @param array $times      Up to 3 {hour, minute} entries (or legacy hour/minute via save_settings_legacy).
+	 * @param array $days
+	 * @param int   $offset_max
+	 */
+	public static function save_settings( $enabled, $times, $days = array(), $offset_max = 45 ) {
 		$days = array_values( array_unique( array_filter(
 			array_map( 'intval', (array) $days ),
-			function( $d ) { return $d >= 0 && $d <= 6; }
+			function( $d ) {
+				return $d >= 0 && $d <= 6;
+			}
 		) ) );
 		sort( $days );
 
-		update_option( self::OPTION_KEY, array(
-			'enabled'    => (bool) $enabled,
-			'hour'       => max( 0, min( 23, (int) $hour ) ),
-			'minute'     => max( 0, min( 59, (int) $minute ) ),
-			'days'       => $days ?: array( 1, 2, 3, 4, 5 ),
-			'offset_max' => max( 0, min( 120, (int) $offset_max ) ),
-		) );
+		$normalized = self::normalize_times( array( 'times' => (array) $times ) );
+
+		update_option(
+			self::OPTION_KEY,
+			array(
+				'enabled'    => (bool) $enabled,
+				'times'      => $normalized,
+				'hour'       => $normalized[0]['hour'],
+				'minute'     => $normalized[0]['minute'],
+				'days'       => $days ?: array( 1, 2, 3, 4, 5 ),
+				'offset_max' => max( 0, min( 120, (int) $offset_max ) ),
+			)
+		);
 	}
 
 	public static function get_last_log() {
@@ -240,5 +311,66 @@ class Hostlinks_CVENT_Scheduler {
 		$dt = new DateTime( '@' . $ts );
 		$dt->setTimezone( $tz );
 		return $dt->format( 'D, M j Y \a\t g:i a T' );
+	}
+
+	/**
+	 * Estimate API usage for the configured schedule.
+	 *
+	 * @return array{
+	 *   calls_today:int,
+	 *   daily_limit:int,
+	 *   last_sync_calls:int|null,
+	 *   times_per_day:int,
+	 *   estimated_per_sync:int,
+	 *   estimated_daily:int,
+	 *   remaining_today:int,
+	 *   over_limit:bool
+	 * }
+	 */
+	public static function api_usage_estimate(): array {
+		$settings      = self::get_settings();
+		$times         = self::normalize_times( $settings );
+		$times_per_day = $settings['enabled'] ? count( $times ) : 0;
+		$calls_today   = class_exists( 'Hostlinks_CVENT_API', false )
+			? Hostlinks_CVENT_API::get_call_count_today()
+			: 0;
+		$log           = self::get_last_log();
+		$last_calls    = ( isset( $log['api_calls'] ) && (int) $log['api_calls'] > 0 )
+			? (int) $log['api_calls']
+			: null;
+
+		// Fallback estimate when we have not measured a sync yet: ~2 calls/event + overhead.
+		$event_count = 0;
+		if ( null === $last_calls ) {
+			global $wpdb;
+			$tbl    = $wpdb->prefix . 'event_details_list';
+			$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
+			$event_count = (int) $wpdb->get_var(
+				$wpdb->prepare(
+					"SELECT COUNT(*) FROM `{$tbl}` WHERE eve_status = 1 AND eve_end >= %s",
+					$cutoff
+				)
+			);
+			$last_calls = max( 10, 2 + ( $event_count * 2 ) );
+		}
+
+		$estimated_daily = $times_per_day * $last_calls;
+		$remaining       = max( 0, self::API_DAILY_LIMIT - $calls_today );
+
+		$measured = ( isset( $log['api_calls'] ) && (int) $log['api_calls'] > 0 )
+			? (int) $log['api_calls']
+			: null;
+
+		return array(
+			'calls_today'         => $calls_today,
+			'daily_limit'         => self::API_DAILY_LIMIT,
+			'last_sync_calls'     => $measured,
+			'times_per_day'       => $times_per_day,
+			'estimated_per_sync'  => $last_calls,
+			'estimated_daily'     => $estimated_daily,
+			'remaining_today'     => $remaining,
+			'over_limit'          => $estimated_daily > self::API_DAILY_LIMIT,
+			'syncable_events'     => $event_count,
+		);
 	}
 }

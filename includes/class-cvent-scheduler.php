@@ -8,7 +8,8 @@
  *   - Day-of-week filtering is respected (skip weekends, etc.).
  *   - A random ±offset is applied to each run, making the schedule appear
  *     less robotic.
- *   - Up to 3 base times per day are supported.
+ *   - Up to 3 base times per day are supported — after each run, the next
+ *     base slot (e.g. 08:00 → 14:00 → next day 08:00) is scheduled.
  *
  * After each run, the next single event is scheduled immediately with a fresh
  * random offset. maybe_reschedule() runs on admin_init to self-heal if the
@@ -41,7 +42,7 @@ class Hostlinks_CVENT_Scheduler {
 
 	public static function init() {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		// Restrict self-healing to admin page loads — wp_next_scheduled() runs a
+		// Restrict self-healing to admin page loads — scanning cron runs a
 		// DB query, so firing on every frontend request is unnecessary overhead.
 		add_action( 'admin_init', array( __CLASS__, 'maybe_reschedule' ) );
 	}
@@ -50,7 +51,10 @@ class Hostlinks_CVENT_Scheduler {
 	// Run the sync (cron callback)
 	// -------------------------------------------------------------------------
 
-	public static function run() {
+	/**
+	 * @param string $slot Slot key that was scheduled, e.g. "08:00" (from cron args).
+	 */
+	public static function run( $slot = '' ) {
 		if ( ! class_exists( 'Hostlinks_CVENT_Sync' ) ) {
 			return;
 		}
@@ -86,19 +90,18 @@ class Hostlinks_CVENT_Scheduler {
 			'errors'        => $result['errors']        ?? 0,
 			'total_events'  => count( $result['results'] ?? array() ),
 			'api_calls'     => max( 0, $calls_after - $calls_before ),
+			'slot'          => is_string( $slot ) ? $slot : '',
 		);
 		update_option( self::LOG_KEY, $log, false );
 
-		// Schedule the next single event with a fresh random offset.
+		// Schedule the next base slot (e.g. morning → afternoon → next day).
 		$settings = self::get_settings();
 		if ( $settings['enabled'] ) {
-			$next_ts = self::next_run_timestamp( $settings );
-			if ( $next_ts ) {
-				wp_schedule_single_event( $next_ts, self::HOOK );
+			$after_base = self::floor_after_completed_run( is_string( $slot ) ? $slot : '', $settings );
+			$planned    = self::plan_next_run( $settings, $after_base );
+			if ( $planned ) {
+				self::schedule_event( $planned['timestamp'], $planned['slot'] );
 				update_option( self::HASH_KEY, md5( serialize( $settings ) ) );
-				// Record the next scheduled time so the settings page can display
-				// it even if wp_next_scheduled() returns an unexpected value.
-				update_option( 'hostlinks_cvent_next_scheduled_run', gmdate( 'Y-m-d H:i:s', $next_ts ), false );
 			}
 		}
 	}
@@ -125,7 +128,7 @@ class Hostlinks_CVENT_Scheduler {
 
 		$settings_hash = md5( serialize( $settings ) );
 		$stored_hash   = get_option( self::HASH_KEY, '' );
-		$next          = wp_next_scheduled( self::HOOK );
+		$next          = self::next_scheduled_ts();
 
 		$needs = false;
 		if ( ! $next ) {
@@ -138,30 +141,84 @@ class Hostlinks_CVENT_Scheduler {
 
 		if ( $needs ) {
 			self::clear();
-			$next_ts = self::next_run_timestamp( $settings );
-			if ( $next_ts ) {
-				wp_schedule_single_event( $next_ts, self::HOOK );
+			// Floor = now so we pick the next remaining slot today (or tomorrow).
+			$planned = self::plan_next_run( $settings, new DateTime( 'now', wp_timezone() ) );
+			if ( $planned ) {
+				self::schedule_event( $planned['timestamp'], $planned['slot'] );
 				update_option( self::HASH_KEY, $settings_hash );
-				update_option( 'hostlinks_cvent_next_scheduled_run', gmdate( 'Y-m-d H:i:s', $next_ts ), false );
 			}
 		}
 	}
 
-	/** Remove any queued instance of the hook. */
+	/** Remove any queued instance of the hook (any slot args). */
 	public static function clear() {
-		$ts = wp_next_scheduled( self::HOOK );
-		if ( $ts ) {
-			wp_unschedule_event( $ts, self::HOOK );
-		}
+		wp_clear_scheduled_hook( self::HOOK );
 	}
 
 	/**
-	 * Calculate the Unix timestamp for the next valid run among configured times.
-	 *
-	 * @param array $settings Result of get_settings().
-	 * @return int|null Unix timestamp, or null if no valid day found.
+	 * @param int    $timestamp Unix timestamp (UTC).
+	 * @param string $slot      e.g. "14:00".
 	 */
-	private static function next_run_timestamp( $settings ) {
+	private static function schedule_event( int $timestamp, string $slot ): void {
+		wp_schedule_single_event( $timestamp, self::HOOK, array( $slot ) );
+		update_option( 'hostlinks_cvent_next_scheduled_run', gmdate( 'Y-m-d H:i:s', $timestamp ), false );
+	}
+
+	/**
+	 * Soonest queued cron timestamp for our hook (any args), or 0.
+	 */
+	private static function next_scheduled_ts(): int {
+		$crons = _get_cron_array();
+		if ( empty( $crons ) || ! is_array( $crons ) ) {
+			return 0;
+		}
+		foreach ( $crons as $ts => $hooks ) {
+			if ( isset( $hooks[ self::HOOK ] ) ) {
+				return (int) $ts;
+			}
+		}
+		return 0;
+	}
+
+	/**
+	 * Base DateTime for a slot key on today's site calendar (or null).
+	 */
+	private static function base_datetime_from_slot( string $slot ): ?DateTime {
+		if ( ! preg_match( '/^(\d{1,2}):(\d{2})$/', $slot, $m ) ) {
+			return null;
+		}
+		$dt = new DateTime( 'now', wp_timezone() );
+		$dt->setTime( (int) $m[1], (int) $m[2], 0 );
+		return $dt;
+	}
+
+	/**
+	 * Floor used after a run so we advance to the *next* base slot.
+	 * Prefer the scheduled slot base (08:00). If unknown (legacy cron), push
+	 * "now" forward by offset_max so an early 07:53 fire still skips 08:00.
+	 */
+	private static function floor_after_completed_run( string $slot, array $settings ): DateTime {
+		$from_slot = self::base_datetime_from_slot( $slot );
+		if ( $from_slot instanceof DateTime ) {
+			return $from_slot;
+		}
+		$floor = new DateTime( 'now', wp_timezone() );
+		$om    = (int) ( $settings['offset_max'] ?? 45 );
+		if ( $om > 0 ) {
+			$floor->modify( "+{$om} minutes" );
+		}
+		return $floor;
+	}
+
+	/**
+	 * Plan the next run: first base slot strictly after $after_base (or now),
+	 * then apply a random ±offset (clamped so it never lands in the past).
+	 *
+	 * @param array          $settings
+	 * @param DateTime|null  $after_base Slot base that just ran; null → floor at now.
+	 * @return array{timestamp:int,slot:string}|null
+	 */
+	private static function plan_next_run( array $settings, $after_base = null ) {
 		$days       = (array) ( $settings['days'] ?? array( 1, 2, 3, 4, 5 ) );
 		$times      = self::normalize_times( $settings );
 		$offset_max = (int) ( $settings['offset_max'] ?? 45 );
@@ -170,40 +227,74 @@ class Hostlinks_CVENT_Scheduler {
 			return null;
 		}
 
-		$tz            = wp_timezone();
-		$now           = new DateTime( 'now', $tz );
-		$random_offset = ( $offset_max > 0 ) ? wp_rand( -$offset_max, $offset_max ) : 0;
-		$best          = null;
+		$tz  = wp_timezone();
+		$now = new DateTime( 'now', $tz );
 
-		// Look forward up to 8 days.
+		// Floor for base-slot selection: the slot that just ran, else "now".
+		// Using the slot base (e.g. 08:00) — not the early offset fire (07:53) —
+		// ensures the afternoon slot is next instead of re-picking morning.
+		if ( $after_base instanceof DateTime ) {
+			$floor = clone $after_base;
+			$floor->setTimezone( $tz );
+		} else {
+			$floor = clone $now;
+		}
+
+		$best_base = null;
+		$best_slot = null;
+
 		for ( $i = 0; $i <= 8; $i++ ) {
 			$day = clone $now;
 			if ( $i > 0 ) {
 				$day->modify( "+{$i} day" );
 			}
+			$day->setTime( 0, 0, 0 );
 
-			// PHP date('w'): 0 = Sunday … 6 = Saturday.
 			$dow = (int) $day->format( 'w' );
 			if ( ! in_array( $dow, $days, true ) ) {
 				continue;
 			}
 
 			foreach ( $times as $slot ) {
-				$candidate = clone $day;
-				$candidate->setTime( (int) $slot['hour'], (int) $slot['minute'], 0 );
+				$base = clone $day;
+				$base->setTime( (int) $slot['hour'], (int) $slot['minute'], 0 );
+				$slot_key = sprintf( '%02d:%02d', (int) $slot['hour'], (int) $slot['minute'] );
 
-				if ( $random_offset !== 0 ) {
-					$abs = abs( $random_offset );
-					$candidate->modify( ( $random_offset > 0 ? '+' : '-' ) . "{$abs} minutes" );
+				// Strictly after the floor base (or now when first scheduling).
+				if ( $base <= $floor ) {
+					continue;
 				}
 
-				if ( $candidate > $now && ( null === $best || $candidate < $best ) ) {
-					$best = $candidate;
+				if ( null === $best_base || $base < $best_base ) {
+					$best_base = $base;
+					$best_slot = $slot_key;
 				}
 			}
 		}
 
-		return $best ? $best->getTimestamp() : null;
+		if ( ! $best_base || ! $best_slot ) {
+			return null;
+		}
+
+		$candidate = clone $best_base;
+		if ( $offset_max > 0 ) {
+			$offset = wp_rand( -$offset_max, $offset_max );
+			if ( $offset !== 0 ) {
+				$abs = abs( $offset );
+				$candidate->modify( ( $offset > 0 ? '+' : '-' ) . "{$abs} minutes" );
+			}
+		}
+
+		// Never schedule in the past (negative offset near "now").
+		if ( $candidate <= $now ) {
+			$candidate = clone $now;
+			$candidate->modify( '+1 minute' );
+		}
+
+		return array(
+			'timestamp' => $candidate->getTimestamp(),
+			'slot'      => $best_slot,
+		);
 	}
 
 	// -------------------------------------------------------------------------
@@ -271,7 +362,7 @@ class Hostlinks_CVENT_Scheduler {
 
 	/**
 	 * @param bool  $enabled
-	 * @param array $times      Up to 3 {hour, minute} entries (or legacy hour/minute via save_settings_legacy).
+	 * @param array $times      Up to 3 {hour, minute} entries.
 	 * @param array $days
 	 * @param int   $offset_max
 	 */
@@ -305,7 +396,7 @@ class Hostlinks_CVENT_Scheduler {
 
 	/** Human-readable next scheduled run in the site timezone. */
 	public static function next_run_display() {
-		$ts = wp_next_scheduled( self::HOOK );
+		$ts = self::next_scheduled_ts();
 		if ( ! $ts ) {
 			return null;
 		}

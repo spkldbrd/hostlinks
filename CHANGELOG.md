@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.51 — 2026-11-05
+
+### Fix: Multi-time daily sync advances to the next slot
+- After a morning run, the scheduler now queues the next base time (e.g. 2:00 PM) instead of jumping to tomorrow’s morning.
+- Each cron event stores its slot so early offset fires (7:53 for an 8:00 base) still skip that slot.
+
+---
+
 ## v2.11.50 — 2026-11-05
 
 ### Fix: Updated stamp shows time without re-sync

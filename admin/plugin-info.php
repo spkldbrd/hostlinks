@@ -25,9 +25,17 @@ $cert_installed = Hostlinks_Cert_Installer::is_installed();
 $cert_active    = $cert_installed && Hostlinks_Cert_Installer::is_active();
 $cert_version   = $cert_installed ? Hostlinks_Cert_Installer::installed_version() : null;
 
+// Zoom companion plugin status
+$zoom_installed      = Hostlinks_Zoom_Installer::is_installed();
+$zoom_active         = $zoom_installed && Hostlinks_Zoom_Installer::is_active();
+$zoom_version        = $zoom_installed ? Hostlinks_Zoom_Installer::installed_version() : null;
+$zoom_latest         = Hostlinks_Zoom_Installer::latest_remote_version();
+$zoom_update_available = $zoom_latest && $zoom_version && version_compare( $zoom_latest, $zoom_version, '>' );
+
 // Install result notices (from redirect after admin-post handlers)
 $hl_mktops_result = isset( $_GET['hl_mktops'] ) ? sanitize_key( $_GET['hl_mktops'] ) : '';
 $hl_cert_result   = isset( $_GET['hl_cert'] )   ? sanitize_key( $_GET['hl_cert'] )   : '';
+$hl_zoom_result   = isset( $_GET['hl_zoom'] )   ? sanitize_key( $_GET['hl_zoom'] )   : '';
 $install_notices  = array(
 	'installed'        => array( 'success', '' ), // message filled per-plugin below
 	'already_installed'=> array( 'info',    '' ),
@@ -43,6 +51,12 @@ $mktops_notices = array(
 $cert_notices = array(
 	'installed'         => array( 'success', 'Certificate Generator installed successfully. You can now activate it on the Plugins page.' ),
 	'already_installed' => array( 'info',    'Certificate Generator is already installed.' ),
+	'github_fail'       => array( 'error',   'Could not reach GitHub to fetch the latest release. Check your server\'s outbound connectivity.' ),
+	'install_fail'      => array( 'error',   'Installation failed. WordPress could not extract or save the plugin files. Check file permissions.' ),
+);
+$zoom_notices = array(
+	'installed'         => array( 'success', 'Hostlinks Zoom installed successfully. You can now activate it on the Plugins page.' ),
+	'already_installed' => array( 'info',    'Hostlinks Zoom is already installed.' ),
 	'github_fail'       => array( 'error',   'Could not reach GitHub to fetch the latest release. Check your server\'s outbound connectivity.' ),
 	'install_fail'      => array( 'error',   'Installation failed. WordPress could not extract or save the plugin files. Check file permissions.' ),
 );
@@ -106,7 +120,7 @@ $cert_notices = array(
 	<?php endif; ?>
 
 	<p style="color:#999;font-size:12px;margin-top:12px;">
-		The latest GitHub release is checked live each time this page loads.
+		The latest GitHub release for Hostlinks (and companions below) is checked when this page loads.
 	</p>
 
 	<?php /* ── Companion Plugin: Marketing Ops ─────────────────────────── */ ?>
@@ -244,6 +258,108 @@ $cert_notices = array(
 		</a>
 		&nbsp;
 		<span style="color:#999;font-size:12px;">Downloads the latest release directly from GitHub.</span>
+	</p>
+	<?php endif; ?>
+
+	<?php /* ── Companion Plugin: Zoom ─────────────────────────────────── */ ?>
+	<h2 style="margin-top:2.5rem;">Companion Plugin — Zoom</h2>
+
+	<?php if ( $hl_zoom_result && isset( $zoom_notices[ $hl_zoom_result ] ) ) :
+		[ $notice_type, $notice_msg ] = $zoom_notices[ $hl_zoom_result ];
+		$notice_colors = array(
+			'success' => 'border:#00a32a;background:#f0f9f0;color:#0a4e22',
+			'info'    => 'border:#72aee6;background:#f0f5fb;color:#1d3557',
+			'error'   => 'border:#d63638;background:#fdf0f0;color:#6e2020',
+		);
+		$notice_style = $notice_colors[ $notice_type ] ?? '';
+	?>
+	<div style="<?php echo esc_attr( $notice_style ); ?>;border-left:4px solid;padding:10px 16px;margin-bottom:16px;border-radius:2px;">
+		<?php echo esc_html( $notice_msg ); ?>
+	</div>
+	<?php endif; ?>
+
+	<table class="widefat striped" style="max-width:680px;">
+		<tbody>
+			<tr>
+				<th style="width:200px;">Plugin Name</th>
+				<td>Hostlinks Zoom</td>
+			</tr>
+			<tr>
+				<th>Status</th>
+				<td>
+					<?php if ( $zoom_active ) : ?>
+						<span style="color:#00a32a;font-weight:600;">&#10003; Active</span>
+						<?php if ( $zoom_version ) : ?>
+							&nbsp;<span style="color:#666;">(v<?php echo esc_html( $zoom_version ); ?>)</span>
+						<?php endif; ?>
+					<?php elseif ( $zoom_installed ) : ?>
+						<span style="color:#996800;font-weight:600;">&#9888; Installed — not activated</span>
+						&nbsp;&nbsp;
+						<a href="<?php echo esc_url( Hostlinks_Zoom_Installer::activate_url() ); ?>"
+						   class="button button-small button-primary">Activate</a>
+					<?php else : ?>
+						<span style="color:#999;font-weight:600;">&#10007; Not installed</span>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th>Installed Version</th>
+				<td>
+					<?php if ( $zoom_version ) : ?>
+						<strong><?php echo esc_html( $zoom_version ); ?></strong>
+					<?php else : ?>
+						<span style="color:#999;">—</span>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th>Latest Version</th>
+				<td>
+					<?php if ( $zoom_latest ) : ?>
+						<strong><?php echo esc_html( $zoom_latest ); ?></strong>
+						<?php if ( $zoom_update_available ) : ?>
+							&nbsp;<span style="color:#d63638;font-weight:600;">&#9650; Update available</span>
+						<?php elseif ( $zoom_installed ) : ?>
+							&nbsp;<span style="color:#00a32a;font-weight:600;">&#10003; Up to date</span>
+						<?php endif; ?>
+					<?php else : ?>
+						<span style="color:#999;">Unable to reach GitHub — check server connectivity.</span>
+					<?php endif; ?>
+				</td>
+			</tr>
+			<tr>
+				<th>GitHub Repository</th>
+				<td>
+					<?php
+					$zoom_repo_url = 'https://github.com/' . Hostlinks_Zoom_Installer::GITHUB_USER . '/' . Hostlinks_Zoom_Installer::GITHUB_REPO;
+					?>
+					<a href="<?php echo esc_url( $zoom_repo_url ); ?>" target="_blank" rel="noopener"><?php echo esc_html( $zoom_repo_url ); ?></a>
+				</td>
+			</tr>
+			<tr>
+				<th>Description</th>
+				<td>Matches past Zoom classes to cloud recordings and emails replay links to active registrants.</td>
+			</tr>
+		</tbody>
+	</table>
+
+	<?php if ( ! $zoom_installed ) : ?>
+	<p style="margin-top:14px;">
+		<a href="<?php echo esc_url( Hostlinks_Zoom_Installer::install_url() ); ?>"
+		   class="button button-primary"
+		   onclick="return confirm('This will download and install the Hostlinks Zoom plugin from GitHub. Continue?');">
+			&#11015; Install Hostlinks Zoom Now
+		</a>
+		&nbsp;
+		<span style="color:#999;font-size:12px;">Downloads the latest release directly from GitHub.</span>
+	</p>
+	<?php elseif ( $zoom_update_available ) : ?>
+	<p style="margin-top:14px;">
+		<a href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>" class="button button-primary" style="color:#fff;background:#d63638;border-color:#c32d2e;">
+			Go to Updates &rarr;
+		</a>
+		&nbsp;
+		<span style="color:#999;font-size:12px;">Hostlinks Zoom has its own GitHub updater once activated.</span>
 	</p>
 	<?php endif; ?>
 

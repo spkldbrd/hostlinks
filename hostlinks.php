@@ -3,7 +3,7 @@
  * Plugin Name: Hostlinks
  * Plugin URI:  https://digitalsolution.com
  * Description: Event management tool for tracking hosted events, marketers, instructors, and types.
- * Version:     2.11.51
+ * Version:     2.11.52
  * Author:      Digital Solution
  * Author URI:  https://digitalsolution.com
  * License:     GPL2
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'HOSTLINKS_VERSION',    '2.11.51' );
+define( 'HOSTLINKS_VERSION',    '2.11.52' );
 define( 'HOSTLINKS_DB_VERSION', '2.10' );
 define( 'HOSTLINKS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'HOSTLINKS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -45,6 +45,7 @@ require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-sync.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cvent-scheduler.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-mktops-installer.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-cert-installer.php';
+require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-zoom-installer.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-instructor-api.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-emailcraft-push.php';
 require_once HOSTLINKS_PLUGIN_DIR . 'includes/class-roster.php';
@@ -74,6 +75,9 @@ Hostlinks_MktOps_Installer::init();
 
 // Certificate Generator one-click installer (admin-post action)
 Hostlinks_Cert_Installer::init();
+
+// Zoom companion one-click installer (admin-post action)
+Hostlinks_Zoom_Installer::init();
 
 // Automation REST API (instructor assignment + read endpoints)
 Hostlinks_Instructor_API::init();

@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.52 — 2026-11-06
+
+### New: Hostlinks Zoom on Plugin Info
+- Companion block for **Hostlinks Zoom** (`spkldbrd/hostlinks-zoom`) with install/activate, installed vs latest GitHub version, and one-click install from the latest release zip.
+
+---
+
 ## v2.11.51 — 2026-11-05
 
 ### Fix: Multi-time daily sync advances to the next slot

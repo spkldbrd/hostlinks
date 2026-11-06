@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.53 — 2026-11-06
+
+### New: Incremental CVENT sync probe
+- Settings page: **Incremental Sync Probe** tries date-window attendees/orders strategies (read-only) and shows which event IDs map to Hostlinks — so we can validate a cheaper “today only” sync before building it.
+
+---
+
 ## v2.11.52 — 2026-11-06
 
 ### New: Hostlinks Zoom on Plugin Info

@@ -823,6 +823,204 @@ class Hostlinks_CVENT_API {
 	}
 
 	// -------------------------------------------------------------------------
+	// Incremental sync probe (read-only experiments)
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Probe whether CVENT can return attendees/orders for a date window
+	 * without walking every event. Used by Settings → Incremental Sync Probe.
+	 *
+	 * Tries several documented strategies (after/before params, created /
+	 * lastModified filters, account-level orders). Each strategy uses at most
+	 * one page (limit 50) so the probe stays cheap.
+	 *
+	 * @param string $after_utc  ISO-8601 UTC, e.g. 2026-11-06T08:00:00Z
+	 * @param string $before_utc ISO-8601 UTC
+	 * @return array{
+	 *   after:string,
+	 *   before:string,
+	 *   strategies:array<string,array>,
+	 *   linked_events:array<string,array{eve_id:int,label:string}>,
+	 *   calls_used:int
+	 * }
+	 */
+	public static function probe_incremental_window( string $after_utc, string $before_utc ): array {
+		$calls_before = self::get_call_count_today();
+
+		$strategies = array(
+			'attendees_after_before' => array(
+				'label'    => 'GET /attendees?after=&before= (SDK date params)',
+				'endpoint' => 'attendees',
+				'params'   => array(
+					'after'  => $after_utc,
+					'before' => $before_utc,
+					'limit'  => 50,
+				),
+			),
+			'attendees_filter_created' => array(
+				'label'    => "GET /attendees?filter=created ge … and created le …",
+				'endpoint' => 'attendees',
+				'params'   => array(
+					'filter' => "created ge '" . $after_utc . "' and created le '" . $before_utc . "'",
+					'limit'  => 50,
+				),
+			),
+			'attendees_filter_lastModified' => array(
+				'label'    => "GET /attendees?filter=lastModified ge …",
+				'endpoint' => 'attendees',
+				'params'   => array(
+					'filter' => "lastModified ge '" . $after_utc . "'",
+					'limit'  => 50,
+				),
+			),
+			'orders_after_before' => array(
+				'label'    => 'GET /orders?after=&before= (account-level orders)',
+				'endpoint' => 'orders',
+				'params'   => array(
+					'after'  => $after_utc,
+					'before' => $before_utc,
+					'limit'  => 50,
+				),
+			),
+			'orders_items_flat_after_before' => array(
+				'label'    => 'GET /orders/items?after=&before= (flat order items)',
+				'endpoint' => 'orders/items',
+				'params'   => array(
+					'after'  => $after_utc,
+					'before' => $before_utc,
+					'limit'  => 50,
+				),
+			),
+		);
+
+		$linked = self::linked_cvent_event_map();
+		$out    = array();
+
+		foreach ( $strategies as $key => $strat ) {
+			$url = self::BASE_URL . $strat['endpoint'] . '?'
+				. http_build_query( $strat['params'], '', '&', PHP_QUERY_RFC3986 );
+			$res = self::request( $strat['endpoint'], $strat['params'] );
+
+			if ( is_wp_error( $res ) ) {
+				$out[ $key ] = array(
+					'label'          => $strat['label'],
+					'ok'             => false,
+					'error'          => $res->get_error_message(),
+					'url'            => $url,
+					'count'          => 0,
+					'sample_keys'    => array(),
+					'sample'         => null,
+					'event_ids'      => array(),
+					'linked_eve_ids' => array(),
+					'unlinked_ids'   => array(),
+				);
+				continue;
+			}
+
+			$rows = isset( $res['data'] ) && is_array( $res['data'] ) ? $res['data'] : array();
+			$sample = $rows[0] ?? null;
+			$event_ids = array();
+			foreach ( $rows as $row ) {
+				$eid = self::extract_event_id_from_record( $row );
+				if ( $eid !== '' ) {
+					$event_ids[ $eid ] = true;
+				}
+			}
+			$event_ids = array_keys( $event_ids );
+			$linked_hits = array();
+			$unlinked    = array();
+			foreach ( $event_ids as $eid ) {
+				if ( isset( $linked[ $eid ] ) ) {
+					$linked_hits[ $eid ] = $linked[ $eid ];
+				} else {
+					$unlinked[] = $eid;
+				}
+			}
+
+			$out[ $key ] = array(
+				'label'          => $strat['label'],
+				'ok'             => true,
+				'error'          => null,
+				'url'            => $url,
+				'count'          => count( $rows ),
+				'has_more'       => ! empty( $res['paging']['nextToken'] ),
+				'sample_keys'    => is_array( $sample ) ? array_keys( $sample ) : array(),
+				'sample'         => $sample,
+				'event_ids'      => $event_ids,
+				'linked_eve_ids' => $linked_hits,
+				'unlinked_ids'   => $unlinked,
+			);
+		}
+
+		return array(
+			'after'         => $after_utc,
+			'before'        => $before_utc,
+			'strategies'    => $out,
+			'linked_events' => $linked,
+			'calls_used'    => max( 0, self::get_call_count_today() - $calls_before ),
+		);
+	}
+
+	/**
+	 * Best-effort event UUID from an attendee or order record.
+	 */
+	public static function extract_event_id_from_record( array $row ): string {
+		$candidates = array(
+			$row['eventId'] ?? null,
+			$row['event_id'] ?? null,
+			is_array( $row['event'] ?? null ) ? ( $row['event']['id'] ?? null ) : null,
+			is_string( $row['event'] ?? null ) ? $row['event'] : null,
+		);
+		foreach ( $candidates as $c ) {
+			if ( ! is_string( $c ) || $c === '' ) {
+				continue;
+			}
+			$clean = self::sanitize_uuid( $c );
+			if ( $clean ) {
+				return $clean;
+			}
+		}
+		return '';
+	}
+
+	/**
+	 * Map of linked CVENT event UUID → Hostlinks eve_id + label.
+	 *
+	 * @return array<string,array{eve_id:int,label:string}>
+	 */
+	public static function linked_cvent_event_map(): array {
+		global $wpdb;
+		$tbl  = $wpdb->prefix . 'event_details_list';
+		$rows = $wpdb->get_results(
+			"SELECT eve_id, cvent_event_id, eve_location, cvent_event_title
+			 FROM `{$tbl}`
+			 WHERE eve_status = 1
+			   AND cvent_event_id IS NOT NULL
+			   AND cvent_event_id != ''",
+			ARRAY_A
+		);
+		$map = array();
+		foreach ( (array) $rows as $r ) {
+			$id = self::sanitize_uuid( (string) ( $r['cvent_event_id'] ?? '' ) );
+			if ( ! $id ) {
+				continue;
+			}
+			$label = trim( (string) ( $r['eve_location'] ?? '' ) );
+			if ( $label === '' ) {
+				$label = trim( (string) ( $r['cvent_event_title'] ?? '' ) );
+			}
+			if ( $label === '' ) {
+				$label = 'Event #' . (int) $r['eve_id'];
+			}
+			$map[ $id ] = array(
+				'eve_id' => (int) $r['eve_id'],
+				'label'  => $label,
+			);
+		}
+		return $map;
+	}
+
+	// -------------------------------------------------------------------------
 	// PAID / FREE logic
 	// -------------------------------------------------------------------------
 

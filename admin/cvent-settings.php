@@ -213,6 +213,24 @@ if ( isset( $_POST['hostlinks_cvent_diag'] ) ) {
 	}
 }
 
+// ── Incremental sync probe (date-window attendees / orders) ───────────────────
+$incr_probe = null;
+if ( isset( $_POST['hostlinks_cvent_incr_probe'] ) ) {
+	check_admin_referer( 'hostlinks_cvent_settings' );
+	$hours = max( 1, min( 168, (int) ( $_POST['incr_probe_hours'] ?? 24 ) ) );
+	$tz    = wp_timezone();
+	$before = new DateTime( 'now', $tz );
+	$after  = clone $before;
+	$after->modify( "-{$hours} hours" );
+	// CVENT after/before expect UTC ISO-8601.
+	$after_utc  = ( clone $after )->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d\TH:i:s\Z' );
+	$before_utc = ( clone $before )->setTimezone( new DateTimeZone( 'UTC' ) )->format( 'Y-m-d\TH:i:s\Z' );
+	$incr_probe = Hostlinks_CVENT_API::probe_incremental_window( $after_utc, $before_utc );
+	$incr_probe['hours']          = $hours;
+	$incr_probe['after_local']    = $after->format( 'Y-m-d H:i:s T' );
+	$incr_probe['before_local']   = $before->format( 'Y-m-d H:i:s T' );
+}
+
 $s = Hostlinks_CVENT_API::get_settings();
 ?>
 <?php if ( empty( $hl_embedded ) ) : ?>
@@ -596,6 +614,129 @@ $s = Hostlinks_CVENT_API::get_settings();
 			</td></tr>
 		</tbody>
 	</table>
+
+	<hr />
+	<h2>Incremental Sync Probe</h2>
+	<p>
+		Read-only test: can we ask CVENT for <strong>recent registrations across the account</strong>
+		(instead of one order-items call per event)? Tries several date-window strategies,
+		one page each (limit 50). Does <em>not</em> write Hostlinks data.
+	</p>
+	<form method="post">
+		<?php wp_nonce_field( 'hostlinks_cvent_settings' ); ?>
+		<table class="form-table" role="presentation">
+			<tr>
+				<th scope="row"><label for="incr_probe_hours">Look back</label></th>
+				<td>
+					<select id="incr_probe_hours" name="incr_probe_hours">
+						<?php
+						$sel_hours = isset( $_POST['incr_probe_hours'] ) ? (int) $_POST['incr_probe_hours'] : 24;
+						foreach ( array( 6, 12, 24, 48, 72 ) as $h ) :
+						?>
+						<option value="<?php echo (int) $h; ?>" <?php selected( $sel_hours, $h ); ?>>
+							Last <?php echo (int) $h; ?> hours
+						</option>
+						<?php endforeach; ?>
+					</select>
+					<p class="description">Window is converted to UTC for the API. Uses ~5 API calls.</p>
+				</td>
+			</tr>
+		</table>
+		<p>
+			<button type="submit" name="hostlinks_cvent_incr_probe" class="button button-secondary">
+				Run Incremental Probe
+			</button>
+		</p>
+	</form>
+
+	<?php if ( is_array( $incr_probe ) ) : ?>
+	<div style="background:#fff;border:1px solid #ccd0d4;padding:16px;margin-top:12px;border-radius:4px;">
+		<h3 style="margin-top:0;">Probe Result</h3>
+		<p>
+			Window (site): <code><?php echo esc_html( $incr_probe['after_local'] ); ?></code>
+			→ <code><?php echo esc_html( $incr_probe['before_local'] ); ?></code><br>
+			Window (UTC): <code><?php echo esc_html( $incr_probe['after'] ); ?></code>
+			→ <code><?php echo esc_html( $incr_probe['before'] ); ?></code><br>
+			API calls used for this probe: <strong><?php echo (int) ( $incr_probe['calls_used'] ?? 0 ); ?></strong>
+			· Linked Hostlinks events in map: <strong><?php echo count( $incr_probe['linked_events'] ?? array() ); ?></strong>
+		</p>
+
+		<table class="widefat striped" style="margin-bottom:12px;">
+			<thead>
+				<tr>
+					<th>Strategy</th>
+					<th>Result</th>
+					<th>Rows</th>
+					<th>Distinct event IDs</th>
+					<th>Linked in Hostlinks</th>
+				</tr>
+			</thead>
+			<tbody>
+			<?php foreach ( (array) ( $incr_probe['strategies'] ?? array() ) as $sk => $sr ) : ?>
+				<tr style="<?php echo ! empty( $sr['ok'] ) ? 'background:#e6f4ea;' : ''; ?>">
+					<td>
+						<strong><?php echo esc_html( $sr['label'] ?? $sk ); ?></strong>
+						<details style="margin-top:4px;">
+							<summary style="cursor:pointer;font-size:11px;color:#666;">URL</summary>
+							<code style="font-size:10px;word-break:break-all;"><?php echo esc_html( $sr['url'] ?? '' ); ?></code>
+						</details>
+					</td>
+					<td>
+						<?php if ( ! empty( $sr['ok'] ) ) : ?>
+							<span style="color:#0a6b00;font-weight:600;">&#10003; OK</span>
+							<?php if ( ! empty( $sr['has_more'] ) ) : ?>
+								<br><small style="color:#996800;">More pages available (probe stopped at 50)</small>
+							<?php endif; ?>
+						<?php else : ?>
+							<span style="color:#d63638;">&#9888; <?php echo esc_html( $sr['error'] ?? 'Failed' ); ?></span>
+						<?php endif; ?>
+					</td>
+					<td><?php echo ! empty( $sr['ok'] ) ? (int) $sr['count'] : '—'; ?></td>
+					<td><?php echo ! empty( $sr['ok'] ) ? count( $sr['event_ids'] ?? array() ) : '—'; ?></td>
+					<td>
+						<?php if ( empty( $sr['ok'] ) ) : ?>
+							—
+						<?php else : ?>
+							<?php echo count( $sr['linked_eve_ids'] ?? array() ); ?>
+							<?php if ( ! empty( $sr['linked_eve_ids'] ) ) : ?>
+								<ul style="margin:6px 0 0;padding-left:1.1rem;font-size:12px;">
+								<?php foreach ( $sr['linked_eve_ids'] as $eid => $info ) : ?>
+									<li>
+										<?php echo esc_html( $info['label'] ?? '' ); ?>
+										<code style="font-size:10px;">#<?php echo (int) ( $info['eve_id'] ?? 0 ); ?></code>
+										<br><code style="font-size:10px;"><?php echo esc_html( $eid ); ?></code>
+									</li>
+								<?php endforeach; ?>
+								</ul>
+							<?php endif; ?>
+						<?php endif; ?>
+					</td>
+				</tr>
+				<?php if ( ! empty( $sr['ok'] ) && ! empty( $sr['sample'] ) ) : ?>
+				<tr>
+					<td colspan="5">
+						<details>
+							<summary style="cursor:pointer;font-size:12px;">
+								Sample record keys:
+								<code><?php echo esc_html( implode( ', ', $sr['sample_keys'] ?? array() ) ); ?></code>
+							</summary>
+							<pre style="background:#f0f0f1;padding:10px;overflow:auto;font-size:10px;max-height:280px;"><?php
+								echo esc_html( wp_json_encode( $sr['sample'], JSON_PRETTY_PRINT ) );
+							?></pre>
+						</details>
+					</td>
+				</tr>
+				<?php endif; ?>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+		<p style="color:#666;font-size:12px;margin:0;">
+			Green rows mean that strategy works for your tenant. “Linked in Hostlinks” is how many of those
+			event IDs already have a CVENT link on an active Hostlinks event — those are the events an
+			incremental sync would need to refresh.
+		</p>
+	</div>
+	<?php endif; ?>
 
 	<hr />
 	<h2>Order Items / Attendee Diagnostic</h2>

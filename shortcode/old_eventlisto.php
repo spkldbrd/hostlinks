@@ -97,7 +97,8 @@ $upcoming_url     = Hostlinks_Page_URLs::get_upcoming();
 $page_url         = get_permalink();
 $reports_page_url = Hostlinks_Page_URLs::get_reports();
 
-$last_updated = Hostlinks_Toolbar::last_updated_display();
+$show_updated = Hostlinks_Toolbar::should_show_last_updated();
+$last_updated = $show_updated ? Hostlinks_Toolbar::last_updated_display() : '';
 ?>
 <div class="hostlinks-page">
 <div class="hostlinks-container">
@@ -143,7 +144,9 @@ $last_updated = Hostlinks_Toolbar::last_updated_display();
 		<?php if ( $reports_page_url ) : ?>
 		<a href="<?php echo esc_url( $reports_page_url ); ?>" class="hostlinks-btn" style="margin-left:auto;">&#x1F4CA; Reports</a>
 		<?php endif; ?>
+		<?php if ( $show_updated ) : ?>
 		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
+		<?php endif; ?>
 	</div>
 
 <?php

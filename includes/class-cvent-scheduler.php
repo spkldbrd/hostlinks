@@ -81,8 +81,8 @@ class Hostlinks_CVENT_Scheduler {
 			: $calls_before;
 
 		if ( class_exists( 'Hostlinks_Toolbar', false ) ) {
-			Hostlinks_Toolbar::touch_last_updated();
-		} else {
+			Hostlinks_Toolbar::touch_last_updated( $mode === 'incremental' ? 'incremental' : 'full' );
+		} elseif ( $mode !== 'incremental' ) {
 			update_option( 'last_data_updation', current_time( 'mysql' ) );
 		}
 

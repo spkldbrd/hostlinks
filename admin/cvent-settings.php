@@ -14,6 +14,7 @@ if ( isset( $_POST['hostlinks_cvent_schedule_recommended'] ) ) {
 		$sched_days,
 		$_POST['cvent_schedule_offset_max'] ?? 45
 	);
+	Hostlinks_Toolbar::save_frontend_updated_mode( $_POST['cvent_frontend_updated'] ?? 'first_full' );
 	Hostlinks_CVENT_Scheduler::maybe_reschedule();
 	$schedule_notice = '<div class="notice notice-success is-dismissible"><p>Recommended schedule applied (10am full; noon / 2 / 4 / 6pm incremental).</p></div>';
 } elseif ( isset( $_POST['hostlinks_cvent_schedule_save'] ) ) {
@@ -40,6 +41,7 @@ if ( isset( $_POST['hostlinks_cvent_schedule_recommended'] ) ) {
 		$sched_days,
 		$_POST['cvent_schedule_offset_max'] ?? 45
 	);
+	Hostlinks_Toolbar::save_frontend_updated_mode( $_POST['cvent_frontend_updated'] ?? 'first_full' );
 	Hostlinks_CVENT_Scheduler::maybe_reschedule();
 	$schedule_notice = '<div class="notice notice-success is-dismissible"><p>Schedule settings saved.</p></div>';
 }
@@ -622,6 +624,21 @@ $s = Hostlinks_CVENT_API::get_settings();
 					<?php endforeach; ?>
 					</select>
 					<p class="description">A random offset is added or subtracted from each base time on each run. Default: ±45 min.</p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="cvent_frontend_updated">Frontend Updated stamp</label></th>
+				<td>
+					<?php $fe_updated = Hostlinks_Toolbar::get_frontend_updated_mode(); ?>
+					<select name="cvent_frontend_updated" id="cvent_frontend_updated" style="width:220px;">
+						<option value="off" <?php selected( $fe_updated, 'off' ); ?>>Off</option>
+						<option value="first_full" <?php selected( $fe_updated, 'first_full' ); ?>>First full sync of day</option>
+						<option value="all" <?php selected( $fe_updated, 'all' ); ?>>All syncs</option>
+					</select>
+					<p class="description" style="margin-top:6px;">
+						Controls the <code>Updated: …</code> time on Upcoming / Past Events.
+						<strong>First full</strong> (default) freezes the stamp at the first full sync each day; incremental and later syncs do not change it.
+					</p>
 				</td>
 			</tr>
 		</table>

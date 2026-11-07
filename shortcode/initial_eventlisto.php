@@ -109,7 +109,8 @@ if ( ! preg_match( '/^#[0-9a-f]{6}$/i', $hl_a2_color ) ) { $hl_a2_color = '#dc26
 // ── Pass 2: render ─────────────────────────────────────────────────────────
 $today         = new DateTime();
 $current_month = null;
-$last_updated  = Hostlinks_Toolbar::last_updated_display();
+$show_updated  = Hostlinks_Toolbar::should_show_last_updated();
+$last_updated  = $show_updated ? Hostlinks_Toolbar::last_updated_display() : '';
 
 $past_events_url      = Hostlinks_Page_URLs::get_past_events();
 $upcoming_url         = Hostlinks_Page_URLs::get_upcoming();
@@ -236,7 +237,9 @@ if ( $cert_url ) {
 		<?php if ( $show_add_event_btn ) : ?>
 		<a href="<?php echo esc_url( $event_request_url ); ?>" class="hostlinks-btn hostlinks-btn--add-event">&#x2B; Event</a>
 		<?php endif; ?>
+		<?php if ( $show_updated ) : ?>
 		<span class="hostlinks-updated">Updated: <?php echo esc_html( $last_updated ); ?></span>
+		<?php endif; ?>
 	</div>
 
 <?php

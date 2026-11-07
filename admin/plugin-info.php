@@ -486,7 +486,7 @@ $zoom_notices = array(
 	<ul style="list-style:disc;padding-left:1.5rem;color:#444;line-height:1.8;">
 		<li>Each shortcode page should be protected — access mode is configured per-shortcode under <strong>Hostlinks → Settings → User Access</strong>.</li>
 		<li>The <strong>Focus dropdown</strong> only lists <em>active</em> marketers. Mark a marketer Inactive under <em>Hostlinks → Marketers</em> to remove them from the dropdown while keeping their historical events intact.</li>
-		<li>The <strong>Updated date</strong> shown on the Upcoming Events page reflects the last CVENT sync (manual or automatic). It updates when any sync saves at least one event.</li>
+		<li>The <strong>Updated</strong> stamp on Upcoming / Past Events is controlled under CVENT Settings → Frontend Updated stamp (Off, First full sync of day, or All syncs). Default: first full sync of the day.</li>
 		<li>Page URL overrides for the nav buttons (Upcoming Events, Past Events, Reports) are configured under <strong>Hostlinks → Settings → General</strong>.</li>
 	</ul>
 

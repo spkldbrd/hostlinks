@@ -80,11 +80,71 @@ class Hostlinks_Toolbar {
 		);
 	}
 
+	/** Option: frontend "Updated" stamp — off | first_full | all */
+	const FRONTEND_UPDATED_OPTION = 'hostlinks_cvent_frontend_updated';
+
 	/**
-	 * Persist the "Updated" stamp (site timezone mysql datetime).
-	 * Call after automatic or manual full CVENT sync.
+	 * @return 'off'|'first_full'|'all'
 	 */
-	public static function touch_last_updated(): void {
+	public static function get_frontend_updated_mode(): string {
+		$mode = sanitize_key( (string) get_option( self::FRONTEND_UPDATED_OPTION, 'first_full' ) );
+		if ( ! in_array( $mode, array( 'off', 'first_full', 'all' ), true ) ) {
+			return 'first_full';
+		}
+		return $mode;
+	}
+
+	/**
+	 * Persist frontend Updated mode from settings.
+	 *
+	 * @param string $mode off|first_full|all
+	 */
+	public static function save_frontend_updated_mode( string $mode ): void {
+		$mode = sanitize_key( $mode );
+		if ( ! in_array( $mode, array( 'off', 'first_full', 'all' ), true ) ) {
+			$mode = 'first_full';
+		}
+		update_option( self::FRONTEND_UPDATED_OPTION, $mode, false );
+	}
+
+	/**
+	 * Whether the frontend "Updated: …" stamp should render.
+	 */
+	public static function should_show_last_updated(): bool {
+		return self::get_frontend_updated_mode() !== 'off';
+	}
+
+	/**
+	 * True when last_data_updation is already set for today's calendar date (site TZ).
+	 */
+	public static function has_updated_stamp_today(): bool {
+		$raw = trim( (string) get_option( 'last_data_updation', '' ) );
+		$dt  = self::parse_updated_datetime( $raw );
+		if ( ! $dt instanceof DateTime ) {
+			return false;
+		}
+		$today = ( new DateTime( 'now', wp_timezone() ) )->format( 'Y-m-d' );
+		return $dt->format( 'Y-m-d' ) === $today;
+	}
+
+	/**
+	 * Persist the "Updated" stamp when the frontend mode allows it.
+	 *
+	 * @param string $sync_mode full|incremental|single — only full counts for first_full.
+	 */
+	public static function touch_last_updated( string $sync_mode = 'full' ): void {
+		$display = self::get_frontend_updated_mode();
+		if ( $display === 'off' ) {
+			return;
+		}
+		if ( $display === 'first_full' ) {
+			if ( $sync_mode !== 'full' ) {
+				return;
+			}
+			if ( self::has_updated_stamp_today() ) {
+				return;
+			}
+		}
 		update_option( 'last_data_updation', current_time( 'mysql' ) );
 	}
 
@@ -255,7 +315,8 @@ class Hostlinks_Toolbar {
 		$reports_url     = Hostlinks_Page_URLs::get_reports();
 
 		$hubs    = self::resolve_hub_button_visibility( $shortcode_for_all );
-		$updated = self::last_updated_display();
+		$show_updated = self::should_show_last_updated();
+		$updated      = $show_updated ? self::last_updated_display() : '';
 		?>
 	<div class="hostlinks-actions">
 		<a href="<?php echo esc_url( $upcoming_url ); ?>" class="hostlinks-btn">Upcoming Events</a>
@@ -338,7 +399,9 @@ class Hostlinks_Toolbar {
 		})();
 		</script>
 		<?php endif; ?>
+		<?php if ( $show_updated ) : ?>
 		<span class="hostlinks-updated">Updated: <?php echo esc_html( $updated ); ?></span>
+		<?php endif; ?>
 	</div>
 		<?php
 	}

@@ -2,6 +2,14 @@
 
 ---
 
+## v2.11.56 — 2026-11-06
+
+### Frontend Updated stamp control
+- CVENT Settings → **Frontend Updated stamp**: Off / First full sync of day / All syncs (default: first full).
+- First-full mode freezes the Upcoming/Past Events `Updated:` time at the first full sync each day; incremental and single-event syncs do not move it.
+
+---
+
 ## v2.11.55 — 2026-11-06
 
 ### New: CVENT Sync Log

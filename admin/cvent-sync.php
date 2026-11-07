@@ -30,7 +30,7 @@ if ( isset( $_POST['hostlinks_cvent_sync_all'] ) ) {
 	$sync_report = Hostlinks_CVENT_Sync::sync_all( $dry_run, $sync_limit );
 	$calls_after  = Hostlinks_CVENT_API::get_call_count_today();
 	if ( ! $dry_run ) {
-		Hostlinks_Toolbar::touch_last_updated();
+		Hostlinks_Toolbar::touch_last_updated( 'full' );
 		Hostlinks_CVENT_Scheduler::set_watermark( gmdate( 'Y-m-d\TH:i:s\Z' ) );
 		Hostlinks_CVENT_Sync_Log::record(
 			$sync_report,
@@ -52,7 +52,7 @@ if ( isset( $_POST['hostlinks_cvent_sync_incremental'] ) ) {
 	$sync_report  = Hostlinks_CVENT_Sync::sync_incremental( $after_utc, $before_utc, $dry_run );
 	$calls_after  = Hostlinks_CVENT_API::get_call_count_today();
 	if ( ! $dry_run ) {
-		Hostlinks_Toolbar::touch_last_updated();
+		Hostlinks_Toolbar::touch_last_updated( 'incremental' );
 		Hostlinks_CVENT_Scheduler::set_watermark( $before_utc );
 		Hostlinks_CVENT_Sync_Log::record(
 			$sync_report,
@@ -74,7 +74,7 @@ if ( isset( $_POST['hostlinks_cvent_sync_one'] ) ) {
 		$sync_report  = Hostlinks_CVENT_Sync::sync_one_or_family( $eve_id, $dry_run );
 		$calls_after  = Hostlinks_CVENT_API::get_call_count_today();
 		if ( ! $dry_run ) {
-			Hostlinks_Toolbar::touch_last_updated();
+			Hostlinks_Toolbar::touch_last_updated( 'single' );
 			Hostlinks_CVENT_Sync_Log::record(
 				$sync_report,
 				array(

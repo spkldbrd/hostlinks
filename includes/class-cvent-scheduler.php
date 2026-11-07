@@ -89,7 +89,8 @@ class Hostlinks_CVENT_Scheduler {
 		// Advance watermark after both modes so the next incremental window is tight.
 		self::set_watermark( $before_utc );
 
-		$log = array(
+		$api_calls = max( 0, $calls_after - $calls_before );
+		$log       = array(
 			'time'               => current_time( 'mysql' ),
 			'mode'               => $mode,
 			'slot'               => $slot_key,
@@ -99,13 +100,26 @@ class Hostlinks_CVENT_Scheduler {
 			'no_candidates'      => $result['no_candidates'] ?? 0,
 			'errors'             => $result['errors']        ?? 0,
 			'total_events'       => count( $result['results'] ?? array() ),
-			'api_calls'          => max( 0, $calls_after - $calls_before ),
+			'api_calls'          => $api_calls,
 			'discovered_events'  => $result['discovered_events'] ?? null,
 			'linked_events'      => $result['linked_events'] ?? null,
 			'skipped_unlinked'   => $result['skipped_unlinked'] ?? null,
 			'attendee_rows'      => $result['attendee_rows'] ?? null,
 		);
 		update_option( self::LOG_KEY, $log, false );
+
+		if ( class_exists( 'Hostlinks_CVENT_Sync_Log', false ) ) {
+			Hostlinks_CVENT_Sync_Log::record(
+				$result,
+				array(
+					'source'       => 'auto',
+					'mode'         => $mode,
+					'slot'         => $slot_key,
+					'api_calls'    => $api_calls,
+					'triggered_by' => 0,
+				)
+			);
+		}
 
 		if ( $settings['enabled'] ) {
 			$after_base = self::floor_after_completed_run( $slot_key, $settings );

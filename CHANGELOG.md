@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.55 — 2026-11-06
+
+### New: CVENT Sync Log
+- **Sync Log** tab on CVENT Sync: last 24 runs with source, mode, API calls, and changed-count totals.
+- Select a run to see per-event before/after paid/free deltas (filter: all vs changed only).
+- History recorded for scheduled, Sync All, Incremental, and single-event syncs (live runs only).
+
+---
+
 ## v2.11.54 — 2026-11-06
 
 ### New: Incremental CVENT sync (up to 5 daily slots)

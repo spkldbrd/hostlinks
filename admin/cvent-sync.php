@@ -26,22 +26,42 @@ $sync_report = null;
 if ( isset( $_POST['hostlinks_cvent_sync_all'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
 	$sync_limit  = ( $dry_run && $limit_test ) ? 10 : 0;
+	$calls_before = Hostlinks_CVENT_API::get_call_count_today();
 	$sync_report = Hostlinks_CVENT_Sync::sync_all( $dry_run, $sync_limit );
+	$calls_after  = Hostlinks_CVENT_API::get_call_count_today();
 	if ( ! $dry_run ) {
 		Hostlinks_Toolbar::touch_last_updated();
 		Hostlinks_CVENT_Scheduler::set_watermark( gmdate( 'Y-m-d\TH:i:s\Z' ) );
+		Hostlinks_CVENT_Sync_Log::record(
+			$sync_report,
+			array(
+				'source'    => 'manual',
+				'mode'      => 'full',
+				'api_calls' => max( 0, $calls_after - $calls_before ),
+			)
+		);
 	}
 }
 
 // Incremental Sync Now (date-window discovery → touched events only)
 if ( isset( $_POST['hostlinks_cvent_sync_incremental'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
-	$before_utc = gmdate( 'Y-m-d\TH:i:s\Z' );
-	$after_utc  = Hostlinks_CVENT_Scheduler::incremental_after_utc( $before_utc );
-	$sync_report = Hostlinks_CVENT_Sync::sync_incremental( $after_utc, $before_utc, $dry_run );
+	$before_utc   = gmdate( 'Y-m-d\TH:i:s\Z' );
+	$after_utc    = Hostlinks_CVENT_Scheduler::incremental_after_utc( $before_utc );
+	$calls_before = Hostlinks_CVENT_API::get_call_count_today();
+	$sync_report  = Hostlinks_CVENT_Sync::sync_incremental( $after_utc, $before_utc, $dry_run );
+	$calls_after  = Hostlinks_CVENT_API::get_call_count_today();
 	if ( ! $dry_run ) {
 		Hostlinks_Toolbar::touch_last_updated();
 		Hostlinks_CVENT_Scheduler::set_watermark( $before_utc );
+		Hostlinks_CVENT_Sync_Log::record(
+			$sync_report,
+			array(
+				'source'    => 'incremental',
+				'mode'      => 'incremental',
+				'api_calls' => max( 0, $calls_after - $calls_before ),
+			)
+		);
 	}
 }
 
@@ -50,9 +70,19 @@ if ( isset( $_POST['hostlinks_cvent_sync_one'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_sync' );
 	$eve_id = intval( $_POST['hostlinks_cvent_eve_id'] ?? 0 );
 	if ( $eve_id ) {
-		$sync_report = Hostlinks_CVENT_Sync::sync_one_or_family( $eve_id, $dry_run );
+		$calls_before = Hostlinks_CVENT_API::get_call_count_today();
+		$sync_report  = Hostlinks_CVENT_Sync::sync_one_or_family( $eve_id, $dry_run );
+		$calls_after  = Hostlinks_CVENT_API::get_call_count_today();
 		if ( ! $dry_run ) {
 			Hostlinks_Toolbar::touch_last_updated();
+			Hostlinks_CVENT_Sync_Log::record(
+				$sync_report,
+				array(
+					'source'    => 'single',
+					'mode'      => 'full',
+					'api_calls' => max( 0, $calls_after - $calls_before ),
+				)
+			);
 		}
 	}
 }
@@ -236,6 +266,18 @@ if ( $review_only ) {
 	);
 }
 
+$cvent_view = sanitize_key( $_GET['view'] ?? 'events' );
+if ( ! in_array( $cvent_view, array( 'events', 'log' ), true ) ) {
+	$cvent_view = 'events';
+}
+$sync_history   = Hostlinks_CVENT_Sync_Log::get_all();
+$selected_log_id = isset( $_GET['log'] ) ? sanitize_text_field( wp_unslash( $_GET['log'] ) ) : '';
+$selected_log    = $selected_log_id !== '' ? Hostlinks_CVENT_Sync_Log::get( $selected_log_id ) : null;
+if ( ! $selected_log && ! empty( $sync_history[0] ) ) {
+	$selected_log    = $sync_history[0];
+	$selected_log_id = (string) ( $selected_log['id'] ?? '' );
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function hl_cvent_status_badge( $status ) {
@@ -319,6 +361,219 @@ function hl_cvent_status_badge( $status ) {
 	</form>
 
 	<?php echo $notice; ?>
+
+	<?php
+	$base_sync_url = admin_url( 'admin.php?page=cvent-sync' );
+	if ( $review_only ) {
+		$base_sync_url = add_query_arg( 'review', '1', $base_sync_url );
+	}
+	?>
+	<nav class="nav-tab-wrapper" style="margin:12px 0 16px;">
+		<a href="<?php echo esc_url( add_query_arg( 'view', 'events', $base_sync_url ) ); ?>"
+			class="nav-tab <?php echo $cvent_view === 'events' ? 'nav-tab-active' : ''; ?>">Events</a>
+		<a href="<?php echo esc_url( add_query_arg( 'view', 'log', $base_sync_url ) ); ?>"
+			class="nav-tab <?php echo $cvent_view === 'log' ? 'nav-tab-active' : ''; ?>">
+			Sync Log
+			<?php if ( ! empty( $sync_history ) ) : ?>
+				<span class="count" style="margin-left:4px;">(<?php echo count( $sync_history ); ?>)</span>
+			<?php endif; ?>
+		</a>
+	</nav>
+
+	<?php if ( $cvent_view === 'log' ) : ?>
+		<?php
+		$user_cache = array();
+		$source_labels = array(
+			'auto'         => 'Scheduled',
+			'manual'       => 'Sync All',
+			'incremental'  => 'Incremental',
+			'single'       => 'Single event',
+		);
+		?>
+		<p style="color:#555;margin-top:0;">Last <?php echo (int) Hostlinks_CVENT_Sync_Log::MAX_ENTRIES; ?> sync runs (newest first). Select a run to see events and paid/free changes.</p>
+
+		<?php if ( empty( $sync_history ) ) : ?>
+			<div class="notice notice-info inline"><p>No sync history yet. Run <strong>Sync All</strong>, <strong>Incremental</strong>, or wait for a scheduled sync.</p></div>
+		<?php else : ?>
+			<table class="widefat striped" style="max-width:1100px;margin-bottom:16px;">
+				<thead>
+					<tr>
+						<th style="width:36px;"></th>
+						<th>When</th>
+						<th>Source</th>
+						<th>Mode</th>
+						<th>Synced</th>
+						<th>Changed</th>
+						<th>Errors</th>
+						<th>API calls</th>
+						<th>By</th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php foreach ( $sync_history as $entry ) :
+					$eid     = (string) ( $entry['id'] ?? '' );
+					$is_sel  = ( $eid === $selected_log_id );
+					$uid     = (int) ( $entry['triggered_by'] ?? 0 );
+					$by_name = '—';
+					if ( $uid > 0 ) {
+						if ( ! isset( $user_cache[ $uid ] ) ) {
+							$u = get_userdata( $uid );
+							$user_cache[ $uid ] = $u ? $u->display_name : ( 'User #' . $uid );
+						}
+						$by_name = $user_cache[ $uid ];
+					} elseif ( ( $entry['source'] ?? '' ) === 'auto' ) {
+						$by_name = 'Cron';
+					}
+					$detail_url = add_query_arg(
+						array(
+							'view' => 'log',
+							'log'  => $eid,
+						),
+						$base_sync_url
+					);
+					?>
+					<tr style="<?php echo $is_sel ? 'background:#e8f4fc;' : ''; ?>">
+						<td>
+							<a href="<?php echo esc_url( $detail_url ); ?>" class="button button-small">
+								<?php echo $is_sel ? 'Viewing' : 'View'; ?>
+							</a>
+						</td>
+						<td><?php echo esc_html( $entry['time'] ?? '' ); ?></td>
+						<td>
+							<?php
+							$src = (string) ( $entry['source'] ?? '' );
+							echo esc_html( $source_labels[ $src ] ?? $src );
+							if ( ! empty( $entry['slot'] ) ) {
+								echo ' <code style="font-size:11px;">' . esc_html( $entry['slot'] ) . '</code>';
+							}
+							?>
+						</td>
+						<td><strong><?php echo esc_html( $entry['mode'] ?? '—' ); ?></strong></td>
+						<td><?php echo (int) ( $entry['synced'] ?? 0 ); ?></td>
+						<td>
+							<?php
+							$ch = (int) ( $entry['changed_count'] ?? 0 );
+							echo $ch > 0
+								? '<strong style="color:#e67e00;">' . $ch . '</strong>'
+								: '0';
+							?>
+						</td>
+						<td><?php echo (int) ( $entry['errors'] ?? 0 ); ?></td>
+						<td><?php echo isset( $entry['api_calls'] ) ? (int) $entry['api_calls'] : '—'; ?></td>
+						<td><?php echo esc_html( $by_name ); ?></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+
+			<?php if ( $selected_log ) : ?>
+				<h2 style="margin-top:8px;">
+					Run detail
+					<span style="font-weight:400;font-size:13px;color:#666;">
+						— <?php echo esc_html( $selected_log['time'] ?? '' ); ?>
+						· <?php echo esc_html( $selected_log['mode'] ?? '' ); ?>
+						<?php if ( isset( $selected_log['attendee_rows'] ) ) : ?>
+							· <?php echo (int) $selected_log['attendee_rows']; ?> attendee rows
+							· <?php echo (int) ( $selected_log['linked_events'] ?? 0 ); ?> linked events
+						<?php endif; ?>
+					</span>
+				</h2>
+
+				<?php
+				$log_events = (array) ( $selected_log['events'] ?? array() );
+				$changed_only = ! empty( $_GET['changed'] );
+				if ( $changed_only ) {
+					$log_events = array_values(
+						array_filter(
+							$log_events,
+							static function( $e ) {
+								return ! empty( $e['changed'] );
+							}
+						)
+					);
+				}
+				$filter_url_all = add_query_arg(
+					array( 'view' => 'log', 'log' => $selected_log_id ),
+					$base_sync_url
+				);
+				$filter_url_ch = add_query_arg(
+					array( 'view' => 'log', 'log' => $selected_log_id, 'changed' => '1' ),
+					$base_sync_url
+				);
+				?>
+				<p style="margin:0 0 10px;">
+					<a href="<?php echo esc_url( $filter_url_all ); ?>" class="button button-small <?php echo ! $changed_only ? 'button-primary' : ''; ?>">All events in run</a>
+					<a href="<?php echo esc_url( $filter_url_ch ); ?>" class="button button-small <?php echo $changed_only ? 'button-primary' : ''; ?>">Changed counts only</a>
+					<span style="color:#888;font-size:12px;margin-left:8px;"><?php echo count( $log_events ); ?> shown</span>
+				</p>
+
+				<?php if ( empty( $log_events ) ) : ?>
+					<p style="color:#888;">No event rows in this run<?php echo $changed_only ? ' with count changes' : ''; ?>.</p>
+				<?php else : ?>
+					<table class="widefat striped" style="max-width:1100px;">
+						<thead>
+							<tr>
+								<th>Event</th>
+								<th>Action</th>
+								<th>Before (HL)</th>
+								<th>After (CVENT)</th>
+								<th>Delta</th>
+								<th>Note</th>
+							</tr>
+						</thead>
+						<tbody>
+						<?php foreach ( $log_events as $le ) :
+							$dp = $le['delta_paid'] ?? null;
+							$df = $le['delta_free'] ?? null;
+							$row_bg = ! empty( $le['changed'] ) ? 'background:#fff8e6;' : '';
+							?>
+							<tr style="<?php echo esc_attr( $row_bg ); ?>">
+								<td>
+									<strong>#<?php echo (int) ( $le['eve_id'] ?? 0 ); ?></strong>
+									<?php echo esc_html( $le['label'] ?? '' ); ?>
+								</td>
+								<td><?php echo hl_cvent_status_badge( $le['action'] ?? '' ); ?></td>
+								<td>
+									<?php if ( isset( $le['hl_paid'] ) ) : ?>
+										<span style="color:#0a6b00;"><?php echo (int) $le['hl_paid']; ?>p</span>
+										<span style="color:#0073aa;"><?php echo (int) $le['hl_free']; ?>f</span>
+									<?php else : ?>
+										—
+									<?php endif; ?>
+								</td>
+								<td>
+									<?php if ( isset( $le['paid'] ) ) : ?>
+										<span style="color:#0a6b00;font-weight:600;"><?php echo (int) $le['paid']; ?>p</span>
+										<span style="color:#0073aa;font-weight:600;"><?php echo (int) $le['free']; ?>f</span>
+									<?php else : ?>
+										—
+									<?php endif; ?>
+								</td>
+								<td>
+									<?php if ( null !== $dp && null !== $df ) :
+										$dp_str = ( $dp > 0 ? '+' : '' ) . $dp . 'p';
+										$df_str = ( $df > 0 ? '+' : '' ) . $df . 'f';
+										if ( $dp === 0 && $df === 0 ) {
+											echo '<span style="color:#bbb;">0</span>';
+										} elseif ( $dp < 0 || $df < 0 ) {
+											echo '<span style="color:#d63638;font-weight:600;">' . esc_html( $dp_str . ' ' . $df_str ) . '</span>';
+										} else {
+											echo '<span style="color:#e67e00;font-weight:600;">' . esc_html( $dp_str . ' ' . $df_str ) . '</span>';
+										}
+									else :
+										echo '—';
+									endif; ?>
+								</td>
+								<td style="font-size:12px;color:#555;"><?php echo esc_html( $le['message'] ?? '' ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+			<?php endif; ?>
+		<?php endif; ?>
+
+	<?php else : /* ── Events view ── */ ?>
 
 	<?php if ( $session_map_cvent_id && is_array( $session_map_sessions ) ) : ?>
 		<?php
@@ -806,4 +1061,6 @@ function hl_cvent_status_badge( $status ) {
 		Auto-match requires score &ge; 90 with a &ge; 20-point gap over the second candidate.
 		Lower scores are flagged as &ldquo;Needs Review&rdquo; for manual selection.
 	</p>
+
+	<?php endif; /* end events view */ ?>
 </div>

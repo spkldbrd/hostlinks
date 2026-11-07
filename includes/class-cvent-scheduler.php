@@ -2,22 +2,20 @@
 /**
  * CVENT Sync Scheduler
  *
- * Manages a WordPress cron job that runs Hostlinks_CVENT_Sync::sync_all().
+ * Manages a WordPress cron job that runs full or incremental CVENT syncs.
  *
  * Uses wp_schedule_single_event() rather than a repeating interval so that:
  *   - Day-of-week filtering is respected (skip weekends, etc.).
  *   - A random ±offset is applied to each run, making the schedule appear
  *     less robotic.
- *   - Up to 3 base times per day are supported — after each run, the next
- *     base slot (e.g. 08:00 → 14:00 → next day 08:00) is scheduled.
- *
- * After each run, the next single event is scheduled immediately with a fresh
- * random offset. maybe_reschedule() runs on admin_init to self-heal if the
- * cron is missing or settings have changed.
+ *   - Up to 5 base times per day are supported — after each run, the next
+ *     base slot is scheduled.
+ *   - Each slot is mode full|incremental (full = sync_all; incremental =
+ *     date-window attendees → sync only touched linked events).
  *
  * Option shape ('hostlinks_cvent_schedule'):
- *   enabled    bool     Whether the scheduler is active.
- *   times      array    Up to 3 {hour, minute} slots (site timezone).
+ *   enabled    bool
+ *   times      array    Up to 5 {hour, minute, mode} slots (site timezone).
  *   hour/minute int     Legacy single time (migrated into times[]).
  *   days       int[]    Days of week to run: 0=Sun…6=Sat. Default [1-5].
  *   offset_max int      Max random ± offset in minutes. Default 45.
@@ -29,12 +27,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Hostlinks_CVENT_Scheduler {
 
-	const HOOK       = 'hostlinks_cvent_daily_sync';
-	const OPTION_KEY = 'hostlinks_cvent_schedule';
-	const LOG_KEY    = 'hostlinks_cvent_schedule_log';
-	const HASH_KEY   = 'hostlinks_cvent_schedule_hash';
-	const MAX_TIMES  = 3;
+	const HOOK          = 'hostlinks_cvent_daily_sync';
+	const OPTION_KEY    = 'hostlinks_cvent_schedule';
+	const LOG_KEY       = 'hostlinks_cvent_schedule_log';
+	const HASH_KEY      = 'hostlinks_cvent_schedule_hash';
+	const WATERMARK_KEY = 'hostlinks_cvent_incr_watermark';
+	const MAX_TIMES     = 5;
 	const API_DAILY_LIMIT = 1000;
+	const INCR_MAX_LOOKBACK_HOURS = 48;
 
 	// -------------------------------------------------------------------------
 	// Bootstrap
@@ -42,8 +42,6 @@ class Hostlinks_CVENT_Scheduler {
 
 	public static function init() {
 		add_action( self::HOOK, array( __CLASS__, 'run' ) );
-		// Restrict self-healing to admin page loads — scanning cron runs a
-		// DB query, so firing on every frontend request is unnecessary overhead.
 		add_action( 'admin_init', array( __CLASS__, 'maybe_reschedule' ) );
 	}
 
@@ -52,52 +50,65 @@ class Hostlinks_CVENT_Scheduler {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * @param string $slot Slot key that was scheduled, e.g. "08:00" (from cron args).
+	 * @param string $slot Slot key that was scheduled, e.g. "10:00" (from cron args).
 	 */
 	public static function run( $slot = '' ) {
 		if ( ! class_exists( 'Hostlinks_CVENT_Sync' ) ) {
 			return;
 		}
 
-		// Record that the cron hook fired — written before sync so even a
-		// hung/errored sync leaves a breadcrumb on the settings page.
 		update_option( 'hostlinks_cvent_last_auto_run', current_time( 'mysql' ), false );
+
+		$settings   = self::get_settings();
+		$slot_key   = is_string( $slot ) ? $slot : '';
+		$mode       = self::mode_for_slot( $settings, $slot_key );
+		$before_utc = gmdate( 'Y-m-d\TH:i:s\Z' );
 
 		$calls_before = class_exists( 'Hostlinks_CVENT_API', false )
 			? Hostlinks_CVENT_API::get_call_count_today()
 			: 0;
 
-		$result = Hostlinks_CVENT_Sync::sync_all( false ); // live run
+		if ( $mode === 'incremental' ) {
+			$after_utc = self::incremental_after_utc( $before_utc );
+			$result    = Hostlinks_CVENT_Sync::sync_incremental( $after_utc, $before_utc, false );
+		} else {
+			$result = Hostlinks_CVENT_Sync::sync_all( false );
+			$result['mode'] = 'full';
+		}
 
 		$calls_after = class_exists( 'Hostlinks_CVENT_API', false )
 			? Hostlinks_CVENT_API::get_call_count_today()
 			: $calls_before;
 
-		// Stamp toolbar "Updated:" after every completed auto sync (date + time).
 		if ( class_exists( 'Hostlinks_Toolbar', false ) ) {
 			Hostlinks_Toolbar::touch_last_updated();
 		} else {
 			update_option( 'last_data_updation', current_time( 'mysql' ) );
 		}
 
-		// Store a compact log of the last run.
+		// Advance watermark after both modes so the next incremental window is tight.
+		self::set_watermark( $before_utc );
+
 		$log = array(
-			'time'          => current_time( 'mysql' ),
-			'synced'        => $result['synced']        ?? 0,
-			'matched'       => $result['matched']       ?? 0,
-			'needs_review'  => $result['needs_review']  ?? 0,
-			'no_candidates' => $result['no_candidates'] ?? 0,
-			'errors'        => $result['errors']        ?? 0,
-			'total_events'  => count( $result['results'] ?? array() ),
-			'api_calls'     => max( 0, $calls_after - $calls_before ),
-			'slot'          => is_string( $slot ) ? $slot : '',
+			'time'               => current_time( 'mysql' ),
+			'mode'               => $mode,
+			'slot'               => $slot_key,
+			'synced'             => $result['synced']        ?? 0,
+			'matched'            => $result['matched']       ?? 0,
+			'needs_review'       => $result['needs_review']  ?? 0,
+			'no_candidates'      => $result['no_candidates'] ?? 0,
+			'errors'             => $result['errors']        ?? 0,
+			'total_events'       => count( $result['results'] ?? array() ),
+			'api_calls'          => max( 0, $calls_after - $calls_before ),
+			'discovered_events'  => $result['discovered_events'] ?? null,
+			'linked_events'      => $result['linked_events'] ?? null,
+			'skipped_unlinked'   => $result['skipped_unlinked'] ?? null,
+			'attendee_rows'      => $result['attendee_rows'] ?? null,
 		);
 		update_option( self::LOG_KEY, $log, false );
 
-		// Schedule the next base slot (e.g. morning → afternoon → next day).
-		$settings = self::get_settings();
 		if ( $settings['enabled'] ) {
-			$after_base = self::floor_after_completed_run( is_string( $slot ) ? $slot : '', $settings );
+			$after_base = self::floor_after_completed_run( $slot_key, $settings );
 			$planned    = self::plan_next_run( $settings, $after_base );
 			if ( $planned ) {
 				self::schedule_event( $planned['timestamp'], $planned['slot'] );
@@ -106,17 +117,39 @@ class Hostlinks_CVENT_Scheduler {
 		}
 	}
 
+	/**
+	 * UTC after bound for incremental: watermark, else now−24h, capped at 48h lookback.
+	 */
+	public static function incremental_after_utc( string $before_utc ): string {
+		$wm = self::get_watermark();
+		if ( is_string( $wm ) && preg_match( '/^\d{4}-\d{2}-\d{2}T/', $wm ) ) {
+			$after = $wm;
+		} else {
+			$after = gmdate( 'Y-m-d\TH:i:s\Z', time() - DAY_IN_SECONDS );
+		}
+
+		$min_after = gmdate( 'Y-m-d\TH:i:s\Z', time() - ( self::INCR_MAX_LOOKBACK_HOURS * HOUR_IN_SECONDS ) );
+		if ( strcmp( $after, $min_after ) < 0 ) {
+			$after = $min_after;
+		}
+		if ( strcmp( $after, $before_utc ) > 0 ) {
+			$after = gmdate( 'Y-m-d\TH:i:s\Z', time() - HOUR_IN_SECONDS );
+		}
+		return $after;
+	}
+
+	public static function get_watermark(): string {
+		return (string) get_option( self::WATERMARK_KEY, '' );
+	}
+
+	public static function set_watermark( string $utc_iso ): void {
+		update_option( self::WATERMARK_KEY, $utc_iso, false );
+	}
+
 	// -------------------------------------------------------------------------
 	// Schedule management
 	// -------------------------------------------------------------------------
 
-	/**
-	 * Called on admin_init. Self-heals the schedule if:
-	 *   - Schedule is disabled → clears any queued event.
-	 *   - Settings changed     → clears old event, queues new one.
-	 *   - No event is queued   → queues one.
-	 *   - Queued time is past  → reschedules (missed cron).
-	 */
 	public static function maybe_reschedule() {
 		$settings = self::get_settings();
 
@@ -132,16 +165,15 @@ class Hostlinks_CVENT_Scheduler {
 
 		$needs = false;
 		if ( ! $next ) {
-			$needs = true; // nothing queued
+			$needs = true;
 		} elseif ( $settings_hash !== $stored_hash ) {
-			$needs = true; // settings changed
+			$needs = true;
 		} elseif ( $next < time() ) {
-			$needs = true; // missed schedule
+			$needs = true;
 		}
 
 		if ( $needs ) {
 			self::clear();
-			// Floor = now so we pick the next remaining slot today (or tomorrow).
 			$planned = self::plan_next_run( $settings, new DateTime( 'now', wp_timezone() ) );
 			if ( $planned ) {
 				self::schedule_event( $planned['timestamp'], $planned['slot'] );
@@ -150,23 +182,15 @@ class Hostlinks_CVENT_Scheduler {
 		}
 	}
 
-	/** Remove any queued instance of the hook (any slot args). */
 	public static function clear() {
 		wp_clear_scheduled_hook( self::HOOK );
 	}
 
-	/**
-	 * @param int    $timestamp Unix timestamp (UTC).
-	 * @param string $slot      e.g. "14:00".
-	 */
 	private static function schedule_event( int $timestamp, string $slot ): void {
 		wp_schedule_single_event( $timestamp, self::HOOK, array( $slot ) );
 		update_option( 'hostlinks_cvent_next_scheduled_run', gmdate( 'Y-m-d H:i:s', $timestamp ), false );
 	}
 
-	/**
-	 * Soonest queued cron timestamp for our hook (any args), or 0.
-	 */
 	private static function next_scheduled_ts(): int {
 		$crons = _get_cron_array();
 		if ( empty( $crons ) || ! is_array( $crons ) ) {
@@ -180,9 +204,6 @@ class Hostlinks_CVENT_Scheduler {
 		return 0;
 	}
 
-	/**
-	 * Base DateTime for a slot key on today's site calendar (or null).
-	 */
 	private static function base_datetime_from_slot( string $slot ): ?DateTime {
 		if ( ! preg_match( '/^(\d{1,2}):(\d{2})$/', $slot, $m ) ) {
 			return null;
@@ -192,11 +213,6 @@ class Hostlinks_CVENT_Scheduler {
 		return $dt;
 	}
 
-	/**
-	 * Floor used after a run so we advance to the *next* base slot.
-	 * Prefer the scheduled slot base (08:00). If unknown (legacy cron), push
-	 * "now" forward by offset_max so an early 07:53 fire still skips 08:00.
-	 */
 	private static function floor_after_completed_run( string $slot, array $settings ): DateTime {
 		$from_slot = self::base_datetime_from_slot( $slot );
 		if ( $from_slot instanceof DateTime ) {
@@ -211,11 +227,8 @@ class Hostlinks_CVENT_Scheduler {
 	}
 
 	/**
-	 * Plan the next run: first base slot strictly after $after_base (or now),
-	 * then apply a random ±offset (clamped so it never lands in the past).
-	 *
-	 * @param array          $settings
-	 * @param DateTime|null  $after_base Slot base that just ran; null → floor at now.
+	 * @param array         $settings
+	 * @param DateTime|null $after_base
 	 * @return array{timestamp:int,slot:string}|null
 	 */
 	private static function plan_next_run( array $settings, $after_base = null ) {
@@ -230,9 +243,6 @@ class Hostlinks_CVENT_Scheduler {
 		$tz  = wp_timezone();
 		$now = new DateTime( 'now', $tz );
 
-		// Floor for base-slot selection: the slot that just ran, else "now".
-		// Using the slot base (e.g. 08:00) — not the early offset fire (07:53) —
-		// ensures the afternoon slot is next instead of re-picking morning.
 		if ( $after_base instanceof DateTime ) {
 			$floor = clone $after_base;
 			$floor->setTimezone( $tz );
@@ -260,7 +270,6 @@ class Hostlinks_CVENT_Scheduler {
 				$base->setTime( (int) $slot['hour'], (int) $slot['minute'], 0 );
 				$slot_key = sprintf( '%02d:%02d', (int) $slot['hour'], (int) $slot['minute'] );
 
-				// Strictly after the floor base (or now when first scheduling).
 				if ( $base <= $floor ) {
 					continue;
 				}
@@ -285,7 +294,6 @@ class Hostlinks_CVENT_Scheduler {
 			}
 		}
 
-		// Never schedule in the past (negative offset near "now").
 		if ( $candidate <= $now ) {
 			$candidate = clone $now;
 			$candidate->modify( '+1 minute' );
@@ -302,10 +310,23 @@ class Hostlinks_CVENT_Scheduler {
 	// -------------------------------------------------------------------------
 
 	/**
-	 * Normalize up to MAX_TIMES unique hour/minute slots (migrate legacy hour/minute).
+	 * Recommended daytime schedule: 10 full, then noon/2/4/6 incremental.
 	 *
+	 * @return array<int,array{hour:int,minute:int,mode:string}>
+	 */
+	public static function recommended_times(): array {
+		return array(
+			array( 'hour' => 10, 'minute' => 0, 'mode' => 'full' ),
+			array( 'hour' => 12, 'minute' => 0, 'mode' => 'incremental' ),
+			array( 'hour' => 14, 'minute' => 0, 'mode' => 'incremental' ),
+			array( 'hour' => 16, 'minute' => 0, 'mode' => 'incremental' ),
+			array( 'hour' => 18, 'minute' => 0, 'mode' => 'incremental' ),
+		);
+	}
+
+	/**
 	 * @param array $settings
-	 * @return array<int,array{hour:int,minute:int}>
+	 * @return array<int,array{hour:int,minute:int,mode:string}>
 	 */
 	public static function normalize_times( array $settings ): array {
 		$raw = $settings['times'] ?? null;
@@ -314,6 +335,7 @@ class Hostlinks_CVENT_Scheduler {
 				array(
 					'hour'   => (int) ( $settings['hour'] ?? 9 ),
 					'minute' => (int) ( $settings['minute'] ?? 0 ),
+					'mode'   => 'full',
 				),
 			);
 		}
@@ -323,12 +345,14 @@ class Hostlinks_CVENT_Scheduler {
 			if ( ! is_array( $t ) ) {
 				continue;
 			}
-			$h   = max( 0, min( 23, (int) ( $t['hour'] ?? 0 ) ) );
-			$m   = max( 0, min( 59, (int) ( $t['minute'] ?? 0 ) ) );
-			$key = sprintf( '%02d:%02d', $h, $m );
+			$h    = max( 0, min( 23, (int) ( $t['hour'] ?? 0 ) ) );
+			$m    = max( 0, min( 59, (int) ( $t['minute'] ?? 0 ) ) );
+			$mode = ( ( $t['mode'] ?? '' ) === 'full' ) ? 'full' : 'incremental';
+			$key  = sprintf( '%02d:%02d', $h, $m );
 			$out[ $key ] = array(
 				'hour'   => $h,
 				'minute' => $m,
+				'mode'   => $mode,
 			);
 			if ( count( $out ) >= self::MAX_TIMES ) {
 				break;
@@ -336,20 +360,38 @@ class Hostlinks_CVENT_Scheduler {
 		}
 
 		if ( empty( $out ) ) {
-			$out['09:00'] = array( 'hour' => 9, 'minute' => 0 );
+			$out['10:00'] = array( 'hour' => 10, 'minute' => 0, 'mode' => 'full' );
 		}
 
 		ksort( $out );
 		return array_values( $out );
 	}
 
+	/**
+	 * Resolve mode for a scheduled slot key (e.g. "14:00").
+	 */
+	public static function mode_for_slot( array $settings, string $slot_key ): string {
+		$times = self::normalize_times( $settings );
+		if ( preg_match( '/^(\d{1,2}):(\d{2})$/', $slot_key, $m ) ) {
+			$want = sprintf( '%02d:%02d', (int) $m[1], (int) $m[2] );
+			foreach ( $times as $t ) {
+				$key = sprintf( '%02d:%02d', (int) $t['hour'], (int) $t['minute'] );
+				if ( $key === $want ) {
+					return ( $t['mode'] ?? '' ) === 'full' ? 'full' : 'incremental';
+				}
+			}
+		}
+		// Legacy cron with no slot args — treat as full for safety.
+		return 'full';
+	}
+
 	public static function get_settings() {
 		$defaults = array(
 			'enabled'    => false,
-			'times'      => array( array( 'hour' => 9, 'minute' => 0 ) ),
-			'hour'       => 9, // legacy
-			'minute'     => 0, // legacy
-			'days'       => array( 1, 2, 3, 4, 5 ), // Mon–Fri
+			'times'      => array( array( 'hour' => 10, 'minute' => 0, 'mode' => 'full' ) ),
+			'hour'       => 10,
+			'minute'     => 0,
+			'days'       => array( 1, 2, 3, 4, 5 ),
 			'offset_max' => 45,
 		);
 		$saved              = get_option( self::OPTION_KEY, array() );
@@ -362,7 +404,7 @@ class Hostlinks_CVENT_Scheduler {
 
 	/**
 	 * @param bool  $enabled
-	 * @param array $times      Up to 3 {hour, minute} entries.
+	 * @param array $times
 	 * @param array $days
 	 * @param int   $offset_max
 	 */
@@ -394,7 +436,6 @@ class Hostlinks_CVENT_Scheduler {
 		return get_option( self::LOG_KEY, null );
 	}
 
-	/** Human-readable next scheduled run in the site timezone. */
 	public static function next_run_display() {
 		$ts = self::next_scheduled_ts();
 		if ( ! $ts ) {
@@ -407,34 +448,40 @@ class Hostlinks_CVENT_Scheduler {
 	}
 
 	/**
-	 * Estimate API usage for the configured schedule.
-	 *
-	 * @return array{
-	 *   calls_today:int,
-	 *   daily_limit:int,
-	 *   last_sync_calls:int|null,
-	 *   times_per_day:int,
-	 *   estimated_per_sync:int,
-	 *   estimated_daily:int,
-	 *   remaining_today:int,
-	 *   over_limit:bool
-	 * }
+	 * Estimate API usage for mixed full + incremental schedules.
 	 */
 	public static function api_usage_estimate(): array {
-		$settings      = self::get_settings();
-		$times         = self::normalize_times( $settings );
-		$times_per_day = $settings['enabled'] ? count( $times ) : 0;
+		$settings = self::get_settings();
+		$times    = self::normalize_times( $settings );
+		$n_full   = 0;
+		$n_incr   = 0;
+		if ( $settings['enabled'] ) {
+			foreach ( $times as $t ) {
+				if ( ( $t['mode'] ?? '' ) === 'full' ) {
+					$n_full++;
+				} else {
+					$n_incr++;
+				}
+			}
+		}
+		$times_per_day = $n_full + $n_incr;
 		$calls_today   = class_exists( 'Hostlinks_CVENT_API', false )
 			? Hostlinks_CVENT_API::get_call_count_today()
 			: 0;
-		$log           = self::get_last_log();
-		$last_calls    = ( isset( $log['api_calls'] ) && (int) $log['api_calls'] > 0 )
-			? (int) $log['api_calls']
-			: null;
+		$log = self::get_last_log();
 
-		// Fallback estimate when we have not measured a sync yet: ~2 calls/event + overhead.
+		$full_cost = null;
+		$incr_cost = null;
+		if ( is_array( $log ) && isset( $log['api_calls'] ) && (int) $log['api_calls'] > 0 ) {
+			if ( ( $log['mode'] ?? '' ) === 'incremental' ) {
+				$incr_cost = (int) $log['api_calls'];
+			} else {
+				$full_cost = (int) $log['api_calls'];
+			}
+		}
+
 		$event_count = 0;
-		if ( null === $last_calls ) {
+		if ( null === $full_cost ) {
 			global $wpdb;
 			$tbl    = $wpdb->prefix . 'event_details_list';
 			$cutoff = gmdate( 'Y-m-d', strtotime( '-60 days' ) );
@@ -444,11 +491,18 @@ class Hostlinks_CVENT_Scheduler {
 					$cutoff
 				)
 			);
-			$last_calls = max( 10, 2 + ( $event_count * 2 ) );
+			$full_cost = max( 10, 2 + ( $event_count * 2 ) );
+		}
+		if ( null === $incr_cost ) {
+			$linked = ( is_array( $log ) && isset( $log['linked_events'] ) )
+				? (int) $log['linked_events']
+				: 15;
+			$incr_cost = max( 3, 2 + $linked );
 		}
 
-		$estimated_daily = $times_per_day * $last_calls;
+		$estimated_daily = ( $n_full * $full_cost ) + ( $n_incr * $incr_cost );
 		$remaining       = max( 0, self::API_DAILY_LIMIT - $calls_today );
+		$blended         = $times_per_day > 0 ? (int) round( $estimated_daily / $times_per_day ) : $full_cost;
 
 		$measured = ( isset( $log['api_calls'] ) && (int) $log['api_calls'] > 0 )
 			? (int) $log['api_calls']
@@ -459,7 +513,11 @@ class Hostlinks_CVENT_Scheduler {
 			'daily_limit'         => self::API_DAILY_LIMIT,
 			'last_sync_calls'     => $measured,
 			'times_per_day'       => $times_per_day,
-			'estimated_per_sync'  => $last_calls,
+			'full_slots'          => $n_full,
+			'incremental_slots'   => $n_incr,
+			'estimated_per_full'  => $full_cost,
+			'estimated_per_incr'  => $incr_cost,
+			'estimated_per_sync'  => $blended,
 			'estimated_daily'     => $estimated_daily,
 			'remaining_today'     => $remaining,
 			'over_limit'          => $estimated_daily > self::API_DAILY_LIMIT,

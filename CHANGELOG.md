@@ -2,6 +2,17 @@
 
 ---
 
+## v2.11.54 — 2026-11-06
+
+### New: Incremental CVENT sync (up to 5 daily slots)
+- Schedule slots support **Full** or **Incremental** mode (max 5/day).
+- Incremental: list recent attendees (`after`/`before`), then sync only linked Hostlinks events that changed.
+- Recommended schedule button: 10am full; noon / 2 / 4 / 6pm incremental.
+- CVENT Sync page: **Run Incremental Sync Now**.
+- Watermark tracks the last sync window for cheap mid-day runs.
+
+---
+
 ## v2.11.53 — 2026-11-06
 
 ### New: Incremental CVENT sync probe

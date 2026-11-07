@@ -694,6 +694,116 @@ class Hostlinks_CVENT_Sync {
 		return array_merge( array( 'results' => $results, 'dry_run' => $dry_run ), $counts );
 	}
 
+	/**
+	 * Incremental sync: discover attendees changed in a UTC window, then
+	 * full-sync only the linked Hostlinks events those attendees belong to.
+	 *
+	 * @param string $after_utc  ISO-8601 UTC (inclusive).
+	 * @param string $before_utc ISO-8601 UTC (inclusive).
+	 * @param bool   $dry_run
+	 * @return array{
+	 *   results:array,
+	 *   dry_run:bool,
+	 *   synced:int,
+	 *   matched:int,
+	 *   needs_review:int,
+	 *   no_candidates:int,
+	 *   errors:int,
+	 *   discovered_events:int,
+	 *   linked_events:int,
+	 *   skipped_unlinked:int,
+	 *   attendee_rows:int,
+	 *   mode:string,
+	 *   after:string,
+	 *   before:string
+	 * }
+	 */
+	public static function sync_incremental( string $after_utc, string $before_utc, $dry_run = false ) {
+		$attendees = Hostlinks_CVENT_API::list_attendees_between( $after_utc, $before_utc );
+		if ( is_wp_error( $attendees ) ) {
+			return array(
+				'results'            => array(),
+				'dry_run'            => (bool) $dry_run,
+				'synced'             => 0,
+				'matched'            => 0,
+				'needs_review'       => 0,
+				'no_candidates'      => 0,
+				'errors'             => 1,
+				'discovered_events'  => 0,
+				'linked_events'      => 0,
+				'skipped_unlinked'   => 0,
+				'attendee_rows'      => 0,
+				'mode'               => 'incremental',
+				'after'              => $after_utc,
+				'before'             => $before_utc,
+				'error_message'      => $attendees->get_error_message(),
+			);
+		}
+
+		$event_ids = array();
+		foreach ( (array) $attendees as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			$eid = Hostlinks_CVENT_API::extract_event_id_from_record( $row );
+			if ( $eid !== '' ) {
+				$event_ids[ $eid ] = true;
+			}
+		}
+		$discovered = array_keys( $event_ids );
+
+		$linked_map = Hostlinks_CVENT_API::linked_cvent_event_map();
+		$eve_ids    = array();
+		$unlinked   = 0;
+		foreach ( $discovered as $eid ) {
+			if ( isset( $linked_map[ $eid ] ) ) {
+				$eve_ids[ (int) $linked_map[ $eid ]['eve_id'] ] = true;
+			} else {
+				$unlinked++;
+			}
+		}
+		$eve_ids = array_keys( $eve_ids );
+
+		$results = array();
+		$counts  = array( 'synced' => 0, 'matched' => 0, 'needs_review' => 0, 'no_candidates' => 0, 'errors' => 0 );
+		$done    = array(); // eve_ids already covered by a family sync
+
+		foreach ( $eve_ids as $eve_id ) {
+			if ( isset( $done[ (int) $eve_id ] ) ) {
+				continue;
+			}
+			$family = self::sync_one_or_family( (int) $eve_id, $dry_run );
+			foreach ( (array) ( $family['results'] ?? array() ) as $res ) {
+				$results[] = $res;
+				if ( isset( $res['eve_id'] ) ) {
+					$done[ (int) $res['eve_id'] ] = true;
+				}
+			}
+			foreach ( array( 'synced', 'matched', 'needs_review', 'no_candidates', 'errors' ) as $k ) {
+				$counts[ $k ] += (int) ( $family[ $k ] ?? 0 );
+			}
+		}
+
+		if ( ! $dry_run && ! empty( $eve_ids ) ) {
+			do_action( 'hostlinks_event_updated' );
+		}
+
+		return array_merge(
+			array(
+				'results'           => $results,
+				'dry_run'           => (bool) $dry_run,
+				'discovered_events' => count( $discovered ),
+				'linked_events'     => count( $eve_ids ),
+				'skipped_unlinked'  => $unlinked,
+				'attendee_rows'     => count( $attendees ),
+				'mode'              => 'incremental',
+				'after'             => $after_utc,
+				'before'            => $before_utc,
+			),
+			$counts
+		);
+	}
+
 	// -------------------------------------------------------------------------
 	// Public: save a manual link
 	// -------------------------------------------------------------------------

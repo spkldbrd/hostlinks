@@ -823,6 +823,47 @@ class Hostlinks_CVENT_API {
 	}
 
 	// -------------------------------------------------------------------------
+	// Incremental sync — production list helper
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Paginate GET /attendees?after=&before= for an account-wide date window.
+	 *
+	 * @param string $after_utc  ISO-8601 UTC inclusive bound.
+	 * @param string $before_utc ISO-8601 UTC inclusive bound.
+	 * @return array|WP_Error Flat attendee records, or WP_Error on failure.
+	 */
+	public static function list_attendees_between( string $after_utc, string $before_utc ) {
+		$all       = array();
+		$next      = null;
+		$page      = 0;
+		$max_pages = 50;
+
+		do {
+			$params = array(
+				'after'  => $after_utc,
+				'before' => $before_utc,
+				'limit'  => 200,
+			);
+			if ( $next ) {
+				$params['token'] = $next;
+			}
+
+			$result = self::request( 'attendees', $params );
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+
+			$data = isset( $result['data'] ) && is_array( $result['data'] ) ? $result['data'] : array();
+			$all  = array_merge( $all, $data );
+			$next = isset( $result['paging']['nextToken'] ) ? $result['paging']['nextToken'] : null;
+			$page++;
+		} while ( $next && $page < $max_pages );
+
+		return $all;
+	}
+
+	// -------------------------------------------------------------------------
 	// Incremental sync probe (read-only experiments)
 	// -------------------------------------------------------------------------
 

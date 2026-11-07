@@ -5,21 +5,34 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // ── Save schedule settings ────────────────────────────────────────────────────
 $schedule_notice = '';
-if ( isset( $_POST['hostlinks_cvent_schedule_save'] ) ) {
+if ( isset( $_POST['hostlinks_cvent_schedule_recommended'] ) ) {
+	check_admin_referer( 'hostlinks_cvent_settings' );
+	$sched_days = array_map( 'intval', (array) ( $_POST['cvent_schedule_days'] ?? array() ) );
+	Hostlinks_CVENT_Scheduler::save_settings(
+		! empty( $_POST['cvent_schedule_enabled'] ),
+		Hostlinks_CVENT_Scheduler::recommended_times(),
+		$sched_days,
+		$_POST['cvent_schedule_offset_max'] ?? 45
+	);
+	Hostlinks_CVENT_Scheduler::maybe_reschedule();
+	$schedule_notice = '<div class="notice notice-success is-dismissible"><p>Recommended schedule applied (10am full; noon / 2 / 4 / 6pm incremental).</p></div>';
+} elseif ( isset( $_POST['hostlinks_cvent_schedule_save'] ) ) {
 	check_admin_referer( 'hostlinks_cvent_settings' );
 	$sched_days  = array_map( 'intval', (array) ( $_POST['cvent_schedule_days'] ?? array() ) );
 	$hours       = array_map( 'intval', (array) ( $_POST['cvent_schedule_hour'] ?? array() ) );
 	$minutes     = array_map( 'intval', (array) ( $_POST['cvent_schedule_minute'] ?? array() ) );
+	$modes       = array_map( 'sanitize_key', (array) ( $_POST['cvent_schedule_mode'] ?? array() ) );
 	$sched_times = array();
-	$n           = max( count( $hours ), count( $minutes ) );
+	$n           = max( count( $hours ), count( $minutes ), count( $modes ) );
 	for ( $i = 0; $i < $n && count( $sched_times ) < Hostlinks_CVENT_Scheduler::MAX_TIMES; $i++ ) {
 		$sched_times[] = array(
-			'hour'   => $hours[ $i ] ?? 9,
+			'hour'   => $hours[ $i ] ?? 10,
 			'minute' => $minutes[ $i ] ?? 0,
+			'mode'   => ( ( $modes[ $i ] ?? '' ) === 'full' ) ? 'full' : 'incremental',
 		);
 	}
 	if ( empty( $sched_times ) ) {
-		$sched_times[] = array( 'hour' => 9, 'minute' => 0 );
+		$sched_times = Hostlinks_CVENT_Scheduler::recommended_times();
 	}
 	Hostlinks_CVENT_Scheduler::save_settings(
 		! empty( $_POST['cvent_schedule_enabled'] ),
@@ -27,7 +40,6 @@ if ( isset( $_POST['hostlinks_cvent_schedule_save'] ) ) {
 		$sched_days,
 		$_POST['cvent_schedule_offset_max'] ?? 45
 	);
-	// Immediately apply the new schedule.
 	Hostlinks_CVENT_Scheduler::maybe_reschedule();
 	$schedule_notice = '<div class="notice notice-success is-dismissible"><p>Schedule settings saved.</p></div>';
 }
@@ -327,14 +339,14 @@ $s = Hostlinks_CVENT_API::get_settings();
 		}
 	}
 	?>
-	<p>Automatically run a full CVENT sync on selected days at up to <strong>3 times per day</strong>, each with a random offset so the schedule looks natural. Only events from the last 60 days forward are processed. Dry-run mode is <strong>not</strong> used — results are written live.</p>
+	<p>Automatically sync on selected days at up to <strong><?php echo (int) Hostlinks_CVENT_Scheduler::MAX_TIMES; ?> times per day</strong>, each with a random offset. Use <strong>Full</strong> once (all linked events) and <strong>Incremental</strong> for cheaper mid-day runs (only events with recent registration activity). Dry-run mode is <strong>not</strong> used for scheduled runs — results are written live.</p>
 
 	<div class="notice notice-warning inline" style="margin:12px 0 16px;padding:10px 14px;">
 		<p style="margin:0;">
 			<strong>Free-tier API limit:</strong> CVENT allows about
 			<strong><?php echo number_format( Hostlinks_CVENT_Scheduler::API_DAILY_LIMIT ); ?></strong> API calls per day (UTC).
-			Each scheduled sync uses roughly the same call volume as a full Sync All.
-			Adding a 2nd or 3rd daily run multiplies usage — you may hit the daily limit and fail later syncs.
+			Full slots cost roughly one Sync All; incremental slots usually cost a few list calls plus only the events that changed.
+			Recommended: one full + several incremental (e.g. 10am full, then noon / 2 / 4 / 6pm).
 		</p>
 	</div>
 
@@ -360,19 +372,24 @@ $s = Hostlinks_CVENT_API::get_settings();
 				<td><?php echo number_format( $api_est['remaining_today'] ); ?></td>
 			</tr>
 			<tr>
-				<td><strong>Est. calls / sync</strong></td>
-				<td>
-					~<?php echo number_format( $api_est['estimated_per_sync'] ); ?>
-					<?php if ( null === $api_est['last_sync_calls'] ) : ?>
-						<em style="color:#888;">(estimate — measured after next auto-sync)</em>
-					<?php else : ?>
-						<em style="color:#888;">(from last auto-sync)</em>
-					<?php endif; ?>
-				</td>
+				<td><strong>Est. calls / full sync</strong></td>
+				<td>~<?php echo number_format( $api_est['estimated_per_full'] ?? $api_est['estimated_per_sync'] ); ?></td>
+			</tr>
+			<tr>
+				<td><strong>Est. calls / incremental</strong></td>
+				<td>~<?php echo number_format( $api_est['estimated_per_incr'] ?? 15 ); ?></td>
 			</tr>
 			<tr>
 				<td><strong>Scheduled runs / day</strong></td>
-				<td><?php echo (int) $api_est['times_per_day']; ?></td>
+				<td>
+					<?php echo (int) $api_est['times_per_day']; ?>
+					<?php if ( ! empty( $api_est['full_slots'] ) || ! empty( $api_est['incremental_slots'] ) ) : ?>
+						<em style="color:#888;">
+							(<?php echo (int) ( $api_est['full_slots'] ?? 0 ); ?> full
+							+ <?php echo (int) ( $api_est['incremental_slots'] ?? 0 ); ?> incremental)
+						</em>
+					<?php endif; ?>
+				</td>
 			</tr>
 			<tr>
 				<td><strong>Est. daily usage if all runs fire</strong></td>
@@ -409,11 +426,17 @@ $s = Hostlinks_CVENT_API::get_settings();
 				<td>
 					<?php if ( $last_log ) : ?>
 						<?php echo esc_html( $last_log['time'] ); ?> (site time)
+						<?php if ( ! empty( $last_log['mode'] ) ) : ?>
+							· <strong><?php echo esc_html( $last_log['mode'] ); ?></strong>
+						<?php endif; ?>
 						— <?php echo (int) $last_log['synced']; ?> synced,
 						<?php echo (int) $last_log['errors']; ?> errors,
 						<?php echo (int) $last_log['needs_review']; ?> need review
 						<?php if ( isset( $last_log['api_calls'] ) ) : ?>
 							· <?php echo (int) $last_log['api_calls']; ?> API calls
+						<?php endif; ?>
+						<?php if ( isset( $last_log['linked_events'] ) ) : ?>
+							· <?php echo (int) $last_log['linked_events']; ?> events touched
 						<?php endif; ?>
 					<?php else : ?>
 						<em style="color:#888;">No sync log yet</em>
@@ -448,7 +471,13 @@ $s = Hostlinks_CVENT_API::get_settings();
 				<tr><td><strong>Needs review</strong></td><td><?php echo (int) $last_log['needs_review']; ?></td></tr>
 				<tr><td><strong>No candidates</strong></td><td><?php echo (int) $last_log['no_candidates']; ?></td></tr>
 				<tr><td><strong>Errors</strong></td><td><?php echo (int) $last_log['errors']; ?></td></tr>
+				<tr><td><strong>Mode</strong></td><td><?php echo esc_html( $last_log['mode'] ?? '—' ); ?></td></tr>
 				<tr><td><strong>API calls this run</strong></td><td><?php echo isset( $last_log['api_calls'] ) ? (int) $last_log['api_calls'] : '—'; ?></td></tr>
+				<?php if ( isset( $last_log['discovered_events'] ) ) : ?>
+				<tr><td><strong>Discovered CVENT events</strong></td><td><?php echo (int) $last_log['discovered_events']; ?></td></tr>
+				<tr><td><strong>Linked Hostlinks events touched</strong></td><td><?php echo (int) ( $last_log['linked_events'] ?? 0 ); ?></td></tr>
+				<tr><td><strong>Attendee rows in window</strong></td><td><?php echo (int) ( $last_log['attendee_rows'] ?? 0 ); ?></td></tr>
+				<?php endif; ?>
 			</tbody>
 		</table>
 	</details>
@@ -487,10 +516,17 @@ $s = Hostlinks_CVENT_API::get_settings();
 			<tr>
 				<th scope="row"><label>Sync times</label></th>
 				<td>
-					<p class="description" style="margin-top:0;">Site timezone: <strong><?php echo esc_html( $tz_label ); ?></strong>. Max <?php echo (int) Hostlinks_CVENT_Scheduler::MAX_TIMES; ?> times per day.</p>
+					<p class="description" style="margin-top:0;">
+						Site timezone: <strong><?php echo esc_html( $tz_label ); ?></strong>.
+						Max <?php echo (int) Hostlinks_CVENT_Scheduler::MAX_TIMES; ?> times per day.
+						<strong>Full</strong> = all linked events.
+						<strong>Incremental</strong> = recent changes only.
+					</p>
 					<div id="hl-cvent-times" data-max="<?php echo (int) Hostlinks_CVENT_Scheduler::MAX_TIMES; ?>">
-						<?php foreach ( $sched_times as $ti => $slot ) : ?>
-						<div class="hl-cvent-time-row" style="margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+						<?php foreach ( $sched_times as $ti => $slot ) :
+							$slot_mode = ( ( $slot['mode'] ?? '' ) === 'full' ) ? 'full' : 'incremental';
+						?>
+						<div class="hl-cvent-time-row" style="margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 							<select name="cvent_schedule_hour[]" style="width:80px;">
 							<?php for ( $h = 0; $h < 24; $h++ ) : ?>
 								<option value="<?php echo $h; ?>" <?php selected( (int) $slot['hour'], $h ); ?>>
@@ -506,21 +542,29 @@ $s = Hostlinks_CVENT_API::get_settings();
 								</option>
 							<?php endforeach; ?>
 							</select>
+							<select name="cvent_schedule_mode[]" style="width:130px;">
+								<option value="full" <?php selected( $slot_mode, 'full' ); ?>>Full</option>
+								<option value="incremental" <?php selected( $slot_mode, 'incremental' ); ?>>Incremental</option>
+							</select>
 							<button type="button" class="button hl-cvent-time-remove" <?php echo count( $sched_times ) <= 1 ? 'disabled' : ''; ?>>Remove</button>
 						</div>
 						<?php endforeach; ?>
 					</div>
-					<p style="margin:8px 0 0;">
+					<p style="margin:8px 0 0;display:flex;gap:8px;flex-wrap:wrap;">
 						<button type="button" class="button" id="hl-cvent-time-add"
 							<?php echo count( $sched_times ) >= Hostlinks_CVENT_Scheduler::MAX_TIMES ? 'disabled' : ''; ?>>
 							+ Add time
 						</button>
+						<button type="submit" name="hostlinks_cvent_schedule_recommended" class="button"
+							onclick="return confirm('Replace sync times with recommended schedule (10am full; noon / 2 / 4 / 6pm incremental)?');">
+							Use recommended schedule
+						</button>
 					</p>
 					<template id="hl-cvent-time-template">
-						<div class="hl-cvent-time-row" style="margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+						<div class="hl-cvent-time-row" style="margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
 							<select name="cvent_schedule_hour[]" style="width:80px;">
 							<?php for ( $h = 0; $h < 24; $h++ ) : ?>
-								<option value="<?php echo $h; ?>" <?php selected( 9, $h ); ?>>
+								<option value="<?php echo $h; ?>" <?php selected( 12, $h ); ?>>
 									<?php echo str_pad( (string) $h, 2, '0', STR_PAD_LEFT ); ?>
 								</option>
 							<?php endfor; ?>
@@ -531,6 +575,10 @@ $s = Hostlinks_CVENT_API::get_settings();
 								<option value="<?php echo $m; ?>"><?php echo str_pad( (string) $m, 2, '0', STR_PAD_LEFT ); ?></option>
 							<?php endforeach; ?>
 							</select>
+							<select name="cvent_schedule_mode[]" style="width:130px;">
+								<option value="full">Full</option>
+								<option value="incremental" selected>Incremental</option>
+							</select>
 							<button type="button" class="button hl-cvent-time-remove">Remove</button>
 						</div>
 					</template>
@@ -540,7 +588,7 @@ $s = Hostlinks_CVENT_API::get_settings();
 						var addBtn = document.getElementById('hl-cvent-time-add');
 						var tpl = document.getElementById('hl-cvent-time-template');
 						if (!wrap || !addBtn || !tpl) return;
-						var max = parseInt(wrap.getAttribute('data-max') || '3', 10);
+						var max = parseInt(wrap.getAttribute('data-max') || '5', 10);
 						function rows(){ return wrap.querySelectorAll('.hl-cvent-time-row'); }
 						function refresh(){
 							var n = rows().length;
@@ -603,11 +651,13 @@ $s = Hostlinks_CVENT_API::get_settings();
 			<tr><td>Daily calls</td><td><?php echo number_format( Hostlinks_CVENT_Scheduler::API_DAILY_LIMIT ); ?> (resets midnight UTC)</td></tr>
 			<tr><td>Per second</td><td>2</td></tr>
 			<tr><td>Calls used today</td><td><?php echo number_format( $api_est['calls_today'] ); ?></td></tr>
-			<tr><td>Est. calls / sync</td><td>~<?php echo number_format( $api_est['estimated_per_sync'] ); ?></td></tr>
+			<tr><td>Est. calls / full</td><td>~<?php echo number_format( $api_est['estimated_per_full'] ?? $api_est['estimated_per_sync'] ); ?></td></tr>
+			<tr><td>Est. calls / incremental</td><td>~<?php echo number_format( $api_est['estimated_per_incr'] ?? 15 ); ?></td></tr>
 			<tr><td>Est. with current schedule</td><td>
 				<?php if ( $api_est['times_per_day'] > 0 ) : ?>
 					~<?php echo number_format( $api_est['estimated_daily'] ); ?> / day
-					(<?php echo (int) $api_est['times_per_day']; ?> × ~<?php echo number_format( $api_est['estimated_per_sync'] ); ?>)
+					(<?php echo (int) ( $api_est['full_slots'] ?? 0 ); ?> full
+					+ <?php echo (int) ( $api_est['incremental_slots'] ?? 0 ); ?> incremental)
 				<?php else : ?>
 					—
 				<?php endif; ?>

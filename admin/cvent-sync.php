@@ -29,6 +29,19 @@ if ( isset( $_POST['hostlinks_cvent_sync_all'] ) ) {
 	$sync_report = Hostlinks_CVENT_Sync::sync_all( $dry_run, $sync_limit );
 	if ( ! $dry_run ) {
 		Hostlinks_Toolbar::touch_last_updated();
+		Hostlinks_CVENT_Scheduler::set_watermark( gmdate( 'Y-m-d\TH:i:s\Z' ) );
+	}
+}
+
+// Incremental Sync Now (date-window discovery → touched events only)
+if ( isset( $_POST['hostlinks_cvent_sync_incremental'] ) ) {
+	check_admin_referer( 'hostlinks_cvent_sync' );
+	$before_utc = gmdate( 'Y-m-d\TH:i:s\Z' );
+	$after_utc  = Hostlinks_CVENT_Scheduler::incremental_after_utc( $before_utc );
+	$sync_report = Hostlinks_CVENT_Sync::sync_incremental( $after_utc, $before_utc, $dry_run );
+	if ( ! $dry_run ) {
+		Hostlinks_Toolbar::touch_last_updated();
+		Hostlinks_CVENT_Scheduler::set_watermark( $before_utc );
 	}
 }
 
@@ -441,6 +454,16 @@ function hl_cvent_status_badge( $status ) {
 					<strong>Session family:</strong> synced <?php echo count( $sync_report['family_ids'] ?? array() ); ?> Hostlinks events on the same CVENT UUID (order items fetched once). &nbsp;
 				<?php endif; ?>
 				<strong><?php echo $is_dry ? 'Preview complete:' : 'Sync complete:'; ?></strong>
+				<?php if ( ( $sync_report['mode'] ?? '' ) === 'incremental' ) : ?>
+					<strong>Incremental</strong>
+					<?php if ( ! empty( $sync_report['error_message'] ) ) : ?>
+						— <span style="color:#d63638;"><?php echo esc_html( $sync_report['error_message'] ); ?></span> &nbsp;
+					<?php else : ?>
+						— <?php echo (int) ( $sync_report['attendee_rows'] ?? 0 ); ?> attendee rows,
+						<?php echo (int) ( $sync_report['discovered_events'] ?? 0 ); ?> CVENT events,
+						<?php echo (int) ( $sync_report['linked_events'] ?? 0 ); ?> linked &nbsp;
+					<?php endif; ?>
+				<?php endif; ?>
 				<?php echo (int)$sync_report['synced']; ?> <?php echo $is_dry ? 'would sync' : 'synced'; ?> &bull;
 				<?php echo (int)$sync_report['matched']; ?> <?php echo $is_dry ? 'would match' : 'newly matched'; ?> &bull;
 				<?php echo (int)$sync_report['needs_review']; ?> need review &bull;
@@ -651,17 +674,21 @@ function hl_cvent_status_badge( $status ) {
 		</div>
 	<?php endif; ?>
 
-	<!-- Sync All button -->
-	<form method="post" style="margin-bottom:16px;">
+	<!-- Sync All + Incremental -->
+	<form method="post" style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
 		<?php wp_nonce_field( 'hostlinks_cvent_sync' ); ?>
 		<button type="submit" name="hostlinks_cvent_sync_all" class="button button-primary" <?php echo $ready ? '' : 'disabled'; ?>>
 			<?php echo ( $dry_run && $limit_test ) ? 'Sync All (next 10 upcoming)' : 'Sync All Events'; ?>
 		</button>
-		<span style="margin-left:12px;color:#666;font-size:12px;">
+		<button type="submit" name="hostlinks_cvent_sync_incremental" class="button button-secondary" <?php echo $ready ? '' : 'disabled'; ?>>
+			Run Incremental Sync Now
+		</button>
+		<span style="color:#666;font-size:12px;">
 			<?php if ( $dry_run && $limit_test ) : ?>
-				Dry-run preview — next 10 upcoming events only (saves API calls).
+				Dry-run preview — Sync All limited to next 10 upcoming. Incremental still uses the date window.
 			<?php else : ?>
-				Matches unlinked events and updates paid/free counts on all confirmed events.
+				<strong>Sync All</strong> = every linked event.
+				<strong>Incremental</strong> = recent registrations only (since last watermark, max 48h).
 			<?php endif; ?>
 		</span>
 	</form>

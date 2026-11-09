@@ -36,6 +36,20 @@ class Hostlinks_CVENT_Sync {
 		'active',
 	);
 
+	/**
+	 * In-request attendee identity cache (UUID => first/last/email/company).
+	 *
+	 * @var array<string,array{first_name:string,last_name:string,email:string,company:string}>
+	 */
+	private static $attendee_identity_cache = array();
+
+	/**
+	 * Attendee UUIDs already GETed this request (even if still blank).
+	 *
+	 * @var array<string,true>
+	 */
+	private static $attendee_api_attempted = array();
+
 	// -------------------------------------------------------------------------
 	// Public: find new CVENT events not yet in Hostlinks
 	// -------------------------------------------------------------------------
@@ -1281,6 +1295,25 @@ class Hostlinks_CVENT_Sync {
 
 		// Persist per-attendee order dates + identity for Daily Totals drill-down.
 		$order_reg_rows = array();
+		$local_idents   = Hostlinks_DB::get_cvent_order_regs_for_event( (int) $eve_id );
+		$blank_ids      = array();
+		foreach ( $seen as $att_key => $_kind ) {
+			$from_expand = array(
+				'first_name' => $order_meta[ $att_key ]['first_name'] ?? '',
+				'last_name'  => $order_meta[ $att_key ]['last_name'] ?? '',
+				'email'      => $order_meta[ $att_key ]['email'] ?? '',
+				'company'    => $order_meta[ $att_key ]['company'] ?? '',
+			);
+			$seed = self::overlay_attendee_identity(
+				self::overlay_attendee_identity( $from_expand, self::$attendee_identity_cache[ $att_key ] ?? array() ),
+				$local_idents[ $att_key ] ?? array()
+			);
+			if ( ! self::attendee_identity_present( $seed ) ) {
+				$blank_ids[] = $att_key;
+			}
+		}
+		$global_idents = Hostlinks_DB::get_cvent_order_reg_identities( $blank_ids );
+
 		foreach ( $seen as $att_key => $kind ) {
 			$meta = $order_meta[ $att_key ] ?? null;
 			if ( empty( $meta['order_date'] ) ) {
@@ -1292,8 +1325,21 @@ class Hostlinks_CVENT_Sync {
 				'email'      => $meta['email'] ?? '',
 				'company'    => $meta['company'] ?? '',
 			);
-			// Order-item expand often returns id-only stubs — fetch full attendee when blank.
-			$ident = self::fill_missing_attendee_identity( $att_key, $ident );
+			$ident = self::overlay_attendee_identity( $ident, self::$attendee_identity_cache[ $att_key ] ?? array() );
+			$ident = self::overlay_attendee_identity( $ident, $local_idents[ $att_key ] ?? array() );
+			$ident = self::overlay_attendee_identity( $ident, $global_idents[ $att_key ] ?? array() );
+
+			// GET /attendees/{id} only for people we have never stored on this event.
+			// expand=attendee is usually an id stub; re-fetching everyone each full sync
+			// was ~1000 extra calls/day.
+			if ( ! self::attendee_identity_present( $ident ) && ! isset( $local_idents[ $att_key ] ) ) {
+				$ident = self::fill_missing_attendee_identity( $att_key, $ident );
+			}
+
+			self::$attendee_identity_cache[ $att_key ] = self::overlay_attendee_identity(
+				self::$attendee_identity_cache[ $att_key ] ?? self::empty_attendee_identity(),
+				$ident
+			);
 
 			$order_reg_rows[ $att_key ] = array(
 				'order_date' => $meta['order_date'],
@@ -1361,38 +1407,70 @@ class Hostlinks_CVENT_Sync {
 	}
 
 	/**
+	 * @return array{first_name:string,last_name:string,email:string,company:string}
+	 */
+	private static function empty_attendee_identity(): array {
+		return array(
+			'first_name' => '',
+			'last_name'  => '',
+			'email'      => '',
+			'company'    => '',
+		);
+	}
+
+	private static function attendee_identity_present( array $ident ): bool {
+		return ( $ident['first_name'] ?? '' ) !== ''
+			|| ( $ident['last_name'] ?? '' ) !== ''
+			|| ( $ident['email'] ?? '' ) !== '';
+	}
+
+	/**
+	 * @param array{first_name?:string,last_name?:string,email?:string,company?:string} $base
+	 * @param array{first_name?:string,last_name?:string,email?:string,company?:string} $overlay
+	 * @return array{first_name:string,last_name:string,email:string,company:string}
+	 */
+	private static function overlay_attendee_identity( array $base, array $overlay ): array {
+		$out = array_merge( self::empty_attendee_identity(), $base );
+		foreach ( array( 'first_name', 'last_name', 'email', 'company' ) as $k ) {
+			if ( $out[ $k ] === '' && ( $overlay[ $k ] ?? '' ) !== '' ) {
+				$out[ $k ] = trim( (string) $overlay[ $k ] );
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * If identity fields are empty, GET /attendees/{id} (same fallback roster uses).
+	 * Uses an in-request cache so the same UUID is fetched at most once per PHP run.
 	 *
 	 * @param array{first_name:string,last_name:string,email:string,company:string} $ident
 	 * @return array{first_name:string,last_name:string,email:string,company:string}
 	 */
 	public static function fill_missing_attendee_identity( string $attendee_id, array $ident ): array {
-		$ident = array_merge(
-			array(
-				'first_name' => '',
-				'last_name'  => '',
-				'email'      => '',
-				'company'    => '',
-			),
-			$ident
-		);
-		if ( $ident['first_name'] !== '' || $ident['last_name'] !== '' || $ident['email'] !== '' ) {
-			return $ident;
-		}
+		$ident       = self::overlay_attendee_identity( self::empty_attendee_identity(), $ident );
 		$attendee_id = Hostlinks_CVENT_API::sanitize_uuid( $attendee_id ) ?: $attendee_id;
 		if ( $attendee_id === '' ) {
 			return $ident;
 		}
-		$fetched = Hostlinks_CVENT_API::get_attendee( $attendee_id );
-		if ( is_wp_error( $fetched ) || ! is_array( $fetched ) ) {
+
+		$ident = self::overlay_attendee_identity( $ident, self::$attendee_identity_cache[ $attendee_id ] ?? array() );
+		if ( self::attendee_identity_present( $ident ) ) {
+			self::$attendee_identity_cache[ $attendee_id ] = $ident;
 			return $ident;
 		}
-		$from = self::identity_from_attendee_record( $fetched );
-		foreach ( array( 'first_name', 'last_name', 'email', 'company' ) as $k ) {
-			if ( $ident[ $k ] === '' && $from[ $k ] !== '' ) {
-				$ident[ $k ] = $from[ $k ];
-			}
+
+		if ( isset( self::$attendee_api_attempted[ $attendee_id ] ) ) {
+			return $ident;
 		}
+		self::$attendee_api_attempted[ $attendee_id ] = true;
+
+		$fetched = Hostlinks_CVENT_API::get_attendee( $attendee_id );
+		if ( is_wp_error( $fetched ) || ! is_array( $fetched ) ) {
+			self::$attendee_identity_cache[ $attendee_id ] = $ident;
+			return $ident;
+		}
+		$ident = self::overlay_attendee_identity( $ident, self::identity_from_attendee_record( $fetched ) );
+		self::$attendee_identity_cache[ $attendee_id ] = $ident;
 		return $ident;
 	}
 

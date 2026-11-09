@@ -638,11 +638,19 @@ class Hostlinks_CVENT_API {
 	 * @return array|WP_Error      Attendee record array, or WP_Error on failure.
 	 */
 	public static function get_attendee( $attendee_id, $expand = '' ) {
+		$id        = self::sanitize_uuid( $attendee_id );
+		$cache_key = 'attendee:' . $id . ':' . $expand;
+		if ( array_key_exists( $cache_key, self::$request_cache ) ) {
+			return self::$request_cache[ $cache_key ];
+		}
+
 		$params = array();
 		if ( $expand !== '' ) {
 			$params['expand'] = $expand;
 		}
-		return self::request( 'attendees/' . self::sanitize_uuid( $attendee_id ), $params );
+		$result = self::request( 'attendees/' . $id, $params );
+		self::$request_cache[ $cache_key ] = $result;
+		return $result;
 	}
 
 	/**

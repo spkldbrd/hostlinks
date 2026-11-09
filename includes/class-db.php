@@ -550,6 +550,99 @@ class Hostlinks_DB {
 	 * @param int   $eve_id
 	 * @param array $rows
 	 */
+	/**
+	 * Stored order-reg identities for one Hostlinks event, keyed by attendee UUID.
+	 *
+	 * @return array<string,array{first_name:string,last_name:string,email:string,company:string}>
+	 */
+	public static function get_cvent_order_regs_for_event( int $eve_id ): array {
+		global $wpdb;
+		if ( $eve_id < 1 ) {
+			return array();
+		}
+
+		$tbl  = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT attendee_id, first_name, last_name, email, company
+				 FROM `{$tbl}`
+				 WHERE eve_id = %d",
+				$eve_id
+			),
+			ARRAY_A
+		);
+
+		$out = array();
+		foreach ( (array) $rows as $row ) {
+			$aid = (string) ( $row['attendee_id'] ?? '' );
+			if ( $aid === '' ) {
+				continue;
+			}
+			$out[ $aid ] = array(
+				'first_name' => trim( (string) ( $row['first_name'] ?? '' ) ),
+				'last_name'  => trim( (string) ( $row['last_name'] ?? '' ) ),
+				'email'      => trim( (string) ( $row['email'] ?? '' ) ),
+				'company'    => trim( (string) ( $row['company'] ?? '' ) ),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Best stored identity per attendee UUID (across events). Empty fields are skipped.
+	 *
+	 * @param array<int,string> $attendee_ids
+	 * @return array<string,array{first_name:string,last_name:string,email:string,company:string}>
+	 */
+	public static function get_cvent_order_reg_identities( array $attendee_ids ): array {
+		global $wpdb;
+		$ids = array();
+		foreach ( $attendee_ids as $id ) {
+			$id = sanitize_text_field( (string) $id );
+			if ( $id !== '' ) {
+				$ids[ $id ] = $id;
+			}
+		}
+		$ids = array_values( $ids );
+		if ( empty( $ids ) ) {
+			return array();
+		}
+
+		$tbl = $wpdb->prefix . 'hostlinks_cvent_order_regs';
+		$out = array();
+		foreach ( array_chunk( $ids, 200 ) as $chunk ) {
+			$placeholders = implode( ',', array_fill( 0, count( $chunk ), '%s' ) );
+			$sql          = "SELECT attendee_id, first_name, last_name, email, company
+				 FROM `{$tbl}`
+				 WHERE attendee_id IN ({$placeholders})
+				 ORDER BY id DESC";
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$chunk ), ARRAY_A );
+
+			foreach ( (array) $rows as $row ) {
+				$aid   = (string) ( $row['attendee_id'] ?? '' );
+				$ident = array(
+					'first_name' => trim( (string) ( $row['first_name'] ?? '' ) ),
+					'last_name'  => trim( (string) ( $row['last_name'] ?? '' ) ),
+					'email'      => trim( (string) ( $row['email'] ?? '' ) ),
+					'company'    => trim( (string) ( $row['company'] ?? '' ) ),
+				);
+				if ( $aid === '' || ( $ident['first_name'] === '' && $ident['last_name'] === '' && $ident['email'] === '' && $ident['company'] === '' ) ) {
+					continue;
+				}
+				if ( ! isset( $out[ $aid ] ) ) {
+					$out[ $aid ] = $ident;
+					continue;
+				}
+				foreach ( array( 'first_name', 'last_name', 'email', 'company' ) as $k ) {
+					if ( $out[ $aid ][ $k ] === '' && $ident[ $k ] !== '' ) {
+						$out[ $aid ][ $k ] = $ident[ $k ];
+					}
+				}
+			}
+		}
+		return $out;
+	}
+
 	public static function replace_cvent_order_regs( int $eve_id, array $rows ): void {
 		global $wpdb;
 		$tbl = $wpdb->prefix . 'hostlinks_cvent_order_regs';

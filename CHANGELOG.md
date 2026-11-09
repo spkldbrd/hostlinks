@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.57 — 2026-11-09
+
+### Fix: full sync no longer re-fetches every attendee
+- Identity is reused from `hostlinks_cvent_order_regs` (and an in-request cache) when name/email already exist.
+- `GET /attendees/{id}` runs only for **new** registrants not yet stored on that event (expand=attendee is usually an id stub).
+- Full sync should return to ~event/order-item traffic instead of ~1 call per person.
+
+---
+
 ## v2.11.56 — 2026-11-06
 
 ### Frontend Updated stamp control

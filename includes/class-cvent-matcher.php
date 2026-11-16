@@ -247,13 +247,12 @@ class Hostlinks_CVENT_Matcher {
 			$hl_state = self::normalize_state( trim( $parts[1] ?? '' ) );
 		}
 
-		// CVENT venues[] array — prefer first venue.
-		if ( ! empty( $cvent_event['venues'] ) && is_array( $cvent_event['venues'] ) ) {
-			$v        = $cvent_event['venues'][0];
-			$cv_city  = self::normalize( $v['city'] ?? '' );
-			$cv_state = self::normalize_state( $v['regionCode'] ?? ( $v['region'] ?? '' ) );
-			$cv_venue = self::normalize( $v['name'] ?? '' );
-		}
+		// CVENT venues[] is on the event payload (no expand). City/region live
+		// on venues[0].address; name is venues[0].name.
+		$venue    = self::event_venue_fields( $cvent_event );
+		$cv_city  = self::normalize( $venue['city'] );
+		$cv_state = self::normalize_state( $venue['region'] );
+		$cv_venue = self::normalize( $venue['name'] );
 
 		$breakdown['hl_city']  = $hl_city;
 		$breakdown['hl_state'] = $hl_state;
@@ -437,13 +436,53 @@ class Hostlinks_CVENT_Matcher {
 	 * @return string sha1 hex string.
 	 */
 	public static function staleness_hash( $cvent_event ) {
-		$city  = '';
-		if ( ! empty( $cvent_event['venues'][0]['city'] ) ) {
-			$city = self::normalize( $cvent_event['venues'][0]['city'] );
-		}
+		$city  = self::normalize( self::event_venue_fields( $cvent_event )['city'] );
 		$start = isset( $cvent_event['start'] ) ? gmdate( 'Y-m-d', strtotime( $cvent_event['start'] ) ) : '';
 		$title = self::normalize( $cvent_event['title'] ?? '' );
 		return sha1( $start . '|' . $city . '|' . $title );
+	}
+
+	/**
+	 * Venue name / city / region from a CVENT event payload.
+	 *
+	 * Event App GET /events and GET /events/{id} already include venues when the
+	 * event has a location. expand=venues is not supported (only expand=image).
+	 * Documented shape: venues[0].name, venues[0].address.city / regionCode.
+	 *
+	 * @param array $cvent_event
+	 * @return array{name:string,city:string,region:string}
+	 */
+	public static function event_venue_fields( $cvent_event ): array {
+		$empty = array(
+			'name'   => '',
+			'city'   => '',
+			'region' => '',
+		);
+		if ( ! is_array( $cvent_event ) ) {
+			return $empty;
+		}
+		if ( empty( $cvent_event['venues'] ) && isset( $cvent_event['data'] ) && is_array( $cvent_event['data'] ) ) {
+			$cvent_event = $cvent_event['data'];
+		}
+		if ( empty( $cvent_event['venues'] ) || ! is_array( $cvent_event['venues'] ) ) {
+			return $empty;
+		}
+
+		$venues = $cvent_event['venues'];
+		$v      = ( isset( $venues['name'] ) || isset( $venues['address'] ) )
+			? $venues
+			: ( ( isset( $venues[0] ) && is_array( $venues[0] ) ) ? $venues[0] : null );
+		if ( ! is_array( $v ) ) {
+			return $empty;
+		}
+
+		$addr = ( isset( $v['address'] ) && is_array( $v['address'] ) ) ? $v['address'] : array();
+
+		return array(
+			'name'   => trim( (string) ( $v['name'] ?? '' ) ),
+			'city'   => trim( (string) ( $addr['city'] ?? $v['city'] ?? '' ) ),
+			'region' => trim( (string) ( $addr['regionCode'] ?? $addr['region'] ?? $v['regionCode'] ?? $v['region'] ?? '' ) ),
+		);
 	}
 
 	// -------------------------------------------------------------------------

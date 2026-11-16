@@ -906,9 +906,13 @@ function hl_cvent_status_badge( $status ) {
 						<thead><tr><th></th><th>CVENT Title</th><th>Start</th><th>End</th><th>Location</th><th>ID</th></tr></thead>
 						<tbody>
 						<?php foreach ( $manual_candidates as $ce ) :
-							$cv_city = isset( $ce['venues'][0]['city'] ) ? $ce['venues'][0]['city'] : '';
-							$cv_reg  = isset( $ce['venues'][0]['regionCode'] ) ? $ce['venues'][0]['regionCode'] : '';
+							$venue   = Hostlinks_CVENT_Matcher::event_venue_fields( $ce );
+							$cv_city = $venue['city'];
+							$cv_reg  = $venue['region'];
 							$cv_loc  = trim( $cv_city . ( $cv_reg ? ', ' . $cv_reg : '' ) );
+							if ( $cv_loc === '' ) {
+								$cv_loc = Hostlinks_CVENT_Matcher::title_location_from_cvent( $ce['title'] ?? '' );
+							}
 						?>
 							<tr>
 								<td><input type="radio" name="hostlinks_cvent_chosen_id" value="<?php echo esc_attr( $ce['id'] ); ?>" required></td>

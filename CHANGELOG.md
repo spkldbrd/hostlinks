@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.58 — 2026-11-16
+
+### Fix: stop sending unsupported expand=venues
+- Event App `GET /events` and `GET /events/{id}` only support `expand=image`; `expand=venues` was a no-op that Cvent flagged.
+- Venue name/city/region are read from the event payload (`venues[0].name`, `venues[0].address.city` / `regionCode`).
+- `expand=attendee` on order items is unchanged.
+
+---
+
 ## v2.11.57 — 2026-11-09
 
 ### Fix: full sync no longer re-fetches every attendee

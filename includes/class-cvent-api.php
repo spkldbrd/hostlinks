@@ -346,7 +346,6 @@ class Hostlinks_CVENT_API {
 		do {
 			$params = array(
 				'filter' => "end ge '" . $cutoff . "'",
-				'expand' => 'venues',
 				'limit'  => 200,
 			);
 			if ( $next ) {
@@ -375,10 +374,7 @@ class Hostlinks_CVENT_API {
 	 * @return array|WP_Error
 	 */
 	public static function get_event( $event_id ) {
-		return self::request(
-			'events/' . self::sanitize_uuid( $event_id ),
-			array( 'expand' => 'venues' )
-		);
+		return self::request( 'events/' . self::sanitize_uuid( $event_id ) );
 	}
 
 	/**
@@ -809,7 +805,6 @@ class Hostlinks_CVENT_API {
 		do {
 			$params = array(
 				'filter' => "start ge '" . $start_min . "' and start le '" . $start_max . "'",
-				'expand' => 'venues',
 				'limit'  => 200,
 			);
 			if ( $next ) {

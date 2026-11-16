@@ -1613,20 +1613,7 @@ class Hostlinks_CVENT_Sync {
 	 * @return string
 	 */
 	private static function cvent_venue_raw_name( $cvent_event ) {
-		if ( empty( $cvent_event['venues'] ) && isset( $cvent_event['data'] ) && is_array( $cvent_event['data'] ) ) {
-			$cvent_event = $cvent_event['data'];
-		}
-		if ( empty( $cvent_event['venues'] ) || ! is_array( $cvent_event['venues'] ) ) {
-			return '';
-		}
-		$venues = $cvent_event['venues'];
-		if ( isset( $venues['name'] ) && is_string( $venues['name'] ) ) {
-			$name = trim( $venues['name'] );
-		} elseif ( isset( $venues[0] ) && is_array( $venues[0] ) ) {
-			$name = trim( (string) ( $venues[0]['name'] ?? '' ) );
-		} else {
-			return '';
-		}
+		$name = Hostlinks_CVENT_Matcher::event_venue_fields( $cvent_event )['name'];
 		if ( '' === $name || 0 === strcasecmp( $name, 'Custom Location' ) ) {
 			return '';
 		}

@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.63 — 2026-11-17
+
+### CVENT Sync status key
+- Events tab shows a status key for Needs Review, Auto-matched, Manual, Session, No Candidates, Unlinked, and Private + CVENT.
+
+---
+
 ## v2.11.62 — 2026-11-17
 
 ### Events list workflow

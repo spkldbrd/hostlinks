@@ -292,6 +292,47 @@ function hl_cvent_status_badge( $status ) {
 	$info  = $map[ $status ] ?? array( '#888', ucfirst( $status ) );
 	return '<span style="background:' . $info[0] . ';color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;">' . esc_html( $info[1] ) . '</span>';
 }
+
+function hl_cvent_status_key(): void {
+	$items = array(
+		array(
+			'status' => 'needs_review',
+			'text'   => 'Use the Manual Link button to find & select a matching event to link for sync.',
+		),
+		array(
+			'status' => 'auto',
+			'text'   => 'Linked automatically (score ≥ 90 and at least 20 points ahead of the next candidate).',
+		),
+		array(
+			'status' => 'manual',
+			'text'   => 'You chose the CVENT event with Manual Link.',
+		),
+		array(
+			'status' => 'session',
+			'text'   => 'Linked to a CVENT session (session code), not the parent event. Use Session map to change.',
+		),
+		array(
+			'status' => 'no_candidates',
+			'text'   => 'No CVENT events in the date window, or this private workshop was skipped.',
+		),
+		array(
+			'status' => 'unlinked',
+			'text'   => 'Not linked yet. Sync will try auto-match; otherwise it becomes Needs Review.',
+		),
+	);
+	echo '<div class="hl-cvent-status-key">';
+	echo '<h2>Status key</h2>';
+	echo '<dl>';
+	foreach ( $items as $item ) {
+		echo '<div class="hl-cvent-status-key__row">';
+		echo '<dt>' . hl_cvent_status_badge( $item['status'] ) . '</dt>';
+		echo '<dd>' . esc_html( $item['text'] ) . '</dd>';
+		echo '</div>';
+	}
+	echo '</dl>';
+	echo '<p class="hl-cvent-status-key__note"><span class="hl-cvent-private-flag">Private + CVENT</span> means a private workshop with “Allow CVENT sync” checked on Edit Event.</p>';
+	echo '</div>';
+}
 ?>
 <div class="wrap">
 	<h1>CVENT Sync</h1>
@@ -952,6 +993,8 @@ function hl_cvent_status_badge( $status ) {
 		</span>
 	</form>
 
+	<?php hl_cvent_status_key(); ?>
+
 	<!-- Events table -->
 	<table class="widefat striped" id="cvent-events-table">
 	<thead>
@@ -1062,8 +1105,6 @@ function hl_cvent_status_badge( $status ) {
 
 	<p style="margin-top:12px;color:#666;font-size:12px;">
 		Showing events ending within the last 60 days or in the future.
-		Auto-match requires score &ge; 90 with a &ge; 20-point gap over the second candidate.
-		Lower scores are flagged as &ldquo;Needs Review&rdquo; for manual selection.
 	</p>
 
 	<?php endif; /* end events view */ ?>

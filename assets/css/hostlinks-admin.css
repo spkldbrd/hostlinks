@@ -1,0 +1,22 @@
+/**
+ * Hostlinks admin: rounded buttons and form controls (match Hostlinks Zoom).
+ */
+.wp-core-ui.hl-admin .button,
+.wp-core-ui.hl-admin input[type="submit"],
+.wp-core-ui.hl-admin .button-primary,
+.wp-core-ui.hl-admin .button-secondary,
+.wp-core-ui.hl-admin .page-title-action {
+	border-radius: 8px !important;
+}
+
+.hl-admin .wrap select,
+.hl-admin .wrap input[type="text"],
+.hl-admin .wrap input[type="email"],
+.hl-admin .wrap input[type="password"],
+.hl-admin .wrap input[type="search"],
+.hl-admin .wrap input[type="url"],
+.hl-admin .wrap input[type="number"],
+.hl-admin .wrap input[type="date"],
+.hl-admin .wrap textarea {
+	border-radius: 8px;
+}

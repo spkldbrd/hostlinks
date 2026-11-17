@@ -9,12 +9,19 @@ class Hostlinks_Assets {
 		add_action( 'wp_enqueue_scripts',    array( $this, 'enqueue_frontend' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin' ) );
 		add_action( 'admin_head',            array( $this, 'print_admin_menu_css' ) );
+		add_filter( 'admin_body_class',      array( $this, 'admin_body_class' ) );
+	}
+
+	public function admin_body_class( string $classes ): string {
+		if ( self::is_hostlinks_admin_page() ) {
+			$classes .= ' hl-admin';
+		}
+		return $classes;
 	}
 
 	/**
 	 * Tighten the padding on the Hostlinks admin submenu items.
 	 * Scoped to #toplevel_page_booking-menu so no other plugin's menu is affected.
-	 * Printed inline (few bytes) and covers both the expanded and folded-flyout states.
 	 */
 	public function print_admin_menu_css() {
 		?>
@@ -97,6 +104,15 @@ class Hostlinks_Assets {
 	}
 
 	public function enqueue_admin( $hook ) {
+		if ( self::is_hostlinks_admin_page() ) {
+			wp_enqueue_style(
+				'hostlinks-admin',
+				HOSTLINKS_PLUGIN_URL . 'assets/css/hostlinks-admin.css',
+				array(),
+				HOSTLINKS_VERSION
+			);
+		}
+
 		// Load WordPress media library on the Roster settings tab.
 		if ( is_admin()
 			&& ( sanitize_key( $_GET['page'] ?? '' ) === 'hostlinks-settings' )
@@ -136,6 +152,20 @@ class Hostlinks_Assets {
 			HOSTLINKS_VERSION,
 			true
 		);
+	}
+
+	/**
+	 * True on Hostlinks wp-admin screens (Events, CVENT, Settings, etc.).
+	 */
+	private static function is_hostlinks_admin_page(): bool {
+		$page = sanitize_key( $_GET['page'] ?? '' );
+		if ( $page === '' ) {
+			return false;
+		}
+		if ( str_starts_with( $page, 'hostlinks-' ) || str_starts_with( $page, 'cvent-' ) ) {
+			return true;
+		}
+		return in_array( $page, array( 'booking-menu', 'types-menu', 'marketer-menu', 'istructor-menu' ), true );
 	}
 }
 

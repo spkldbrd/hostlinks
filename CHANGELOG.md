@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.59 — 2026-11-16
+
+### Admin: rounded buttons
+- Hostlinks admin screens use the same 8px corner radius as Hostlinks Zoom for buttons, selects, and text fields.
+
+---
+
 ## v2.11.58 — 2026-11-16
 
 ### Fix: stop sending unsupported expand=venues

@@ -1,6 +1,16 @@
 (function ($) {
 	'use strict';
 
+	var hlDirty = false;
+	var hlAllowLeave = false;
+	var LINK_KEYS = [
+		{ key: 'host', input: '#hl-links-host', ignore: '#hl-links-host-ignore', fld: '.hl-fld-host' },
+		{ key: 'roster', input: '#hl-links-roster', ignore: '#hl-links-roster-ignore', fld: '.hl-fld-roster' },
+		{ key: 'reg', input: '#hl-links-reg', ignore: '#hl-links-reg-ignore', fld: '.hl-fld-reg' },
+		{ key: 'web', input: '#hl-links-web', ignore: '#hl-links-web-ignore', fld: '.hl-fld-web' },
+		{ key: 'email', input: '#hl-links-email', ignore: '#hl-links-email-ignore', fld: '.hl-fld-email' }
+	];
+
 	function compactMD(d) {
 		if (!d || typeof d.format !== 'function') {
 			return '';
@@ -46,15 +56,48 @@
 		$el.text(text).toggleClass('is-error', !!isError).removeAttr('hidden');
 	}
 
+	function parseIgnore(raw) {
+		try {
+			var d = JSON.parse(raw || '{}');
+			return d && typeof d === 'object' ? d : {};
+		} catch (e) {
+			return {};
+		}
+	}
+
+	function rowHasMissingLinks($row) {
+		var ignore = parseIgnore($row.find('.hl-fld-ignore').val());
+		return LINK_KEYS.some(function (item) {
+			var url = $.trim($row.find(item.fld).val() || '');
+			return !url && !ignore[item.key];
+		});
+	}
+
+	function paintLinksBtn($row) {
+		var $btn = $row.find('.hl-links-btn');
+		if (!$btn.length) {
+			return;
+		}
+		var missing = rowHasMissingLinks($row);
+		$btn.toggleClass('is-incomplete', missing);
+		$btn.attr('title', missing ? 'One or more links are empty' : 'Event links');
+		var $mark = $btn.find('.hl-links-mark');
+		if (missing && !$mark.length) {
+			$btn.append('<span class="hl-links-mark" aria-hidden="true"></span>');
+		} else if (!missing) {
+			$mark.remove();
+		}
+	}
+
 	function openLinksModal($row) {
 		var loc = $row.find('.hl-loc-input').val() || 'Event';
+		var ignore = parseIgnore($row.find('.hl-fld-ignore').val());
 		$('#hl-links-title').text(loc + ' — Links');
 		$('#hl-links-eve-id').val($row.data('eve-id'));
-		$('#hl-links-host').val($row.find('.hl-fld-host').val());
-		$('#hl-links-roster').val($row.find('.hl-fld-roster').val());
-		$('#hl-links-reg').val($row.find('.hl-fld-reg').val());
-		$('#hl-links-web').val($row.find('.hl-fld-web').val());
-		$('#hl-links-email').val($row.find('.hl-fld-email').val());
+		LINK_KEYS.forEach(function (item) {
+			$(item.input).val($row.find(item.fld).val());
+			$(item.ignore).prop('checked', !!ignore[item.key]);
+		});
 		$('#hl-links-zoom-time').val($row.find('.hl-fld-zoom-time').val());
 		setStatus('');
 		$('#hl-links-modal').removeAttr('hidden');
@@ -67,6 +110,25 @@
 
 	function fieldVal(id) {
 		return $.trim($(id).val() || '');
+	}
+
+	function collectIgnore() {
+		var ignore = {};
+		LINK_KEYS.forEach(function (item) {
+			if ($(item.ignore).prop('checked')) {
+				ignore[item.key] = 1;
+			}
+		});
+		return ignore;
+	}
+
+	function markRowEdited($row) {
+		if (!$row.length) {
+			return;
+		}
+		$row.find('input.administrator').prop('checked', true);
+		$row.addClass('is-dirty');
+		hlDirty = true;
 	}
 
 	$(function () {
@@ -82,6 +144,7 @@
 			$el.daterangepicker(opts);
 			$el.on('apply.daterangepicker', function () {
 				refreshCompact($(this));
+				markRowEdited($(this).closest('tr'));
 			});
 		});
 
@@ -98,6 +161,41 @@
 		});
 		$(document).on('change', '.hl-type-select', function () {
 			syncTypeBadge($(this));
+		});
+
+		$('#hl-events-table tbody').on('change input', ':input', function () {
+			var $el = $(this);
+			if ($el.is('.administrator') || $el.is('[type=hidden]') || $el.is('.hl-date-hidden') || $el.is('.eventenddertot') || $el.closest('#hl-links-modal').length) {
+				return;
+			}
+			markRowEdited($el.closest('tr'));
+		});
+
+		$('#hl-events-search').on('keydown', function (e) {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+			}
+		});
+
+		$('#posts-filter').on('submit', function (e) {
+			var action = $('#bulk-action-selector-top').val();
+			if (action === 'delete') {
+				var n = $('#hl-events-table tbody input.administrator:checked').length;
+				if (!window.confirm('Delete ' + n + ' selected event(s)?')) {
+					e.preventDefault();
+					return false;
+				}
+			}
+			hlAllowLeave = true;
+		});
+
+		$(window).on('beforeunload', function (e) {
+			if (hlAllowLeave || !hlDirty) {
+				return undefined;
+			}
+			e.preventDefault();
+			e.returnValue = '';
+			return '';
 		});
 
 		$('#hl-chooseyear, #hl-choosemonth').on('change', function () {
@@ -175,6 +273,7 @@
 			var cfg = window.hlEvents || {};
 			var eveId = $('#hl-links-eve-id').val();
 			var $row = $('#user-' + eveId);
+			var ignore = collectIgnore();
 			var payload = {
 				action: 'hostlinks_save_event_links',
 				nonce: cfg.nonce || '',
@@ -184,7 +283,8 @@
 				eve_trainer_url: fieldVal('#hl-links-reg'),
 				eve_web_url: fieldVal('#hl-links-web'),
 				eve_email_url: fieldVal('#hl-links-email'),
-				eve_zoom_time: fieldVal('#hl-links-zoom-time')
+				eve_zoom_time: fieldVal('#hl-links-zoom-time'),
+				ignore: ignore
 			};
 			var $save = $(this).prop('disabled', true);
 			setStatus('Saving…');
@@ -201,6 +301,8 @@
 					$row.find('.hl-fld-web').val(d.eve_web_url || payload.eve_web_url);
 					$row.find('.hl-fld-email').val(d.eve_email_url || payload.eve_email_url);
 					$row.find('.hl-fld-zoom-time').val(d.eve_zoom_time || payload.eve_zoom_time);
+					$row.find('.hl-fld-ignore').val(d.eve_links_ignore || JSON.stringify(ignore));
+					paintLinksBtn($row);
 					closeLinksModal();
 				})
 				.fail(function () {

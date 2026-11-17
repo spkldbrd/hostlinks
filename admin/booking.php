@@ -291,6 +291,27 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 							<input type="hidden" class="hl-fld-web" name="eve_web_url[]" value="<?php echo esc_attr( $alldriver['eve_web_url'] ?? '' ); ?>">
 							<input type="hidden" class="hl-fld-email" name="eve_email_url[]" value="<?php echo esc_attr( $alldriver['eve_email_url'] ?? '' ); ?>">
 							<input type="hidden" class="hl-fld-zoom-time" name="eve_zoom_time[]" value="<?php echo esc_attr( $alldriver['eve_zoom_time'] ?? '' ); ?>">
+							<?php
+							$_ignore = json_decode( (string) ( $alldriver['eve_links_ignore'] ?? '' ), true );
+							if ( ! is_array( $_ignore ) ) {
+								$_ignore = array();
+							}
+							$_link_map = array(
+								'host'   => trim( (string) ( $alldriver['eve_host_url'] ?? '' ) ),
+								'roster' => trim( (string) ( $alldriver['eve_roster_url'] ?? '' ) ),
+								'reg'    => trim( (string) ( $alldriver['eve_trainer_url'] ?? '' ) ),
+								'web'    => trim( (string) ( $alldriver['eve_web_url'] ?? '' ) ),
+								'email'  => trim( (string) ( $alldriver['eve_email_url'] ?? '' ) ),
+							);
+							$_links_missing = false;
+							foreach ( $_link_map as $_lk => $_lv ) {
+								if ( $_lv === '' && empty( $_ignore[ $_lk ] ) ) {
+									$_links_missing = true;
+									break;
+								}
+							}
+							?>
+							<input type="hidden" class="hl-fld-ignore" value="<?php echo esc_attr( wp_json_encode( $_ignore ) ); ?>">
 							<input type="text" class="hl-cell-input hl-loc-input" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required autocomplete="off">
 						</td>
 						<td class="hl-col-date" data-order="<?php echo esc_attr( $alldriver['eve_start'] ?? '' ); ?>">
@@ -365,7 +386,9 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 							<?php endif; ?>
 						</td>
 						<td class="hl-col-links">
-							<button type="button" class="button hl-links-btn">Links</button>
+							<button type="button" class="button hl-links-btn<?php echo $_links_missing ? ' is-incomplete' : ''; ?>" title="<?php echo $_links_missing ? 'One or more links are empty' : 'Event links'; ?>">
+								Links<?php echo $_links_missing ? '<span class="hl-links-mark" aria-hidden="true"></span>' : ''; ?>
+							</button>
 						</td>
 						<td class="hl-col-actions">
 							<a href="<?php echo esc_url( $edit_url ); ?>" class="hl-icon-btn" title="Edit event" aria-label="Edit event #<?php echo (int) $eve_id; ?>">
@@ -410,6 +433,7 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 					<input type="url" id="hl-links-host" class="hl-links-input" placeholder="https://">
 					<button type="button" class="button hl-links-open" data-for="hl-links-host">Open</button>
 					<button type="button" class="button hl-links-copy" data-for="hl-links-host">Copy</button>
+					<label class="hl-links-ignore"><input type="checkbox" id="hl-links-host-ignore" value="1"> Ignore</label>
 				</div>
 			</div>
 			<div class="hl-links-row">
@@ -418,6 +442,7 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 					<input type="url" id="hl-links-roster" class="hl-links-input" placeholder="https://">
 					<button type="button" class="button hl-links-open" data-for="hl-links-roster">Open</button>
 					<button type="button" class="button hl-links-copy" data-for="hl-links-roster">Copy</button>
+					<label class="hl-links-ignore"><input type="checkbox" id="hl-links-roster-ignore" value="1"> Ignore</label>
 				</div>
 			</div>
 			<div class="hl-links-row">
@@ -426,6 +451,7 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 					<input type="url" id="hl-links-reg" class="hl-links-input" placeholder="https://">
 					<button type="button" class="button hl-links-open" data-for="hl-links-reg">Open</button>
 					<button type="button" class="button hl-links-copy" data-for="hl-links-reg">Copy</button>
+					<label class="hl-links-ignore"><input type="checkbox" id="hl-links-reg-ignore" value="1"> Ignore</label>
 				</div>
 			</div>
 			<div class="hl-links-row">
@@ -434,6 +460,7 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 					<input type="url" id="hl-links-web" class="hl-links-input" placeholder="https://">
 					<button type="button" class="button hl-links-open" data-for="hl-links-web">Open</button>
 					<button type="button" class="button hl-links-copy" data-for="hl-links-web">Copy</button>
+					<label class="hl-links-ignore"><input type="checkbox" id="hl-links-web-ignore" value="1"> Ignore</label>
 				</div>
 			</div>
 			<div class="hl-links-row">
@@ -442,6 +469,7 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 					<input type="url" id="hl-links-email" class="hl-links-input" placeholder="https://">
 					<button type="button" class="button hl-links-open" data-for="hl-links-email">Open</button>
 					<button type="button" class="button hl-links-copy" data-for="hl-links-email">Copy</button>
+					<label class="hl-links-ignore"><input type="checkbox" id="hl-links-email-ignore" value="1"> Ignore</label>
 				</div>
 			</div>
 			<div class="hl-links-row">

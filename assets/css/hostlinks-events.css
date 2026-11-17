@@ -314,7 +314,39 @@
 }
 
 .hl-links-btn {
+	position: relative;
 	min-width: 64px;
+}
+
+.hl-links-btn.is-incomplete {
+	padding-right: 22px;
+}
+
+.hl-links-mark {
+	position: absolute;
+	top: 5px;
+	right: 6px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #dba617;
+	box-shadow: 0 0 0 1px #fff;
+}
+
+.hl-links-ignore {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin: 0;
+	font-size: 12px;
+	font-weight: 500;
+	color: #6b7280;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.hl-links-ignore input {
+	margin: 0;
 }
 
 .hl-col-actions {

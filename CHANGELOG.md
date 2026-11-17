@@ -2,6 +2,16 @@
 
 ---
 
+## v2.11.62 — 2026-11-17
+
+### Events list workflow
+- Search no longer submits Update/Apply on Enter.
+- Editing a row auto-checks it; leaving the page with unsaved edits prompts to save.
+- Delete asks for confirmation.
+- Links button shows a mark when a URL is empty, unless that link is marked Ignore in the modal.
+
+---
+
 ## v2.11.61 — 2026-11-17
 
 ### Events list toolbar

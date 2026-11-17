@@ -50,6 +50,15 @@ class Hostlinks_Admin_Menus {
 		$email   = esc_url_raw( trim( (string) ( $_POST['eve_email_url'] ?? '' ) ) );
 		$zoom_tm = sanitize_text_field( (string) ( $_POST['eve_zoom_time'] ?? '' ) );
 
+		$ignore_in = isset( $_POST['ignore'] ) && is_array( $_POST['ignore'] ) ? wp_unslash( $_POST['ignore'] ) : array();
+		$ignore    = array();
+		foreach ( array( 'host', 'roster', 'reg', 'web', 'email' ) as $ikey ) {
+			if ( ! empty( $ignore_in[ $ikey ] ) ) {
+				$ignore[ $ikey ] = 1;
+			}
+		}
+		$ignore_json = $ignore ? wp_json_encode( $ignore ) : '';
+
 		if ( ! $roster && class_exists( 'Hostlinks_Page_URLs' ) ) {
 			$roster_base = Hostlinks_Page_URLs::get_roster();
 			if ( $roster_base ) {
@@ -60,15 +69,16 @@ class Hostlinks_Admin_Menus {
 		$wpdb->update(
 			$table,
 			array(
-				'eve_host_url'    => $host,
-				'eve_roster_url'  => $roster,
-				'eve_trainer_url' => $reg,
-				'eve_web_url'     => $web,
-				'eve_email_url'   => $email,
-				'eve_zoom_time'   => $zoom_tm,
+				'eve_host_url'      => $host,
+				'eve_roster_url'    => $roster,
+				'eve_trainer_url'   => $reg,
+				'eve_web_url'       => $web,
+				'eve_email_url'     => $email,
+				'eve_zoom_time'     => $zoom_tm,
+				'eve_links_ignore'  => $ignore_json,
 			),
 			array( 'eve_id' => $eve_id ),
-			array( '%s', '%s', '%s', '%s', '%s', '%s' ),
+			array( '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
 			array( '%d' )
 		);
 
@@ -80,12 +90,13 @@ class Hostlinks_Admin_Menus {
 
 		wp_send_json_success(
 			array(
-				'eve_host_url'    => $host,
-				'eve_roster_url'  => $roster,
-				'eve_trainer_url' => $reg,
-				'eve_web_url'     => $web,
-				'eve_email_url'   => $email,
-				'eve_zoom_time'   => $zoom_tm,
+				'eve_host_url'     => $host,
+				'eve_roster_url'   => $roster,
+				'eve_trainer_url'  => $reg,
+				'eve_web_url'      => $web,
+				'eve_email_url'    => $email,
+				'eve_zoom_time'    => $zoom_tm,
+				'eve_links_ignore' => $ignore_json,
 			)
 		);
 	}

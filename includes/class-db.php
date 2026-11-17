@@ -148,6 +148,15 @@ class Hostlinks_DB {
 		self::create_tables();
 	}
 
+	// v2.11 — per-event ignored empty links (Events list Links mark).
+	if ( version_compare( $installed, '2.11', '<' ) ) {
+		$tbl      = $wpdb->prefix . 'event_details_list';
+		$existing = $wpdb->get_col( "SHOW COLUMNS FROM `{$tbl}`", 0 );
+		if ( is_array( $existing ) && ! in_array( 'eve_links_ignore', $existing, true ) ) {
+			$wpdb->query( "ALTER TABLE `{$tbl}` ADD `eve_links_ignore` varchar(255) NOT NULL DEFAULT '' AFTER `eve_email_url`" );
+		}
+	}
+
 	// v2.10 — registrant name/email/company on order_regs for Daily Totals drill-down.
 	if ( version_compare( $installed, '2.10', '<' ) ) {
 		$tbl      = $wpdb->prefix . 'hostlinks_cvent_order_regs';
@@ -331,6 +340,7 @@ class Hostlinks_DB {
 			ship_workbooks int(11) DEFAULT NULL,
 			ship_notes     text NOT NULL DEFAULT '',
 			eve_email_url  text NOT NULL DEFAULT '',
+			eve_links_ignore varchar(255) NOT NULL DEFAULT '',
 			host_name            varchar(255) NOT NULL DEFAULT '',
 			cvent_host_name      varchar(255) NOT NULL DEFAULT '',
 			displayed_as         varchar(500) NOT NULL DEFAULT '',

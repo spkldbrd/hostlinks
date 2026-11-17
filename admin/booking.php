@@ -196,6 +196,13 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 			<input type="hidden" value="list" name="mode">
 
 			<div class="hl-events-toolbar">
+				<div class="hl-events-bulk">
+					<select id="bulk-action-selector-top" name="actiondelete">
+						<option value="uppydate">Update</option>
+						<option value="delete">Delete</option>
+					</select>
+					<input type="submit" value="Apply" class="button action" id="doaction" name="deleteentire">
+				</div>
 				<div class="hl-events-filters">
 					<label class="hl-filter-label">Year
 						<select id="hl-chooseyear">
@@ -219,13 +226,6 @@ $month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => '
 							?>
 						</select>
 					</label>
-					<div class="hl-events-bulk">
-						<select id="bulk-action-selector-top" name="actiondelete">
-							<option value="uppydate">Update</option>
-							<option value="delete">Delete</option>
-						</select>
-						<input type="submit" value="Apply" class="button action" id="doaction" name="deleteentire">
-					</div>
 				</div>
 				<input type="search" id="hl-events-search" class="hl-events-search" placeholder="Search events…" autocomplete="off">
 			</div>

@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.61 — 2026-11-17
+
+### Events list toolbar
+- Year/month selectors sit in the center of the header; bulk Update/Apply is on the left and search on the right.
+
+---
+
 ## v2.11.60 — 2026-11-17
 
 ### Events list: card layout and Links modal

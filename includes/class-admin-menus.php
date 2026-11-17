@@ -14,6 +14,80 @@ class Hostlinks_Admin_Menus {
 		// Run Add/Convert POST before admin HTML so wp_safe_redirect works
 		// (page callbacks run after menus — redirect then yields a blank content area).
 		add_action( 'load-toplevel_page_booking-menu', array( $this, 'process_event_add_form' ) );
+		add_action( 'wp_ajax_hostlinks_save_event_links', array( $this, 'ajax_save_event_links' ) );
+	}
+
+	/**
+	 * Save HOST / Roster / REG / Web / Email URLs and Zoom time from the Events list modal.
+	 */
+	public function ajax_save_event_links() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => 'Unauthorized' ), 403 );
+		}
+		check_ajax_referer( 'hostlinks_event_links', 'nonce' );
+
+		$eve_id = (int) ( $_POST['eve_id'] ?? 0 );
+		if ( $eve_id <= 0 ) {
+			wp_send_json_error( array( 'message' => 'Missing event.' ), 400 );
+		}
+
+		global $wpdb;
+		$table = $wpdb->prefix . 'event_details_list';
+		$exists = (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT eve_id FROM {$table} WHERE eve_id = %d AND eve_status = '1'",
+				$eve_id
+			)
+		);
+		if ( ! $exists ) {
+			wp_send_json_error( array( 'message' => 'Event not found.' ), 404 );
+		}
+
+		$host    = esc_url_raw( trim( (string) ( $_POST['eve_host_url'] ?? '' ) ) );
+		$roster  = esc_url_raw( trim( (string) ( $_POST['eve_roster_url'] ?? '' ) ) );
+		$reg     = esc_url_raw( trim( (string) ( $_POST['eve_trainer_url'] ?? '' ) ) );
+		$web     = esc_url_raw( trim( (string) ( $_POST['eve_web_url'] ?? '' ) ) );
+		$email   = esc_url_raw( trim( (string) ( $_POST['eve_email_url'] ?? '' ) ) );
+		$zoom_tm = sanitize_text_field( (string) ( $_POST['eve_zoom_time'] ?? '' ) );
+
+		if ( ! $roster && class_exists( 'Hostlinks_Page_URLs' ) ) {
+			$roster_base = Hostlinks_Page_URLs::get_roster();
+			if ( $roster_base ) {
+				$roster = rtrim( $roster_base, '/' ) . '/?eve_id=' . $eve_id;
+			}
+		}
+
+		$wpdb->update(
+			$table,
+			array(
+				'eve_host_url'    => $host,
+				'eve_roster_url'  => $roster,
+				'eve_trainer_url' => $reg,
+				'eve_web_url'     => $web,
+				'eve_email_url'   => $email,
+				'eve_zoom_time'   => $zoom_tm,
+			),
+			array( 'eve_id' => $eve_id ),
+			array( '%s', '%s', '%s', '%s', '%s', '%s' ),
+			array( '%d' )
+		);
+
+		update_option( 'last_data_updation', wp_date( 'Y-m-d H:i:s' ) );
+		do_action( 'hostlinks_event_updated' );
+		if ( class_exists( 'HMO_REST', false ) && is_callable( array( 'HMO_REST', 'flush_public_events_cache' ) ) ) {
+			HMO_REST::flush_public_events_cache();
+		}
+
+		wp_send_json_success(
+			array(
+				'eve_host_url'    => $host,
+				'eve_roster_url'  => $roster,
+				'eve_trainer_url' => $reg,
+				'eve_web_url'     => $web,
+				'eve_email_url'   => $email,
+				'eve_zoom_time'   => $zoom_tm,
+			)
+		);
 	}
 
 	/**

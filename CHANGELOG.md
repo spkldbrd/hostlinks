@@ -2,6 +2,15 @@
 
 ---
 
+## v2.11.60 — 2026-11-17
+
+### Events list: card layout and Links modal
+- Default columns are Location, Date, Type (color badge), Paid, Free, Zoom, Marketer, Instructor, Hide, Proj. Total, Links, and Actions.
+- HOST / Roster / REG / Web / Email URLs and Zoom Time open from a **Links** button in a modal (full URL, Open, Copy, Save).
+- Copy event moved to the row ⋮ menu. Bulk Update/Delete, search, year/month, and inline location/date/type/paid/free stay.
+
+---
+
 ## v2.11.59 — 2026-11-16
 
 ### Admin: rounded buttons

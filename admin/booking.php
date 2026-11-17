@@ -135,6 +135,11 @@ $all_pending_toterxx = $wpdb->get_results( "SELECT * FROM $table14 WHERE `event_
 $_active_mktr_ids = array_column( $all_pending_toterx,  'event_marketer_id' );
 $_active_inst_ids = array_column( $all_pending_toterxx, 'event_instructor_id' );
 
+$_type_meta = array();
+foreach ( $all_pending_toter as $_t ) {
+	$_type_meta[ (int) $_t['event_type_id'] ] = $_t;
+}
+
 // ── Single JOIN query — eliminates N+1 per-row lookups ───────────────────
 // NOTE: we deliberately DO NOT reference t.event_type_abbr here. That column
 // arrived in DB v2.4, and if the migration has not yet run on a given site
@@ -166,355 +171,290 @@ if ( $tot1 > 0 ) {
 	$_hl_eve_ids  = array_map( fn( $r ) => (int) $r['eve_id'], $all_pending_bookings );
 	$_hl_avg_regs = Hostlinks_DB::get_avg_daily_regs_bulk( $_hl_eve_ids );
 }
+
+$period_label = $allMonths
+	? ( 'All of ' . $filterYear )
+	: date( 'F Y', mktime( 0, 0, 0, $filterMonth, 1, $filterYear ) );
+
+$month_names = array( 1 => 'Jan.', 2 => 'Feb.', 3 => 'Mar.', 4 => 'Apr.', 5 => 'May', 6 => 'Jun.',
+	7 => 'Jul.', 8 => 'Aug.', 9 => 'Sep.', 10 => 'Oct.', 11 => 'Nov.', 12 => 'Dec.' );
 ?>
-<div id="wpbody">
-<?php echo $sucessmsgnew; ?>
-<div tabindex="0" id="wpbody-content" class="ddddd">
-  <div class="wrap">
-    <h2>Events <a class="add-new-h2" href="admin.php?page=booking-menu&add_event=1">Add New Event</a></h2>
-    <ul class="subsubsubx">
-      <li class="all"><a class="current">Showing <?php echo $tot1; ?> event(s) for <?php
-          echo esc_html( $allMonths
-              ? ( 'All of ' . $filterYear )
-              : date( 'F Y', mktime( 0, 0, 0, $filterMonth, 1, $filterYear ) )
-          );
-      ?></a></li>
-    </ul>
+<div class="wrap hl-events-wrap">
+	<?php echo $sucessmsgnew; ?>
 
-    <?php /* ── Year / Month filter — uses JS redirect so it works inside a WP admin page callback ── */ ?>
-    <div class="tablenav-pages" style="margin-bottom:10px;">
-      <table border="0" cellspacing="0" cellpadding="0" class="listtable" width="100%"><tr>
-        <td align="left">
-          <select id="hl-chooseyear">
-            <?php
-            $yearStart = 2022;
-            $yearEnd   = $currentYear + 1;
-            for ( $yr = $yearEnd; $yr >= $yearStart; $yr-- ) {
-                $sel = ( $yr === $filterYear ) ? 'selected' : '';
-                echo "<option value=\"$yr\" $sel>$yr</option>";
-            }
-            ?>
-          </select>
-          <select id="hl-choosemonth">
-            <option value="all" <?php echo $allMonths ? 'selected' : ''; ?>>All months</option>
-            <?php
-            $monthNames = array( 1=>'Jan',2=>'Feb',3=>'Mar',4=>'Apr',5=>'May',6=>'Jun',
-                                 7=>'Jul',8=>'Aug',9=>'Sep',10=>'Oct',11=>'Nov',12=>'Dec' );
-            for ( $m = 1; $m <= 12; $m++ ) {
-                $mv  = str_pad( $m, 2, '0', STR_PAD_LEFT );
-                $sel = ( $m === $filterMonth ) ? 'selected' : '';
-                echo "<option value=\"$mv\" $sel>" . $monthNames[$m] . " ($mv)</option>";
-            }
-            ?>
-          </select>
-        </td>
-      </tr></table>
-    </div>
-    <script>
-    function hlApplyFilter() {
-        var yr  = document.getElementById('hl-chooseyear').value;
-        var mo  = document.getElementById('hl-choosemonth').value;
-        var url = 'admin.php?page=booking-menu&syear=' + yr;
-        if (mo !== 'all') { url += '-' + mo; }
-        window.location.href = url;
-    }
-    document.getElementById('hl-chooseyear').addEventListener('change', hlApplyFilter);
-    document.getElementById('hl-choosemonth').addEventListener('change', hlApplyFilter);
-    </script>
+	<div class="hl-events-card">
+		<div class="hl-events-head">
+			<div>
+				<h1 class="hl-events-title">Events</h1>
+				<p class="hl-events-sub">Showing <?php echo (int) $tot1; ?> event(s) for <?php echo esc_html( $period_label ); ?></p>
+			</div>
+			<a class="button button-primary hl-events-add" href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&add_event=1' ) ); ?>">+ Add New Event</a>
+		</div>
 
-    <form method="post" action="admin.php?page=booking-menu&syear=<?php echo esc_attr( $syear ); ?>" id="posts-filter">
-      <?php wp_nonce_field( 'hostlinks_manage_events' ); ?>
-      <div class="tablenav-pages">
-        <table border="0" cellspacing="0" cellpadding="0" class="listtable" width="100%"><tr>
-          <td align="left">
-            <div class="alignleft actions bulkactions">
-              <select id="bulk-action-selector-top" name="actiondelete">
-                <option class="hide-if-no-js" value="uppydate">Update</option>
-                <option class="hide-if-no-js" value="delete">Delete</option>
-              </select>
-              <input type="submit" value="Apply" class="button action" id="doaction" name="deleteentire">
-            </div>
-          </td>
-        </tr></table>
-      </div>
-      <input type="hidden" value="list" name="mode">
-      <br class="clear">
-      <table class="wp-list-table widefat table table-bordered table-striped dataTable" id="myTable">
-        <thead>
-          <tr>
-            <th class="manage-column column-cb check-column"><input type="checkbox" id="cb-select-all-1"></th>
-            <th style="width:64px;"></th>
-            <th>Location</th><th>Paid</th><th>Free</th><th style="width:90px;">Date</th>
-            <th style="width:60px;">Type</th><th>Zoom</th><th>Marketer</th>
-            <th>HOST URL</th><th>ROSTER URL</th><th>REG URL</th><th>WEB URL</th><th>EMAIL URL</th><th>ZOOM TIME</th><th>HIDE PUBLIC</th><th>Instructor</th><th style="width:64px;" title="Projected total registrations at event date, based on avg daily pace since first CVENT sync">Proj. Total</th>
-          </tr>
-        </thead>
-        <tbody id="the-list">
-          <?php
-          if ( $tot1 > 0 ) {
-              foreach ( $all_pending_bookings as $alldriver ) {
-                  ?>
-          <tr class="alternate" id="user-<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
-            <th class="check-column"><input type="checkbox" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" class="administrator splchkkr" name="users[]"></th>
-            <input type="hidden" name="originalid[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>">
-            <td class="hl-edit-cell">
-              <a href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&edit_event=' . (int) $alldriver['eve_id'] ) ); ?>"
-                title="Edit event" aria-label="Edit event #<?php echo (int) $alldriver['eve_id']; ?>"
-                class="hl-edit-icon">
-                <span class="dashicons dashicons-edit" aria-hidden="true"></span>
-              </a>
-              <a href="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&copy_event=' . (int) $alldriver['eve_id'] ) ); ?>"
-                title="Copy event" aria-label="Copy event #<?php echo (int) $alldriver['eve_id']; ?>"
-                class="hl-edit-icon hl-copy-icon">
-                <span class="dashicons dashicons-admin-page" aria-hidden="true"></span>
-              </a>
-            </td>
-            <td>
-              <p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
-              <input type="text" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required autocomplete="off">
-            </td>
-            <td><p class="hidder"><?php echo esc_html( $alldriver['eve_paid'] ?? '' ); ?></p>
-              <input type="number" value="<?php echo esc_attr( $alldriver['eve_paid'] ?? '' ); ?>" name="eve_paid[]" required style="width:50px;"></td>
-            <td><p class="hidder"><?php echo esc_html( $alldriver['eve_free'] ?? '' ); ?></p>
-              <input type="number" value="<?php echo esc_attr( $alldriver['eve_free'] ?? '' ); ?>" name="eve_free[]" required style="width:50px;"></td>
-            <td>
-              <p class="hidder"><?php echo esc_html( $alldriver['eve_start'] ?? '' ); ?></p>
-              <?php
-              // Compact display: "MM/DD-MM/DD" (same-day collapses to "MM/DD").
-              // The real <input> below stays in the DOM and holds the full
-              // YYYY/MM/DD - YYYY/MM/DD string that daterangepicker & the
-              // POST handler expect — this span is purely visual.
-              $_start_ts = ! empty( $alldriver['eve_start'] ) ? strtotime( $alldriver['eve_start'] ) : false;
-              $_end_ts   = ! empty( $alldriver['eve_end'] )   ? strtotime( $alldriver['eve_end'] )   : false;
-              $_compact  = '';
-              if ( $_start_ts ) {
-                  $_compact = date( 'm/d', $_start_ts );
-                  if ( $_end_ts && $_end_ts !== $_start_ts ) {
-                      $_compact .= '-' . date( 'm/d', $_end_ts );
-                  }
-              }
-              ?>
-              <span class="hl-date-wrap">
-                <span class="hl-compact-date" title="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>"><?php echo esc_html( $_compact !== '' ? $_compact : '—' ); ?></span>
-                <input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot hl-date-hidden" id="eventenddertot<?php echo esc_attr( $alldriver['eve_id'] ); ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required autocomplete="off">
-              </span>
-            </td>
-            <td>
-              <select name="eve_type[]" class="evetype hl-type-compact" required>
-                <option value="">—</option>
-                <?php foreach ( $all_pending_toter as $alldriverx1 ) {
-                    $_opt_abbr  = $alldriverx1['event_type_abbr'] ?? '';
-                    $_opt_label = $_opt_abbr !== '' ? $_opt_abbr : $alldriverx1['event_type_name'];
-                    $_opt_title = $alldriverx1['event_type_name'];
-                ?>
-                  <option value="<?php echo esc_attr( $alldriverx1['event_type_id'] ); ?>" title="<?php echo esc_attr( $_opt_title ); ?>" <?php if ( $alldriverx1['event_type_id'] == $alldriver['eve_type'] ) echo 'selected'; ?>><?php echo esc_html( $_opt_label ); ?></option>
-                <?php } ?>
-              </select>
-              <p class="hidder"><?php echo esc_html( $alldriver['event_type_name'] ?? '' ); ?></p>
-            </td>
-            <td><input type="checkbox" class="splchkkr" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" name="eve_zoom[]" <?php if ( ( $alldriver['eve_zoom'] ?? '' ) == 'yes' ) echo 'checked'; ?>></td>
-            <td>
-              <select name="eve_marketer[]" class="evetype" required style="width:100px;">
-                <option value="">Please Choose</option>
-                <?php foreach ( $all_pending_toterx as $alldriverx2 ) { ?>
-                  <option value="<?php echo esc_attr( $alldriverx2['event_marketer_id'] ); ?>" <?php if ( $alldriver['eve_marketer'] == $alldriverx2['event_marketer_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx2['event_marketer_name'] ); ?></option>
-                <?php } ?>
-                <?php if ( $alldriver['eve_marketer'] && ! in_array( (string) $alldriver['eve_marketer'], $_active_mktr_ids ) && ! empty( $alldriver['event_marketer_name'] ) ) { ?>
-                  <option value="<?php echo esc_attr( $alldriver['eve_marketer'] ); ?>" selected style="color:#999;font-style:italic;"><?php echo esc_html( $alldriver['event_marketer_name'] ); ?> (archived)</option>
-                <?php } ?>
-              </select>
-              <p class="hidder"><?php echo esc_html( $alldriver['event_marketer_name'] ?? '' ); ?></p>
-            </td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>" name="eve_host_url[]" style="width:98px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>" name="eve_roster_url[]" style="width:98px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>" name="eve_trainer_url[]" style="width:98px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_web_url'] ?? '' ); ?>" name="eve_web_url[]" style="width:98px;"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_email_url'] ?? '' ); ?>" name="eve_email_url[]" style="width:98px;" placeholder="https://"></td>
-            <td><input type="text" value="<?php echo esc_attr( $alldriver['eve_zoom_time'] ?? '' ); ?>" name="eve_zoom_time[]" placeholder="e.g. 9:30-4:30 EST" style="width:110px;"></td>
-            <td style="text-align:center;"><input type="checkbox" name="eve_public_hide_ids[]" value="<?php echo esc_attr( $alldriver['eve_id'] ); ?>" <?php checked( 1, intval( $alldriver['eve_public_hide'] ?? 0 ) ); ?>></td>
-            <td>
-              <select name="eve_instructor[]" class="evetype" required style="width:80px;">
-                <option value="">Please Choose</option>
-                <?php foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
-                  <option value="<?php echo esc_attr( $alldriverx3['event_instructor_id'] ); ?>" <?php if ( $alldriver['eve_instructor'] == $alldriverx3['event_instructor_id'] ) echo 'selected'; ?>><?php echo esc_html( $alldriverx3['event_instructor_name'] ); ?></option>
-                <?php } ?>
-                <?php if ( $alldriver['eve_instructor'] && ! in_array( (string) $alldriver['eve_instructor'], $_active_inst_ids ) && ! empty( $alldriver['event_instructor_name'] ) ) { ?>
-                  <option value="<?php echo esc_attr( $alldriver['eve_instructor'] ); ?>" selected style="color:#999;font-style:italic;"><?php echo esc_html( $alldriver['event_instructor_name'] ); ?> (archived)</option>
-                <?php } ?>
-              </select>
-              <p class="hidder"><?php echo esc_html( $alldriver['event_instructor_name'] ?? '' ); ?></p>
-            </td>
-            <td style="text-align:center;font-size:12px;" title="Projected total registrations at event date"><?php
-              $_stat      = $_hl_avg_regs[ (int) $alldriver['eve_id'] ] ?? null;
-              $_eve_start = ! empty( $alldriver['eve_start'] ) ? strtotime( $alldriver['eve_start'] ) : 0;
-              if ( $_stat !== null && $_eve_start > 0 ) {
-                  $_days_left = max( 0, (int) floor( ( $_eve_start - time() ) / DAY_IN_SECONDS ) );
-                  $_projected = (int) round( $_stat['latest_total'] + $_stat['avg'] * $_days_left );
-                  $_tip       = 'Now: ' . $_stat['latest_total'] . ' + (' . number_format( $_stat['avg'], 2 ) . '/day × ' . $_days_left . ' days)';
-                  echo '<span title="' . esc_attr( $_tip ) . '" style="font-weight:600;color:' . ( $_days_left > 0 ? '#0a6b00' : '#555' ) . ';">' . esc_html( $_projected ) . '</span>';
-              } else {
-                  echo '<span style="color:#bbb;">—</span>';
-              }
-            ?></td>
-          </tr>
-                  <?php
-              }
-          } else { ?>
-          <tr><td colspan="13"><h3>Sorry! Nothing Found</h3></td></tr>
-          <?php } ?>
-        </tbody>
-      </table>
-    </form>
-  </div>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin.php?page=booking-menu&syear=' . rawurlencode( $syear ) ) ); ?>" id="posts-filter">
+			<?php wp_nonce_field( 'hostlinks_manage_events' ); ?>
+			<input type="hidden" value="list" name="mode">
+
+			<div class="hl-events-toolbar">
+				<div class="hl-events-filters">
+					<label class="hl-filter-label">Year
+						<select id="hl-chooseyear">
+							<?php
+							$year_start = 2022;
+							$year_end   = $currentYear + 1;
+							for ( $yr = $year_end; $yr >= $year_start; $yr-- ) {
+								echo '<option value="' . (int) $yr . '"' . selected( $yr, $filterYear, false ) . '>' . (int) $yr . '</option>';
+							}
+							?>
+						</select>
+					</label>
+					<label class="hl-filter-label">Month
+						<select id="hl-choosemonth">
+							<option value="all" <?php selected( $allMonths ); ?>>All months</option>
+							<?php
+							for ( $m = 1; $m <= 12; $m++ ) {
+								$mv = str_pad( (string) $m, 2, '0', STR_PAD_LEFT );
+								echo '<option value="' . esc_attr( $mv ) . '"' . selected( $m, $filterMonth, false ) . '>' . esc_html( $month_names[ $m ] ) . '</option>';
+							}
+							?>
+						</select>
+					</label>
+					<div class="hl-events-bulk">
+						<select id="bulk-action-selector-top" name="actiondelete">
+							<option value="uppydate">Update</option>
+							<option value="delete">Delete</option>
+						</select>
+						<input type="submit" value="Apply" class="button action" id="doaction" name="deleteentire">
+					</div>
+				</div>
+				<input type="search" id="hl-events-search" class="hl-events-search" placeholder="Search events…" autocomplete="off">
+			</div>
+
+			<div class="hl-events-table-wrap">
+			<table class="hl-events-table" id="hl-events-table">
+				<thead>
+					<tr>
+						<th class="hl-col-check"><input type="checkbox" id="cb-select-all-1"></th>
+						<th class="hl-col-location">Location</th>
+						<th class="hl-col-date">Date</th>
+						<th class="hl-col-type">Type</th>
+						<th class="hl-col-num">Paid</th>
+						<th class="hl-col-num">Free</th>
+						<th class="hl-col-zoom">Zoom</th>
+						<th class="hl-col-marketer">Marketer</th>
+						<th class="hl-col-instructor">Instructor</th>
+						<th class="hl-col-hide" title="Hide from the public event list">Hide</th>
+						<th class="hl-col-proj" title="Projected total registrations at event date, based on avg daily pace since first CVENT sync">Proj. Total</th>
+						<th class="hl-col-links">Links</th>
+						<th class="hl-col-actions">Actions</th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php
+				if ( $tot1 > 0 ) {
+					foreach ( $all_pending_bookings as $alldriver ) {
+						$eve_id    = (int) $alldriver['eve_id'];
+						$_tmeta    = $_type_meta[ (int) $alldriver['eve_type'] ] ?? array();
+						$_tcolor   = $_tmeta['event_type_color'] ?? '';
+						$_start_ts = ! empty( $alldriver['eve_start'] ) ? strtotime( $alldriver['eve_start'] ) : false;
+						$_end_ts   = ! empty( $alldriver['eve_end'] ) ? strtotime( $alldriver['eve_end'] ) : false;
+						$_compact  = '';
+						if ( $_start_ts ) {
+							$_compact = date( 'm/d', $_start_ts );
+							if ( $_end_ts && $_end_ts !== $_start_ts ) {
+								$_compact .= '-' . date( 'm/d', $_end_ts );
+							}
+						}
+						$_stat      = $_hl_avg_regs[ $eve_id ] ?? null;
+						$_eve_start = ! empty( $alldriver['eve_start'] ) ? strtotime( $alldriver['eve_start'] ) : 0;
+						$_proj      = null;
+						$_proj_tip  = '';
+						$_days_left = 0;
+						if ( $_stat !== null && $_eve_start > 0 ) {
+							$_days_left = max( 0, (int) floor( ( $_eve_start - time() ) / DAY_IN_SECONDS ) );
+							$_proj      = (int) round( $_stat['latest_total'] + $_stat['avg'] * $_days_left );
+							$_proj_tip  = 'Now: ' . $_stat['latest_total'] . ' + (' . number_format( $_stat['avg'], 2 ) . '/day × ' . $_days_left . ' days)';
+						}
+						$edit_url = admin_url( 'admin.php?page=booking-menu&edit_event=' . $eve_id );
+						$copy_url = admin_url( 'admin.php?page=booking-menu&copy_event=' . $eve_id );
+						?>
+					<tr id="user-<?php echo esc_attr( (string) $eve_id ); ?>" data-eve-id="<?php echo esc_attr( (string) $eve_id ); ?>">
+						<th class="hl-col-check">
+							<input type="checkbox" value="<?php echo esc_attr( (string) $eve_id ); ?>" class="administrator splchkkr" name="users[]">
+						</th>
+						<td class="hl-col-location" data-order="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>">
+							<p class="hidder"><?php echo esc_html( $alldriver['eve_location'] ?? '' ); ?></p>
+							<input type="hidden" name="originalid[]" value="<?php echo esc_attr( (string) $eve_id ); ?>">
+							<input type="hidden" class="hl-fld-host" name="eve_host_url[]" value="<?php echo esc_attr( $alldriver['eve_host_url'] ?? '' ); ?>">
+							<input type="hidden" class="hl-fld-roster" name="eve_roster_url[]" value="<?php echo esc_attr( $alldriver['eve_roster_url'] ?? '' ); ?>">
+							<input type="hidden" class="hl-fld-reg" name="eve_trainer_url[]" value="<?php echo esc_attr( $alldriver['eve_trainer_url'] ?? '' ); ?>">
+							<input type="hidden" class="hl-fld-web" name="eve_web_url[]" value="<?php echo esc_attr( $alldriver['eve_web_url'] ?? '' ); ?>">
+							<input type="hidden" class="hl-fld-email" name="eve_email_url[]" value="<?php echo esc_attr( $alldriver['eve_email_url'] ?? '' ); ?>">
+							<input type="hidden" class="hl-fld-zoom-time" name="eve_zoom_time[]" value="<?php echo esc_attr( $alldriver['eve_zoom_time'] ?? '' ); ?>">
+							<input type="text" class="hl-cell-input hl-loc-input" value="<?php echo esc_attr( $alldriver['eve_location'] ?? '' ); ?>" name="eve_location[]" required autocomplete="off">
+						</td>
+						<td class="hl-col-date" data-order="<?php echo esc_attr( $alldriver['eve_start'] ?? '' ); ?>">
+							<p class="hidder"><?php echo esc_html( $alldriver['eve_start'] ?? '' ); ?></p>
+							<span class="hl-date-wrap">
+								<span class="hl-compact-date" title="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>"><?php echo esc_html( $_compact !== '' ? $_compact : '—' ); ?></span>
+								<input type="text" name="evedate[]" class="sentinal inputfilder eventenddertot hl-date-hidden" id="eventenddertot<?php echo esc_attr( (string) $eve_id ); ?>" value="<?php echo esc_attr( $alldriver['eve_tot_date'] ?? '' ); ?>" required autocomplete="off">
+							</span>
+						</td>
+						<td class="hl-col-type">
+							<p class="hidder"><?php echo esc_html( $alldriver['event_type_name'] ?? '' ); ?></p>
+							<div class="hl-type-badge" data-color="<?php echo esc_attr( $_tcolor ); ?>">
+								<select name="eve_type[]" class="evetype hl-type-select" required>
+									<option value="">—</option>
+									<?php foreach ( $all_pending_toter as $alldriverx1 ) {
+										$_opt_abbr  = $alldriverx1['event_type_abbr'] ?? '';
+										$_opt_label = $_opt_abbr !== '' ? $_opt_abbr : $alldriverx1['event_type_name'];
+										$_opt_title = $alldriverx1['event_type_name'];
+										$_opt_color = $alldriverx1['event_type_color'] ?? '';
+										?>
+									<option value="<?php echo esc_attr( $alldriverx1['event_type_id'] ); ?>"
+										data-color="<?php echo esc_attr( $_opt_color ); ?>"
+										title="<?php echo esc_attr( $_opt_title ); ?>"
+										<?php selected( $alldriverx1['event_type_id'], $alldriver['eve_type'] ); ?>><?php echo esc_html( $_opt_label ); ?></option>
+									<?php } ?>
+								</select>
+							</div>
+						</td>
+						<td class="hl-col-num" data-order="<?php echo esc_attr( (string) (int) ( $alldriver['eve_paid'] ?? 0 ) ); ?>">
+							<p class="hidder"><?php echo esc_html( $alldriver['eve_paid'] ?? '' ); ?></p>
+							<input type="number" class="hl-cell-input hl-num-input" value="<?php echo esc_attr( $alldriver['eve_paid'] ?? '' ); ?>" name="eve_paid[]" required min="0">
+						</td>
+						<td class="hl-col-num" data-order="<?php echo esc_attr( (string) (int) ( $alldriver['eve_free'] ?? 0 ) ); ?>">
+							<p class="hidder"><?php echo esc_html( $alldriver['eve_free'] ?? '' ); ?></p>
+							<input type="number" class="hl-cell-input hl-num-input" value="<?php echo esc_attr( $alldriver['eve_free'] ?? '' ); ?>" name="eve_free[]" required min="0">
+						</td>
+						<td class="hl-col-zoom">
+							<input type="checkbox" class="splchkkr" value="<?php echo esc_attr( (string) $eve_id ); ?>" name="eve_zoom[]" <?php checked( $alldriver['eve_zoom'] ?? '', 'yes' ); ?> title="Virtual / Zoom event">
+						</td>
+						<td class="hl-col-marketer">
+							<p class="hidder"><?php echo esc_html( $alldriver['event_marketer_name'] ?? '' ); ?></p>
+							<select name="eve_marketer[]" class="evetype hl-cell-select" required>
+								<option value="">Please Choose</option>
+								<?php foreach ( $all_pending_toterx as $alldriverx2 ) { ?>
+								<option value="<?php echo esc_attr( $alldriverx2['event_marketer_id'] ); ?>" <?php selected( $alldriver['eve_marketer'], $alldriverx2['event_marketer_id'] ); ?>><?php echo esc_html( $alldriverx2['event_marketer_name'] ); ?></option>
+								<?php } ?>
+								<?php if ( $alldriver['eve_marketer'] && ! in_array( (string) $alldriver['eve_marketer'], $_active_mktr_ids ) && ! empty( $alldriver['event_marketer_name'] ) ) { ?>
+								<option value="<?php echo esc_attr( $alldriver['eve_marketer'] ); ?>" selected style="color:#999;font-style:italic;"><?php echo esc_html( $alldriver['event_marketer_name'] ); ?> (archived)</option>
+								<?php } ?>
+							</select>
+						</td>
+						<td class="hl-col-instructor">
+							<p class="hidder"><?php echo esc_html( $alldriver['event_instructor_name'] ?? '' ); ?></p>
+							<select name="eve_instructor[]" class="evetype hl-cell-select" required>
+								<option value="">Please Choose</option>
+								<?php foreach ( $all_pending_toterxx as $alldriverx3 ) { ?>
+								<option value="<?php echo esc_attr( $alldriverx3['event_instructor_id'] ); ?>" <?php selected( $alldriver['eve_instructor'], $alldriverx3['event_instructor_id'] ); ?>><?php echo esc_html( $alldriverx3['event_instructor_name'] ); ?></option>
+								<?php } ?>
+								<?php if ( $alldriver['eve_instructor'] && ! in_array( (string) $alldriver['eve_instructor'], $_active_inst_ids ) && ! empty( $alldriver['event_instructor_name'] ) ) { ?>
+								<option value="<?php echo esc_attr( $alldriver['eve_instructor'] ); ?>" selected style="color:#999;font-style:italic;"><?php echo esc_html( $alldriver['event_instructor_name'] ); ?> (archived)</option>
+								<?php } ?>
+							</select>
+						</td>
+						<td class="hl-col-hide">
+							<input type="checkbox" name="eve_public_hide_ids[]" value="<?php echo esc_attr( (string) $eve_id ); ?>" <?php checked( 1, intval( $alldriver['eve_public_hide'] ?? 0 ) ); ?> title="Hide from public event list">
+						</td>
+						<td class="hl-col-proj" data-order="<?php echo esc_attr( (string) ( $_proj !== null ? $_proj : -1 ) ); ?>">
+							<?php if ( $_proj !== null ) : ?>
+							<span class="hl-proj-num<?php echo $_days_left > 0 ? ' is-live' : ''; ?>" title="<?php echo esc_attr( $_proj_tip ); ?>"><?php echo esc_html( (string) $_proj ); ?></span>
+							<?php else : ?>
+							<span class="hl-proj-empty">—</span>
+							<?php endif; ?>
+						</td>
+						<td class="hl-col-links">
+							<button type="button" class="button hl-links-btn">Links</button>
+						</td>
+						<td class="hl-col-actions">
+							<a href="<?php echo esc_url( $edit_url ); ?>" class="hl-icon-btn" title="Edit event" aria-label="Edit event #<?php echo (int) $eve_id; ?>">
+								<span class="dashicons dashicons-edit" aria-hidden="true"></span>
+							</a>
+							<div class="hl-row-menu">
+								<button type="button" class="hl-icon-btn hl-menu-toggle" title="More actions" aria-haspopup="true" aria-expanded="false">
+									<span class="dashicons dashicons-ellipsis" aria-hidden="true"></span>
+								</button>
+								<div class="hl-row-menu-panel" hidden>
+									<a href="<?php echo esc_url( $copy_url ); ?>" class="hl-row-menu-item">
+										<span class="dashicons dashicons-admin-page" aria-hidden="true"></span>
+										Copy event
+									</a>
+								</div>
+							</div>
+						</td>
+					</tr>
+						<?php
+					}
+				}
+				?>
+				</tbody>
+			</table>
+			</div>
+		</form>
+	</div>
 </div>
 
-<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/jszip-2.5.0/dt-1.12.1/af-2.4.0/b-2.2.3/b-colvis-2.2.3/b-html5-2.2.3/b-print-2.2.3/cr-1.5.6/date-1.1.2/fc-4.1.0/fh-3.2.4/kt-2.7.0/r-2.3.0/rg-1.2.0/rr-1.2.8/sc-2.0.7/sb-1.3.4/sp-2.0.2/sl-1.4.0/sr-1.1.1/datatables.min.css"/>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
-<script type="text/javascript" src="https://cdn.datatables.net/v/dt/jszip-2.5.0/dt-1.12.1/af-2.4.0/b-2.2.3/b-colvis-2.2.3/b-html5-2.2.3/b-print-2.2.3/cr-1.5.6/date-1.1.2/fc-4.1.0/fh-3.2.4/kt-2.7.0/r-2.3.0/rg-1.2.0/rr-1.2.8/sc-2.0.7/sb-1.3.4/sp-2.0.2/sl-1.4.0/sr-1.1.1/datatables.min.js"></script>
-<script type="text/javascript">
-jQuery(function() {
-  // Format a moment-ish date-string to "MM/DD" for the compact display.
-  function _hlCompactMD(d) {
-    if (!d || typeof d.format !== 'function') return '';
-    return d.format('MM/DD');
-  }
-  function _hlRefreshCompact($input) {
-    var $row  = $input.closest('tr');
-    var $span = $row.find('span.hl-compact-date');
-    if (!$span.length) return;
-    var dp = $input.data('daterangepicker');
-    if (!dp) return;
-    var s = dp.startDate, e = dp.endDate;
-    var out = _hlCompactMD(s);
-    if (e && e.format('YYYY-MM-DD') !== s.format('YYYY-MM-DD')) {
-      out += '-' + _hlCompactMD(e);
-    }
-    $span.text(out || '—').attr('title', s.format('YYYY/MM/DD') + ' - ' + e.format('YYYY/MM/DD'));
-    // Keep the real hidden input's value in the picker's output format so
-    // the POST handler still parses it via preg_split('/ - /', ...).
-    $input.val( s.format('YYYY/MM/DD') + ' - ' + e.format('YYYY/MM/DD') );
-  }
-
-  jQuery('.eventenddertot').each(function() {
-    var $el  = jQuery(this);
-    var val  = $el.val();
-    var opts = { timePicker: false, locale: { format: 'YYYY/MM/DD' } };
-    var p    = val ? val.split(' - ') : [];
-    if ( p.length === 2 && p[0].trim() && p[1].trim() ) {
-      opts.startDate = p[0].trim();
-      opts.endDate   = p[1].trim();
-    }
-    $el.daterangepicker(opts);
-    $el.on('apply.daterangepicker', function() { _hlRefreshCompact( jQuery(this) ); });
-  });
-
-  // Clicking the compact span opens the associated picker.
-  jQuery(document).on('click', 'span.hl-compact-date', function() {
-    var $input = jQuery(this).siblings('input.eventenddertot');
-    var dp     = $input.data('daterangepicker');
-    if (dp) { dp.show(); }
-  });
-});
-</script>
-<script type="text/javascript">
-jQuery(document).ready(function(){
-  jQuery('#myTable').dataTable({
-    "aoColumns": [null,null,null,null,null,{"sType":"date-uk"},null,null,null,null,null,null,null,null,null,null,null,null],
-    "order": [[5,"asc"]],
-    "bPaginate": true, "bLengthChange": true, "bFilter": true, "bSort": true,
-    "bInfo": true, "bAutoWidth": true, "stateSave": true, "searching": true,
-    "dom": 'lfrtip', "pageLength": 25, "lengthChange": true,
-    "columnDefs": [{"targets":[0,1,3,4,6,7,8,9,10,11,12,13,14,15,16,17],"orderable":false}],
-    // Keep sort/pagination state persisted across loads, but always start
-    // with an empty search box. Clears both the saved value and any
-    // per-column search state before DataTables applies it on init.
-    "stateLoadParams": function(settings, data) {
-      if (data && data.search) { data.search.search = ""; }
-      if (data && Array.isArray(data.columns)) {
-        for (var i = 0; i < data.columns.length; i++) {
-          if (data.columns[i] && data.columns[i].search) {
-            data.columns[i].search.search = "";
-          }
-        }
-      }
-    }
-  });
-  jQuery.extend(jQuery.fn.dataTableExt.oSort, {
-    "date-uk-pre": function(a) { var d=a.split('/'); return (d[2]+d[1]+d[0])*1; },
-    "date-uk-asc":  function(a,b) { return ((a<b)?-1:((a>b)?1:0)); },
-    "date-uk-desc": function(a,b) { return ((a<b)?1:((a>b)?-1:0)); }
-  });
-});
-</script>
-<style type="text/css">
-.hidder{display:none;}
-.splchkkr,.administrator,#cb-select-all-1{width:17px!important;height:17px!important;}
-th.manage-column{padding-bottom:0px!important;padding-top:10px!important;vertical-align:middle!important;}
-.updpocode,.anewpostcode{background-color:#e0e0e0;padding:20px;width:49%;}
-.TFtable tr:nth-child(odd){background:#f9f9f9;}
-.TFtable tr:nth-child(even){background:#ededed;}
-
-/* Event list: tighter than WP forms.css (0 12px) so narrow URL/location columns show more text. */
-#myTable input[type=date],
-#myTable input[type=datetime-local],
-#myTable input[type=datetime],
-#myTable input[type=email],
-#myTable input[type=month],
-#myTable input[type=number],
-#myTable input[type=password],
-#myTable input[type=search],
-#myTable input[type=tel],
-#myTable input[type=text],
-#myTable input[type=time],
-#myTable input[type=url],
-#myTable input[type=week] {
-	padding: 0 6px;
-	min-height: 40px;
-}
-
-/* Event list: compact date column.
-   The wrap is a positioned inline box. The compact span sits on top as the
-   visible label. The real daterangepicker-bound input is overlaid at the same
-   spot with opacity:0 so the popup still anchors correctly to the input's
-   on-screen rect, but it's invisible and pointer-events pass through to the
-   span underneath (so the span click handler fires). */
-.hl-date-wrap{position:relative;display:inline-block;}
-.hl-date-hidden{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;pointer-events:none;border:0;padding:0;margin:0;}
-.hl-compact-date{cursor:pointer;display:inline-block;padding:3px 6px;border:1px dashed #bbb;border-radius:3px;font-family:monospace;font-size:12px;white-space:nowrap;background:#fff;}
-.hl-compact-date:hover{background:#eef5fb;border-color:#72aee6;}
-
-/* Event list: narrower Type dropdown when abbreviations are used. */
-select.hl-type-compact{width:64px;padding-left:4px;padding-right:18px;}
-
-/* Event list: Edit icon column — centered square icon-button using the
-   native WordPress dashicons. Flex centering guarantees vertical alignment
-   with the row's form-control content regardless of row height. */
-.hl-edit-cell{text-align:center;vertical-align:middle;padding:4px 4px;width:60px;white-space:nowrap;}
-.hl-edit-icon{
-	display:inline-flex;
-	align-items:center;
-	justify-content:center;
-	width:26px;
-	height:26px;
-	border-radius:4px;
-	color:#2271b1;
-	background:transparent;
-	text-decoration:none;
-	transition:background-color .15s ease, color .15s ease, box-shadow .15s ease;
-	box-sizing:border-box;
-	vertical-align:middle;
-}
-.hl-edit-icon:hover, .hl-edit-icon:focus{
-	background:#2271b1;
-	color:#fff;
-	box-shadow:0 0 0 1px #135e96;
-	outline:none;
-}
-.hl-edit-icon .dashicons{
-	font-size:16px;
-	width:16px;
-	height:16px;
-	line-height:1;
-}
-</style>
+<div id="hl-links-modal" class="hl-links-modal" hidden>
+	<div class="hl-links-modal__backdrop" data-hl-links-close></div>
+	<div class="hl-links-modal__panel" role="dialog" aria-modal="true" aria-labelledby="hl-links-title">
+		<div class="hl-links-modal__header">
+			<h2 id="hl-links-title" class="hl-links-modal__title">Links</h2>
+			<button type="button" class="hl-links-modal__close" data-hl-links-close aria-label="Close">&times;</button>
+		</div>
+		<div class="hl-links-modal__body">
+			<input type="hidden" id="hl-links-eve-id" value="">
+			<div class="hl-links-row">
+				<label for="hl-links-host">Host URL</label>
+				<div class="hl-links-field">
+					<input type="url" id="hl-links-host" class="hl-links-input" placeholder="https://">
+					<button type="button" class="button hl-links-open" data-for="hl-links-host">Open</button>
+					<button type="button" class="button hl-links-copy" data-for="hl-links-host">Copy</button>
+				</div>
+			</div>
+			<div class="hl-links-row">
+				<label for="hl-links-roster">Roster URL</label>
+				<div class="hl-links-field">
+					<input type="url" id="hl-links-roster" class="hl-links-input" placeholder="https://">
+					<button type="button" class="button hl-links-open" data-for="hl-links-roster">Open</button>
+					<button type="button" class="button hl-links-copy" data-for="hl-links-roster">Copy</button>
+				</div>
+			</div>
+			<div class="hl-links-row">
+				<label for="hl-links-reg">REG URL</label>
+				<div class="hl-links-field">
+					<input type="url" id="hl-links-reg" class="hl-links-input" placeholder="https://">
+					<button type="button" class="button hl-links-open" data-for="hl-links-reg">Open</button>
+					<button type="button" class="button hl-links-copy" data-for="hl-links-reg">Copy</button>
+				</div>
+			</div>
+			<div class="hl-links-row">
+				<label for="hl-links-web">Web / Sign-in URL</label>
+				<div class="hl-links-field">
+					<input type="url" id="hl-links-web" class="hl-links-input" placeholder="https://">
+					<button type="button" class="button hl-links-open" data-for="hl-links-web">Open</button>
+					<button type="button" class="button hl-links-copy" data-for="hl-links-web">Copy</button>
+				</div>
+			</div>
+			<div class="hl-links-row">
+				<label for="hl-links-email">Email URL</label>
+				<div class="hl-links-field">
+					<input type="url" id="hl-links-email" class="hl-links-input" placeholder="https://">
+					<button type="button" class="button hl-links-open" data-for="hl-links-email">Open</button>
+					<button type="button" class="button hl-links-copy" data-for="hl-links-email">Copy</button>
+				</div>
+			</div>
+			<div class="hl-links-row">
+				<label for="hl-links-zoom-time">Zoom Time</label>
+				<div class="hl-links-field">
+					<input type="text" id="hl-links-zoom-time" class="hl-links-input" placeholder="e.g. 9:30–4:30 EST">
+				</div>
+			</div>
+		</div>
+		<div class="hl-links-modal__footer">
+			<p class="hl-links-status" id="hl-links-status" hidden></p>
+			<button type="button" class="button" data-hl-links-close>Cancel</button>
+			<button type="button" class="button button-primary" id="hl-links-save">Save</button>
+		</div>
+	</div>
+</div>

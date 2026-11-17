@@ -128,30 +128,72 @@ class Hostlinks_Assets {
 			'events_page_hostlinks-import-export',
 		);
 
-		if ( ! in_array( $hook, $hostlinks_pages, true ) ) {
-			return;
+		if ( in_array( $hook, $hostlinks_pages, true ) ) {
+			wp_enqueue_style(
+				'hostlinks-daterangepicker',
+				HOSTLINKS_PLUGIN_URL . 'assets/css/daterangepicker.css',
+				array(),
+				HOSTLINKS_VERSION
+			);
+			wp_enqueue_script(
+				'hostlinks-moment',
+				'https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.1/moment.min.js',
+				array( 'jquery' ),
+				'2.22.1',
+				true
+			);
+			wp_enqueue_script(
+				'hostlinks-daterangepicker',
+				HOSTLINKS_PLUGIN_URL . 'assets/js/daterangepicker.js',
+				array( 'jquery', 'hostlinks-moment' ),
+				HOSTLINKS_VERSION,
+				true
+			);
 		}
 
-		wp_enqueue_style(
-			'hostlinks-daterangepicker',
-			HOSTLINKS_PLUGIN_URL . 'assets/css/daterangepicker.css',
-			array(),
-			HOSTLINKS_VERSION
-		);
-		wp_enqueue_script(
-			'hostlinks-moment',
-			'https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.1/moment.min.js',
-			array( 'jquery' ),
-			'2.22.1',
-			true
-		);
-		wp_enqueue_script(
-			'hostlinks-daterangepicker',
-			HOSTLINKS_PLUGIN_URL . 'assets/js/daterangepicker.js',
-			array( 'jquery', 'hostlinks-moment' ),
-			HOSTLINKS_VERSION,
-			true
-		);
+		$is_events_list = ( sanitize_key( $_GET['page'] ?? '' ) === 'booking-menu' )
+			&& empty( $_GET['edit_event'] )
+			&& empty( $_GET['add_event'] )
+			&& empty( $_GET['add_cvent'] )
+			&& empty( $_GET['add_request'] )
+			&& empty( $_GET['copy_event'] );
+
+		if ( $is_events_list ) {
+			wp_enqueue_style(
+				'hostlinks-datatables',
+				'https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css',
+				array(),
+				'1.13.8'
+			);
+			wp_enqueue_style(
+				'hostlinks-events',
+				HOSTLINKS_PLUGIN_URL . 'assets/css/hostlinks-events.css',
+				array( 'hostlinks-admin', 'hostlinks-datatables' ),
+				HOSTLINKS_VERSION
+			);
+			wp_enqueue_script(
+				'hostlinks-datatables',
+				'https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js',
+				array( 'jquery' ),
+				'1.13.8',
+				true
+			);
+			wp_enqueue_script(
+				'hostlinks-events',
+				HOSTLINKS_PLUGIN_URL . 'assets/js/hostlinks-events.js',
+				array( 'jquery', 'hostlinks-daterangepicker', 'hostlinks-datatables' ),
+				HOSTLINKS_VERSION,
+				true
+			);
+			wp_localize_script(
+				'hostlinks-events',
+				'hlEvents',
+				array(
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'hostlinks_event_links' ),
+				)
+			);
+		}
 	}
 
 	/**

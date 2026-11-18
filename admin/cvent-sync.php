@@ -348,6 +348,9 @@ function hl_cvent_status_key(): void {
 		</div>
 	<?php endif; ?>
 
+	<div class="hl-cvent-sync-top">
+	<div class="hl-cvent-sync-top__main">
+
 	<!-- Daily API call counter -->
 	<?php
 	$calls_today = Hostlinks_CVENT_API::get_call_count_today();
@@ -420,6 +423,9 @@ function hl_cvent_status_key(): void {
 			<?php endif; ?>
 		</a>
 	</nav>
+	</div><!-- .hl-cvent-sync-top__main -->
+	<?php hl_cvent_status_key(); ?>
+	</div><!-- .hl-cvent-sync-top -->
 
 	<?php if ( $cvent_view === 'log' ) : ?>
 		<?php
@@ -992,8 +998,6 @@ function hl_cvent_status_key(): void {
 			<?php endif; ?>
 		</span>
 	</form>
-
-	<?php hl_cvent_status_key(); ?>
 
 	<!-- Events table -->
 	<table class="widefat striped" id="cvent-events-table">

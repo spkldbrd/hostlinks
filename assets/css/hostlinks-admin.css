@@ -21,17 +21,28 @@
 	border-radius: 8px;
 }
 
+.hl-cvent-sync-top {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+	gap: 16px;
+	align-items: start;
+	margin-bottom: 8px;
+}
+
+.hl-cvent-sync-top__main {
+	min-width: 0;
+}
+
 .hl-cvent-status-key {
 	background: #fff;
 	border: 1px solid #ddd;
 	border-radius: 8px;
-	padding: 12px 16px;
-	margin: 0 0 16px;
-	max-width: 920px;
+	padding: 10px 12px;
+	margin: 0;
 }
 
 .hl-cvent-status-key h2 {
-	margin: 0 0 10px;
+	margin: 0 0 8px;
 	font-size: 13px;
 	font-weight: 600;
 }
@@ -39,19 +50,13 @@
 .hl-cvent-status-key dl {
 	margin: 0;
 	display: grid;
-	gap: 8px 20px;
-}
-
-@media (min-width: 800px) {
-	.hl-cvent-status-key dl {
-		grid-template-columns: 1fr 1fr;
-	}
+	gap: 6px;
 }
 
 .hl-cvent-status-key__row {
 	display: grid;
-	grid-template-columns: 130px minmax(0, 1fr);
-	gap: 8px;
+	grid-template-columns: 118px minmax(0, 1fr);
+	gap: 6px 8px;
 	align-items: start;
 }
 
@@ -63,16 +68,23 @@
 .hl-cvent-status-key dd {
 	color: #3c434a;
 	font-size: 12px;
-	line-height: 1.4;
+	line-height: 1.35;
 }
 
 .hl-cvent-status-key__note {
-	margin: 10px 0 0;
+	margin: 8px 0 0;
 	color: #555;
 	font-size: 12px;
+	line-height: 1.35;
 }
 
 .hl-cvent-private-flag {
 	color: #996800;
 	font-weight: 600;
+}
+
+@media (max-width: 1100px) {
+	.hl-cvent-sync-top {
+		grid-template-columns: 1fr;
+	}
 }

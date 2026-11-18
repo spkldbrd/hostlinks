@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.64 — 2026-11-17
+
+### CVENT Sync header
+- Status key sits in the top-right column beside API calls, Dry Run, and the Events / Sync Log tabs.
+
+---
+
 ## v2.11.63 — 2026-11-17
 
 ### CVENT Sync status key

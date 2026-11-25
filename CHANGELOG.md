@@ -2,6 +2,13 @@
 
 ---
 
+## v2.11.65 — 2026-11-24
+
+### EmailCraft ingest window 360 → 730 days
+- Upcoming-events snapshot pushed to EmailCraft now includes the next **730** days of public classes (was 360). Cap raised from 500 to 1000 events.
+
+---
+
 ## v2.11.64 — 2026-11-17
 
 ### CVENT Sync header

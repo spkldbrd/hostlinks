@@ -17,8 +17,8 @@ class Hostlinks_EmailCraft_Push {
 	const HOOK_PUSH       = 'hostlinks_emailcraft_push';
 	const HOOK_HOURLY     = 'hostlinks_emailcraft_push_hourly';
 	const DEFAULT_URL     = 'https://emailcraft.grantwritingusa.com/api/events/hostlinks-ingest';
-	const DAYS            = 360;
-	const MAX_EVENTS      = 500;
+	const DAYS            = 730;
+	const MAX_EVENTS      = 1000;
 	const MIN_INTERVAL    = 20;
 
 	private static $scheduled_this_request = false;
